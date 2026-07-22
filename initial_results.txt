@@ -1,0 +1,35 @@
+# clin-genomic-analysis-benchmark — initial scorecards
+
+Aggregate results across 6 cohorts / 211 scored questions (820.0 total points).
+
+## claude_opus_4_8_vertex
+- **Run id**: `20260710T180900Z-fcbedf`
+- **Total points**: 589.5 / 820.0 (71.9%)
+- **Classification accuracy**: 81.5%
+- **Mean concept recall (disambiguation)**: 56.8%
+- **Mean analysis score (0–1)**: 0.926
+- **Items needing manual review**: 13
+
+## antigravity_gemini_3.5_flash
+- **Run id**: `20260708T164646Z-e1442c`
+- **Total points**: 570.5 / 820.0 (69.6%)
+- **Classification accuracy**: 82.5%
+- **Mean concept recall (disambiguation)**: 49.6%
+- **Mean analysis score (0–1)**: 0.976
+- **Items needing manual review**: 15
+
+## codex_gpt_5.4
+- **Run id**: `20260710T020409Z-b3e6cf`
+- **Total points**: 560.5 / 820.0 (68.4%)
+- **Classification accuracy**: 82.5%
+- **Mean concept recall (disambiguation)**: 53.2%
+- **Mean analysis score (0–1)**: 0.960
+- **Items needing manual review**: 17
+
+## codex_qwen_3.6-35B-A3B_GGUF_Unsloth_q4bitxl
+- **Run id**: `20260707T162817Z-035fb3`
+- **Total points**: 181.0 / 820.0 (22.1%)
+- **Classification accuracy**: 45.0%
+- **Mean concept recall (disambiguation)**: 4.2%
+- **Mean analysis score (0–1)**: 0.826
+- **Items needing manual review**: 2

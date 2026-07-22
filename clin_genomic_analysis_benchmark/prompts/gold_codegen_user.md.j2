@@ -1,0 +1,23 @@
+# Question {{ question.id }}  (cohort: {{ cohort.name }}, category {{ question.category }})
+
+## Question text
+> {{ question.text }}
+
+## Analysis spec
+- Population unit: **{{ question.analysis_spec.population_unit }}**
+- Tables to use: {{ question.analysis_spec.tables | join(", ") }}
+- Filters: {% if question.analysis_spec.filters %}{{ question.analysis_spec.filters | tojson }}{% else %}(none){% endif %}
+- Statistic: {{ question.analysis_spec.statistic }}
+- Expected answer type: **`{{ question.analysis_spec.expected_answer_type }}`**
+{% if question.analysis_spec.notes %}- Additional notes: {{ question.analysis_spec.notes }}{% endif %}
+
+## Cohort file inventory
+{% for cat, names in files_by_category.items() %}{% if names %}
+- **{{ cat }}**: {{ names | join(", ") }}
+{% endif %}{% endfor %}
+
+## Your task
+Write `def analyze(cohort_dir: Path) -> dict:` that returns a dict matching the `{{ question.analysis_spec.expected_answer_type }}` schema.
+
+Files live at `cohort_dir / "<filename>"`.
+Reply with a single fenced ```python``` block — no surrounding prose.

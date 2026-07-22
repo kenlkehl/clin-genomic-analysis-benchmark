@@ -1,0 +1,14 @@
+# Question
+> {{ question_text }}
+
+## Gold-standard disambiguation concepts ({{ gold_concepts | length }})
+{% for c in gold_concepts -%}
+{{ loop.index }}. {{ c }}
+{% endfor %}
+
+## Agent's listed concepts ({{ agent_concepts | length }})
+{% for c in agent_concepts -%}
+- {{ c }}
+{% endfor %}
+
+For each gold concept above (in order), decide whether the agent's list covers it. Reply with VALID JSON only.

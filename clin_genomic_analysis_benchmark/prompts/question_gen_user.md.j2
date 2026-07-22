@@ -1,0 +1,40 @@
+# Cohort: {{ cohort_label }} ({{ cohort_name }})
+
+You are generating questions for **Category {{ category.id }}: {{ category.name }}**.
+
+## Category description
+{{ category.description }}
+
+## Most relevant tables
+{% for t in category.relevant_tables -%}
+- `{{ t }}`
+{% endfor %}
+
+## Typical answer types
+{{ category.typical_answer_types | join(", ") }}
+
+## Common ambiguity sources for this category
+{% for s in category.common_ambiguity_sources -%}
+- {{ s }}
+{% endfor %}
+
+## Category-specific guidance
+{{ category.guidance }}
+
+## Task
+
+Generate **{{ n_to_request }} questions** for this category against the supplied cohort.
+Aim for a roughly {{ ambiguous_target }} : {{ unambiguous_target }} split (ambiguous : unambiguous).
+
+Constraints:
+- Use only column names and filenames that appear in the supplied cohort context.
+- Vary the focus across questions (different genes, different drug classes, different stage strata, different demographics, etc.).
+- Each question must stand alone (do not refer to other questions).
+- Respond with VALID JSON only, matching the schema in the system prompt.
+{% if existing_question_texts %}
+
+## Avoid duplicates with these existing questions for this cohort/category
+{% for t in existing_question_texts -%}
+- {{ t }}
+{% endfor %}
+{% endif %}

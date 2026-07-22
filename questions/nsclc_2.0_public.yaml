@@ -1,0 +1,176 @@
+cohort: nsclc_2.0_public
+generated_at: '2026-07-05T23:05:27.784069Z'
+model: claude-opus-4-8@vertex
+schema_version: '1'
+questions:
+- id: nsclc_2.0_public-Q00fa95f4
+  category: 2
+  text: Among patients with a Stage I-III NSCLC diagnosis, how many developed a distant
+    metastasis after diagnosis? (Include all NSCLC histologic subtypes in the cohort.)
+- id: nsclc_2.0_public-Q566b7369
+  category: 1
+  text: What proportion of patients in the non-small cell lung cancer cohort are female?
+    (Include all key cancer-type subtypes, i.e. all NSCLC histologic subtypes.)
+- id: nsclc_2.0_public-Q75afd228
+  category: 2
+  text: Among non-small cell lung cancers with curated histology, what proportion
+    are classified as adenocarcinoma?
+- id: nsclc_2.0_public-Q9027ef59
+  category: 1
+  text: Among patients with Stage IV NSCLC at diagnosis, what proportion were former
+    smokers at the time of NSCLC diagnosis? (Include all NSCLC histologic subtypes.)
+- id: nsclc_2.0_public-Qbbc2279f
+  category: 1
+  text: What is the median age at non-small cell lung cancer diagnosis? (Include all
+    NSCLC histologic subtypes.)
+- id: nsclc_2.0_public-Qd253aedd
+  category: 3
+  text: In the NSCLC cohort, among patients with at least one cancer panel test on
+    a panel that includes EGFR, what proportion had a tumor with at least one non-synonymous
+    EGFR mutation? (Include all NSCLC histologic subtypes in the cohort.)
+- id: nsclc_2.0_public-Qda260301
+  category: 4
+  text: How many distinct patients in the non-small-cell lung cancer cohort ever received
+    osimertinib in any regimen? Assume any clinical-trial regimen did not contain
+    osimertinib. (Include all NSCLC histologic subtypes.)
+- id: nsclc_2.0_public-Q04488571
+  category: 1
+  text: How many patients in the NSCLC cancer cohort were classified as never having
+    used cigarettes at the time of NSCLC diagnosis?
+- id: nsclc_2.0_public-Q0cef3bbc
+  category: 4
+  text: Among patients with Stage IV NSCLC at diagnosis, what proportion ever received
+    platinum-based chemotherapy without concurrent immunotherapy; assume any clinical-trial
+    regimen did not contain platinum-based chemotherapy or immunotherapy? (Include
+    all NSCLC histologic subtypes that make up the cohort's key cancer type.)
+- id: nsclc_2.0_public-Q15d8058e
+  category: 7
+  text: Among patients with Stage IV NSCLC receiving first-line systemic therapy for
+    the cancer, what is the Cox proportional-hazards hazard ratio (with 95% CI and
+    p-value) for overall survival from regimen start comparing single-agent immune
+    checkpoint inhibitor monotherapy (pembrolizumab, nivolumab, atezolizumab, or durvalumab
+    as the only drug) versus platinum doublet chemotherapy without concurrent immunotherapy,
+    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
+    date), excluding patients whose first-line regimen was a clinical-trial regimen
+    (composition not annotated in BPC)?
+- id: nsclc_2.0_public-Q1ea24f43
+  category: 5
+  text: Among patients with Stage IV NSCLC at diagnosis, what is the median overall
+    survival from diagnosis in months (with 95% CI), with risk-set adjustment for
+    delayed cohort entry (left-truncating at NGS testing date)?
+- id: nsclc_2.0_public-Q1f9df13e
+  category: 6
+  text: Among patients with Stage IV NSCLC at diagnosis, what is the hazard ratio
+    (with 95% CI) for overall survival from onset of advanced disease comparing patients
+    with any non-synonymous TP53 mutation versus TP53-wildtype, restricting to patients
+    whose tumors were sequenced on a panel that includes TP53, with risk-set adjustment
+    for delayed cohort entry (left-truncating at NGS testing date)?
+- id: nsclc_2.0_public-Q32556403
+  category: 8
+  text: Is there a treatment-by-biomarker interaction between TP53 status and platinum-based
+    chemotherapy (without concurrent immunotherapy) on outcomes in the NSCLC cohort?
+- id: nsclc_2.0_public-Q37e5456c
+  category: 4
+  text: What proportion of patients with NSCLC ever received immunotherapy at any
+    point during their treatment course?
+- id: nsclc_2.0_public-Q475ddf54
+  category: 8
+  text: Among patients with Stage IV NSCLC initiating first-line platinum-doublet
+    chemotherapy without immunotherapy (a carboplatin- or cisplatin-containing regimen
+    combined with pemetrexed, paclitaxel, gemcitabine, or docetaxel, and not containing
+    pembrolizumab, atezolizumab, nivolumab, or durvalumab, as the first regimen for
+    the cancer), what is the hazard ratio (with 95% CI) for the interaction term between
+    TP53 mutation status (any non-synonymous TP53 variant on TP53-covering panels)
+    and the addition of bevacizumab in a Cox PH model for PFS-I from regimen start?
+- id: nsclc_2.0_public-Q48106600
+  category: 5
+  text: Among patients with Stage IV NSCLC receiving osimertinib as first-line treatment
+    for the cancer, what is the median PFS (in months) on this treatment?
+- id: nsclc_2.0_public-Q51a30c03
+  category: 5
+  text: For patients with NSCLC receiving first-line carboplatin plus pemetrexed for
+    Stage IV disease, what is the median PFS-I from regimen start in months with 95%
+    CI? Exclude patients whose first-line regimen was a clinical-trial regimen (composition
+    not annotated in BPC).
+- id: nsclc_2.0_public-Q59452c1d
+  category: 7
+  text: Do patients with advanced NSCLC who receive immunotherapy have better outcomes
+    than those who receive chemotherapy alone?
+- id: nsclc_2.0_public-Q5ab28810
+  category: 3
+  text: Among patients whose tumors were sequenced on a KRAS-covering panel, what
+    proportion had a tumor with at least one KRAS G12C missense mutation? (Include
+    all NSCLC histologic subtypes in the cohort.)
+- id: nsclc_2.0_public-Q5b41f709
+  category: 5
+  text: Among patients treated with single-agent pembrolizumab as their first regimen
+    for Stage IV NSCLC, what is the median OS from regimen start in months (with 95%
+    CI), with risk-set adjustment for delayed cohort entry (left-truncating at NGS
+    testing date); assume any clinical-trial regimen did not contain pembrolizumab?
+    (Include all NSCLC histologic subtypes in the cohort.)
+- id: nsclc_2.0_public-Q643ab252
+  category: 3
+  text: Among all sequenced tumor samples obtained for any NSCLC index cancer in the
+    NSCLC cohort (including all NSCLC histologic subtypes, and counting a sample regardless
+    of whether its panel covered MET), how many unique samples harbor a high-level
+    MET amplification?
+- id: nsclc_2.0_public-Q65fdb736
+  category: 3
+  text: What is the prevalence of MET alterations among patients with NSCLC whose
+    tumors were sequenced?
+- id: nsclc_2.0_public-Q6e39b7f6
+  category: 4
+  text: Among patients with Stage IV NSCLC at diagnosis (including all NSCLC histologic
+    subtypes), what proportion ever received pembrolizumab as a single agent (monotherapy)
+    in any regimen? Assume any clinical-trial regimen did not contain pembrolizumab.
+- id: nsclc_2.0_public-Q7840687a
+  category: 7
+  text: Among patients with Stage IV NSCLC at diagnosis who received first-line carboplatin
+    plus pemetrexed (with or without bevacizumab) as their first regimen for the cancer,
+    what is the median PFS-I from regimen start in months with 95% CI? Assume any
+    clinical-trial regimen did not contain carboplatin, pemetrexed, or bevacizumab.
+- id: nsclc_2.0_public-Q7a93af46
+  category: 3
+  text: In the NSCLC cohort, what proportion of patients had a tumor with a TP53 mutation?
+- id: nsclc_2.0_public-Q7d8e89e8
+  category: 2
+  text: Among patients with metastatic NSCLC, what proportion have liver involvement?
+- id: nsclc_2.0_public-Qa0cf060c
+  category: 7
+  text: Among patients in the NSCLC cohort with Stage IV EGFR-mutant non-small cell
+    lung cancer at diagnosis whose first-line regimen was either osimertinib monotherapy
+    or erlotinib monotherapy, what is the median time to next treatment for the same
+    cancer (in months, with 95% CI) from regimen start, by regimen?
+- id: nsclc_2.0_public-Qbd20b49e
+  category: 2
+  text: What proportion of patients with NSCLC are diagnosed at an advanced stage?
+- id: nsclc_2.0_public-Qc11bd653
+  category: 4
+  text: Among patients with Stage IV NSCLC (any NSCLC histologic subtype) whose first
+    systemic regimen for the cancer included carboplatin and pemetrexed, what is the
+    median time on regimen in months (from regimen start to end of all drugs)? Assume
+    any clinical-trial regimen did not contain carboplatin or pemetrexed (exclude
+    regimens with drugs_ct_yn == 'Yes' from the carboplatin+pemetrexed identification).
+- id: nsclc_2.0_public-Qc51cfeb9
+  category: 8
+  text: Do patients with KRAS-mutant advanced NSCLC benefit more from immunotherapy
+    than patients with KRAS-wildtype advanced NSCLC?
+- id: nsclc_2.0_public-Qd11e3eb6
+  category: 6
+  text: Is there an association between TP53 co-mutation and overall survival in patients
+    with an EGFR-mutant lung adenocarcinoma?
+- id: nsclc_2.0_public-Qd5c0a58a
+  category: 1
+  text: What proportion of older patients in the NSCLC cohort are non-Hispanic White?
+- id: nsclc_2.0_public-Qe746d620
+  category: 6
+  text: Among patients with Stage IV NSCLC (including all NSCLC histologic subtypes)
+    whose tumors were sequenced on a panel that includes KRAS, what is the hazard
+    ratio (95% CI) for overall survival from onset of advanced disease comparing patients
+    whose tumors carry a KRAS G12C missense mutation versus all other patients (tumors
+    KRAS-wildtype and other KRAS variants combined), with risk-set adjustment for
+    delayed cohort entry (left-truncating at NGS testing date)?
+- id: nsclc_2.0_public-Qe9438978
+  category: 5
+  text: Among patients with NSCLC, do those with EGFR-mutant tumors have better outcomes
+    on first-line therapy for the cancer than patients with EGFR-wild-type tumors?

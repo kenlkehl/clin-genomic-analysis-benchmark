@@ -1,0 +1,189 @@
+cohort: prostate_1.2
+generated_at: '2026-07-05T23:05:27.784069Z'
+model: claude-opus-4-8@vertex
+schema_version: '1'
+questions:
+- id: prostate_1.2-Q17f290d9
+  category: 3
+  text: In the prostate cancer cohort, among sequenced samples obtained for a prostate
+    cancer diagnosis, how many unique samples show a high-level (deep) deletion of
+    PTEN?
+- id: prostate_1.2-Q1e8d34c1
+  category: 2
+  text: How many patients in the prostate cohort had prostate cancer with high-grade
+    disease at diagnosis (Gleason score ≥ 8 / ISUP grade group 4–5; missing/unknown
+    grade treated as not high-grade)?
+- id: prostate_1.2-Q31783668
+  category: 4
+  text: How many unique patients in the prostate cohort ever received docetaxel in
+    any regimen for their prostate cancer? Assume any clinical-trial regimen did not
+    contain docetaxel.
+- id: prostate_1.2-Q3e2aaa54
+  category: 2
+  text: Among patients in the prostate cancer cohort, what proportion were diagnosed
+    with stage IV prostate cancer?
+- id: prostate_1.2-Q5a10607f
+  category: 5
+  text: Among patients in the prostate cancer cohort who received any prostate cancer-directed
+    systemic therapy, what is the median overall survival in months from regimen start
+    (Kaplan-Meier with 95% CI), with risk-set adjustment for delayed cohort entry
+    (left-truncating at NGS testing date)? Include all systemic therapy regimens regardless
+    of burden of disease/intent of therapy.
+- id: prostate_1.2-Q62b56bf7
+  category: 3
+  text: Among patients in the prostate cohort whose sequenced prostate cancer specimen
+    was tested on an assay panel that covers SPOP, what proportion had a prostate
+    cancer tumor with at least one non-synonymous SPOP mutation?
+- id: prostate_1.2-Q6b869850
+  category: 4
+  text: Among patients with prostate cancer, what proportion ever received abiraterone
+    acetate as part of any prostate cancer-directed regimen? Assume any clinical-trial
+    regimen did not contain abiraterone acetate.
+- id: prostate_1.2-Q8e4139df
+  category: 2
+  text: Among patients in the prostate cancer cohort, how many had an initial prostate
+    cancer Gleason score of 9 or 10?
+- id: prostate_1.2-Q94868401
+  category: 1
+  text: How many unique patients in the prostate cancer cohort self-identify as Non-Hispanic
+    Black?
+- id: prostate_1.2-Q95d5d662
+  category: 6
+  text: In the prostate cancer cohort, what is the Cox PH hazard ratio (95% CI, p-value)
+    for overall survival from diagnosis comparing patients whose tumors have PTEN
+    homozygous deletion versus patients whose tumors are PTEN copy-number neutral
+    or amplified, using a sample sequenced for the prostate cancer and restricted
+    to patients whose sequencing assay panel includes PTEN, using one CNA sample per
+    patient (the earliest sample with CNA data per patient), with risk-set adjustment
+    for delayed cohort entry (left-truncating at NGS testing date)?
+- id: prostate_1.2-Q98cef48a
+  category: 1
+  text: What proportion of patients in the prostate cancer cohort were born before
+    1940?
+- id: prostate_1.2-Q9e43be6a
+  category: 2
+  text: Among patients in the prostate cohort diagnosed with stage IV prostate cancer,
+    what proportion had bone metastases at diagnosis?
+- id: prostate_1.2-Qa6e104e6
+  category: 2
+  text: What proportion of patients in the prostate cancer cohort had Stage IV prostate
+    cancer at diagnosis?
+- id: prostate_1.2-Qadfbc974
+  category: 1
+  text: What is the median age at diagnosis of prostate cancer in the prostate cancer
+    cohort?
+- id: prostate_1.2-Qafe15a6b
+  category: 7
+  text: Among first regimens for prostate cancer that contain docetaxel, what is the
+    median overall survival in months (with 95% CI) from regimen start, with risk-set
+    adjustment for delayed cohort entry (left-truncating at NGS testing date); assume
+    any clinical-trial regimen did not contain docetaxel?
+- id: prostate_1.2-Qb89136fd
+  category: 4
+  text: What is the median number of distinct cancer-directed regimens administered
+    for prostate cancer to patients in the prostate cancer cohort?
+- id: prostate_1.2-Qd8337668
+  category: 3
+  text: Among patients in the prostate cancer cohort, how many unique patients had
+    a prostate cancer tumor specimen with at least one non-synonymous mutation in
+    PTEN reported?
+- id: prostate_1.2-Qdb8fc80a
+  category: 5
+  text: Among patients with Stage IV prostate cancer at diagnosis, what is the median
+    overall survival in months from diagnosis (Kaplan-Meier estimate with 95% CI),
+    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
+    date)?
+- id: prostate_1.2-Qf4eb2c93
+  category: 1
+  text: What was the median age at prostate cancer diagnosis (in years), with 95%
+    confidence interval?
+- id: prostate_1.2-Qf6226dee
+  category: 3
+  text: What proportion of patients with prostate cancer whose tumors were sequenced
+    had a tumor with a TP53 mutation?
+- id: prostate_1.2-Q0358d0d9
+  category: 6
+  text: In the prostate cancer cohort, what is the Cox proportional-hazards hazard
+    ratio (with 95% CI and p-value) for overall survival from the onset of advanced
+    disease, comparing patients whose tumors carry any non-synonymous TP53 mutation
+    versus patients with TP53-wildtype tumors, restricting the denominator to patients
+    whose cancer panel test used an assay whose gene panel includes TP53, with risk-set
+    adjustment for delayed cohort entry (left-truncating at NGS testing date)?
+- id: prostate_1.2-Q08118ced
+  category: 4
+  text: What is the median time on first-line treatment (first regimen after mCRPC
+    onset) for patients with metastatic castration-resistant prostate cancer?
+- id: prostate_1.2-Q1c301ed6
+  category: 6
+  text: Is PTEN loss associated with worse overall survival in patients with metastatic
+    prostate cancer, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date)?
+- id: prostate_1.2-Q352ae9ce
+  category: 5
+  text: Among patients with prostate cancer receiving docetaxel-containing regimens,
+    what is the median PFS-I-or-M in months from regimen start (Kaplan-Meier with
+    95% CI)?
+- id: prostate_1.2-Q3e2b4eb4
+  category: 5
+  text: Among patients with metastatic castration-resistant prostate cancer, what
+    is the median progression-free survival on abiraterone-containing regimens?
+- id: prostate_1.2-Q714edb70
+  category: 1
+  text: What is the most common race/ethnicity group among patients in the prostate
+    cancer cohort?
+- id: prostate_1.2-Q7ea929fe
+  category: 8
+  text: In men with metastatic prostate cancer initiating abiraterone acetate or enzalutamide
+    as a first-line mCRPC-era regimen, does the presence of a nonsynonymous TP53 mutation
+    in the tumor (restricted to patients tested on TP53-covered panels) modify the
+    effect of abiraterone vs enzalutamide on PFS-M from regimen start, as measured
+    by the interaction term p-value in a Cox PH model?
+- id: prostate_1.2-Qa334cdaf
+  category: 7
+  text: Comparing first regimens for prostate cancer that were administered as part
+    of a clinical trial vs not, what is the log-rank p-value for time-to-next-treatment
+    for the same cancer?
+- id: prostate_1.2-Qcc762a62
+  category: 6
+  text: Among patients with metastatic castration-resistant prostate cancer, is there
+    an association between tumor TP53 mutation status and overall survival, with risk-set
+    adjustment for delayed cohort entry (left-truncating at NGS testing date)?
+- id: prostate_1.2-Qd0f4b68f
+  category: 4
+  text: What proportion of patients in the prostate cancer cohort ever received platinum-based
+    chemotherapy (carboplatin, cisplatin, or oxaliplatin) for their prostate cancer
+    at any point during follow-up? Assume any clinical-trial regimen did not contain
+    platinum-based chemotherapy.
+- id: prostate_1.2-Qd76d75ea
+  category: 7
+  text: Among patients with prostate cancer, considering each patient's first regimen
+    for the cancer, what is the hazard ratio (with 95% CI) for overall survival from
+    regimen start comparing regimens containing abiraterone acetate vs regimens containing
+    enzalutamide, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date)?
+- id: prostate_1.2-Qdd42ed19
+  category: 7
+  text: Among men with metastatic castration-resistant prostate cancer, what is the
+    hazard ratio for overall survival comparing first-line (post-CRPC) abiraterone
+    acetate to first-line (post-CRPC) enzalutamide, with time-origin at regimen start
+    and risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
+    date)?
+- id: prostate_1.2-Qe9ccfa5c
+  category: 8
+  text: Among men with metastatic castration-resistant prostate cancer, does TP53
+    mutation status modify the effect of abiraterone-containing versus docetaxel-containing
+    first-line mCRPC regimens on overall survival, with risk-set adjustment for delayed
+    cohort entry (left-truncating at NGS testing date)?
+- id: prostate_1.2-Qf17acd7c
+  category: 8
+  text: Among patients with Stage IV prostate cancer receiving a first regimen for
+    the cancer, is there a statistically significant interaction between PTEN homozygous
+    deletion and docetaxel exposure (docetaxel-containing vs non-docetaxel-containing
+    first regimen) on overall survival from regimen start, restricted to tumors assayed
+    on panels that cover PTEN, fit using a Cox proportional hazards model with a treatment-by-biomarker
+    interaction term, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date), assuming any clinical-trial regimen did not contain docetaxel?
+- id: prostate_1.2-Qf8b44f4f
+  category: 3
+  text: Among patients in the prostate cancer cohort whose tumors were sequenced,
+    what fraction had a tumor with an AR alteration?

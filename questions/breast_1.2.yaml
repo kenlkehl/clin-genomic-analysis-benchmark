@@ -1,0 +1,198 @@
+cohort: breast_1.2
+generated_at: '2026-07-05T23:05:27.784069Z'
+model: claude-opus-4-8@vertex
+schema_version: '1'
+questions:
+- id: breast_1.2-Q0ed39ff9
+  category: 1
+  text: How many unique patients in the breast cancer cohort are female?
+- id: breast_1.2-Q438e2904
+  category: 4
+  text: Among patients with Stage IV breast cancer at diagnosis, what is the median
+    number of distinct regimens received for that index cancer? (Restrict to invasive
+    breast carcinoma; exclude the small subset of breast sarcomas.)
+- id: breast_1.2-Q522c00c5
+  category: 6
+  text: Among patients with Stage IV breast cancer at diagnosis, what is the hazard
+    ratio for overall survival from diagnosis comparing patients with any TP53 non-synonymous
+    somatic mutation to those without, restricted to patients whose sequencing panel
+    covers TP53, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date)? (Restrict to invasive breast carcinoma; exclude the small
+    subset of breast sarcomas.)
+- id: breast_1.2-Q8d040027
+  category: 7
+  text: Among patients with triple-negative breast cancer that was Stage IV at diagnosis
+    who received any first-line cytotoxic regimen for the cancer, is median overall
+    survival from regimen start (in months) different between platinum-containing
+    regimens without concurrent immunotherapy and non-platinum regimens without concurrent
+    immunotherapy, excluding patients whose first-line regimen was a clinical-trial
+    regimen (composition not annotated in BPC), with risk-set adjustment for delayed
+    cohort entry (left-truncating at NGS testing date)? (Restrict to invasive breast
+    carcinoma; exclude the small subset of breast sarcomas.)
+- id: breast_1.2-Qa6ab70c3
+  category: 5
+  text: Among patients with Stage IV breast cancer at diagnosis, what is the median
+    overall survival in months from diagnosis with 95% confidence interval, with risk-set
+    adjustment for delayed cohort entry (left-truncating at NGS testing date)? (Restrict
+    to invasive breast carcinoma; exclude the small subset of breast sarcomas.)
+- id: breast_1.2-Qd9af976f
+  category: 4
+  text: Among patients with HR+/HER2- breast cancer, what proportion received a CDK4/6
+    inhibitor (palbociclib, ribociclib, or abemaciclib) as part of any regimen for
+    that cancer? Assume any clinical-trial regimen did not contain a CDK4/6 inhibitor.
+    (Restrict to invasive breast carcinoma; exclude the small subset of breast sarcomas.)
+- id: breast_1.2-Qeda1eecf
+  category: 1
+  text: What proportion of patients in the breast cancer cohort are non-white (using
+    primary race; treat 'Other' and 'Unknown' as not non-white; ignore Hispanic ethnicity)?
+- id: breast_1.2-Q080cf2ee
+  category: 2
+  text: What proportion of patients with breast cancer had metastatic disease?
+- id: breast_1.2-Q086f5cc2
+  category: 7
+  text: Compare survival between patients receiving capecitabine-based and eribulin-based
+    regimens in metastatic breast cancer, with risk-set adjustment for delayed cohort
+    entry (left-truncating at NGS testing date).
+- id: breast_1.2-Q0c55cde3
+  category: 5
+  text: Among regimens containing palbociclib for HR+/HER2- breast cancer, what is
+    the median PFS-M from regimen start with 95% confidence interval?
+- id: breast_1.2-Q1e90a8f5
+  category: 3
+  text: What proportion of patients in the breast cancer cohort had a tumor with a
+    TP53 mutation?
+- id: breast_1.2-Q2e82fad9
+  category: 1
+  text: What is the median age at first breast cancer diagnosis (in years), with 95%
+    CI, among unique patients in the cohort?
+- id: breast_1.2-Q32e231ae
+  category: 7
+  text: Among patients with HR+/HER2- stage IV breast cancer who received a CDK4/6
+    inhibitor (palbociclib, ribociclib, or abemaciclib) combined with an aromatase
+    inhibitor (anastrozole, letrozole, or exemestane) as their first regimen, what
+    is the median PFS-I from regimen start in months with 95% CI? Assume any clinical-trial
+    regimen did not contain a CDK4/6 inhibitor or aromatase inhibitor.
+- id: breast_1.2-Q336fdccc
+  category: 7
+  text: Does adding pertuzumab to trastuzumab-based therapy improve outcomes in HER2-positive
+    metastatic breast cancer?
+- id: breast_1.2-Q3710dfd2
+  category: 8
+  text: Is there an interaction between ESR1 mutation status and choice of treatment
+    (fulvestrant vs aromatase inhibitor) with respect to outcome among patients with
+    HR+/HER2- metastatic breast cancer who got one of those two treatments?
+- id: breast_1.2-Q3ad97efc
+  category: 8
+  text: Among patients with HER2+ metastatic breast cancer receiving first-line trastuzumab-based
+    therapy (with first line anchored to the first treatment after onset of metastatic
+    disease), does ERBB2 amplification status modify the effect of adding pertuzumab
+    on PFS-I measured from regimen start, tested via the interaction term in a Cox
+    PH model? (Count trastuzumab and its biosimilars, but exclude trastuzumab-based
+    antibody-drug conjugates such as trastuzumab emtansine and trastuzumab deruxtecan.)
+- id: breast_1.2-Q3b4023fc
+  category: 1
+  text: How many young patients are in the breast cancer cohort?
+- id: breast_1.2-Q3c5c07a6
+  category: 6
+  text: Does GATA3 mutation status affect outcomes in patients with breast cancer?
+- id: breast_1.2-Q3d022b1f
+  category: 2
+  text: How many patients in the breast cohort had stage IV breast cancer at initial
+    diagnosis? (Restrict to invasive breast carcinoma; exclude the small subset of
+    breast sarcomas.)
+- id: breast_1.2-Q4a538b91
+  category: 8
+  text: Among patients with HR+/HER2- metastatic breast cancer receiving a CDK4/6
+    inhibitor (palbociclib, ribociclib, or abemaciclib) in combination with an aromatase
+    inhibitor as their first regimen after Stage IV diagnosis, does PIK3CA mutation
+    status (any non-synonymous mutation) modify the treatment effect on PFS-I from
+    regimen start, tested via the interaction p-value in a Cox PH model with a CDK4/6i
+    × PIK3CA interaction term?
+- id: breast_1.2-Q56286dd2
+  category: 5
+  text: In the breast cancer cohort, do patients on CDK4/6 inhibitor regimens do better
+    than those on endocrine monotherapy?
+- id: breast_1.2-Q563e05a4
+  category: 3
+  text: Among NGS samples in the breast cohort, how many unique samples have a high-level
+    ERBB2 amplification (defined as CNA value == 2 per cBioPortal/GISTIC convention,
+    where 2 = high-level amplification, 1 = gain, 0 = neutral, -1 = shallow loss,
+    -2 = deep deletion)?
+- id: breast_1.2-Q7e4e718d
+  category: 6
+  text: Among patients with HER2-positive (HER2+/HR+ or HER2+/HR-) breast cancer receiving
+    a trastuzumab-containing regimen as first-line therapy for metastatic disease,
+    what is the hazard ratio for PFS-I-or-M comparing patients with a tumor harboring
+    ERBB2 high-level amplification versus those without, restricted to patients whose
+    sequencing panel covers ERBB2 and whose ERBB2 status was ascertained before first-line
+    metastatic therapy start?
+- id: breast_1.2-Q81d813d0
+  category: 4
+  text: What proportion of patients in the breast cohort ever received a regimen containing
+    trastuzumab (Herceptin) for their breast cancer? Assume any clinical-trial regimen
+    did not contain trastuzumab. (Restrict to invasive breast carcinoma; exclude the
+    small subset of breast sarcomas.)
+- id: breast_1.2-Q8a4babcc
+  category: 5
+  text: Among patients with triple-negative breast cancer, what is the median PFS-I
+    from the date of advanced/metastatic diagnosis (including both de novo Stage IV
+    and recurrent/relapsed metastatic disease), with 95% confidence interval?
+- id: breast_1.2-Q8d802225
+  category: 7
+  text: Among patients with HER2+ metastatic breast cancer initiating first-line therapy
+    after Stage IV diagnosis, what is the Cox proportional-hazards hazard ratio (with
+    95% CI and p-value) for overall survival from regimen start comparing regimens
+    containing both trastuzumab and pertuzumab versus regimens containing trastuzumab
+    without pertuzumab, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
+    regimen (composition not annotated in BPC)?
+- id: breast_1.2-Q993b440a
+  category: 3
+  text: In the breast cancer cohort, how many patients have at least one tumor with
+    a recorded ERBB2 fusion event?
+- id: breast_1.2-Qc8e7299d
+  category: 5
+  text: Among patients with metastatic breast cancer, how does overall survival from
+    start of first-line treatment in the metastatic setting compare across breast
+    cancer subtypes, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date)?
+- id: breast_1.2-Qd26c20c2
+  category: 2
+  text: What proportion of patients in the breast cancer cohort were diagnosed at
+    an advanced stage?
+- id: breast_1.2-Qd3de1f04
+  category: 6
+  text: Among patients with Stage IV triple-negative breast cancer, is there an association
+    between BRCA1 and/or BRCA2 pathogenic/likely-pathogenic somatic mutation status
+    (comparing patients with a BRCA1- and/or BRCA2-mutant tumor to patients whose
+    tumor has mutations in neither gene) and overall survival from diagnosis, with
+    risk-set adjustment for delayed cohort entry (left-truncating at NGS testing date)?
+- id: breast_1.2-Qd65985df
+  category: 3
+  text: Among patients with a HR+/HER2- breast cancer, what fraction had a tumor that
+    ever had an ESR1 alteration detected?
+- id: breast_1.2-Qdc5b5eb2
+  category: 4
+  text: How many patients in the breast cohort received endocrine therapy as part
+    of treatment (any line, any setting)? Assume any clinical-trial regimen did not
+    contain endocrine therapy.
+- id: breast_1.2-Qdce7a7df
+  category: 1
+  text: What proportion of patients in the breast cancer cohort have primary race
+    recorded as Black?
+- id: breast_1.2-Qde59dc35
+  category: 3
+  text: Among samples in the breast cancer cohort sequenced on the MSK-IMPACT468 panel,
+    what proportion have at least one PIK3CA mutation?
+- id: breast_1.2-Qe98ae915
+  category: 6
+  text: Among patients with HR+/HER2- metastatic breast cancer who received a CDK4/6
+    inhibitor (palbociclib, ribociclib, or abemaciclib) as their first regimen after
+    advanced disease diagnosis, what is the median PFS-I from regimen start, comparing
+    patients with a PIK3CA-mutant tumor vs PIK3CA-wildtype tumor (restricted to sequencing
+    panels covering PIK3CA)?
+- id: breast_1.2-Qf5fdd296
+  category: 4
+  text: What proportion of patients with metastatic breast cancer received chemotherapy
+    in the first-line metastatic setting? Assume any clinical-trial regimen did not
+    contain chemotherapy.

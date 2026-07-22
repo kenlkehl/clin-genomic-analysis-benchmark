@@ -1,0 +1,38 @@
+# env / secrets
+.env
+*.local
+
+# data (not in git) — BPC patient/sample-level data must never be committed
+bpc_from_synapse/
+
+# generated outputs / caches (may contain patient- or sample-level data)
+runs/
+.cache/
+.logs/
+gold_standard/*/
+!gold_standard/.gitkeep
+
+# local agent/tool config
+.claude/
+.agents/
+.codex/
+.antigravitycli/
+.continue/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.uv/
+dist/
+build/
+
+# editor
+.idea/
+.vscode/
+.DS_Store
+.ipynb_checkpoints/
+
+# pytest
+.pytest_cache/

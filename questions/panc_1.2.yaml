@@ -1,0 +1,205 @@
+cohort: panc_1.2
+generated_at: '2026-07-05T23:05:27.784069Z'
+model: claude-opus-4-8@vertex
+schema_version: '1'
+questions:
+- id: panc_1.2-Q0240855a
+  category: 2
+  text: Among patients with pancreatic cancer, what proportion were Stage IV at initial
+    diagnosis?
+- id: panc_1.2-Q0bc79ded
+  category: 4
+  text: What proportion of patients with pancreatic cancer received FOLFIRINOX (a
+    regimen containing fluorouracil, leucovorin calcium, irinotecan, and oxaliplatin)
+    at any point during follow-up? Assume any clinical-trial regimen did not contain
+    FOLFIRINOX components.
+- id: panc_1.2-Q172ee2a2
+  category: 4
+  text: Among patients with pancreatic cancer, what is the median number of distinct
+    cancer-directed regimens received per patient for that cancer?
+- id: panc_1.2-Q194c29b3
+  category: 8
+  text: Among patients with Stage IV pancreatic adenocarcinoma receiving first-line
+    FOLFIRINOX (fluorouracil + leucovorin + oxaliplatin + irinotecan) versus first-line
+    gemcitabine + nab-paclitaxel for the cancer, does KRAS mutation status (any non-synonymous
+    KRAS mutation) modify the treatment effect on overall survival from regimen start,
+    as assessed by the interaction term p-value in a Cox proportional hazards model,
+    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
+    date), excluding patients whose first-line regimen was a clinical-trial regimen
+    (composition not annotated in BPC)?
+- id: panc_1.2-Q27072f96
+  category: 3
+  text: How many unique tumor samples in the pancreatic cancer cohort carry a high-level
+    CDKN2A homozygous deletion?
+- id: panc_1.2-Q2c4f4dfc
+  category: 3
+  text: Among patients with pancreatic cancer, what proportion had a tumor with at
+    least one non-synonymous (missense, nonsense, frameshift, splice-site, in-frame
+    indel) somatic mutation in KRAS, restricted to patients whose tumors were sequenced
+    on a panel that covers KRAS?
+- id: panc_1.2-Q3e3dd614
+  category: 3
+  text: Among patients in the pancreatic cancer cohort whose tumors were sequenced
+    on a TP53-covering panel, what proportion had a tumor with at least one non-synonymous
+    somatic TP53 mutation?
+- id: panc_1.2-Q9b4402d0
+  category: 5
+  text: Among patients with Stage IV pancreatic cancer at diagnosis, what is the median
+    overall survival from diagnosis in months with 95% CI, with risk-set adjustment
+    for delayed cohort entry (left-truncating at NGS testing date)?
+- id: panc_1.2-Qadb92d64
+  category: 7
+  text: Among patients with stage I-III pancreatic cancer who underwent surgical resection
+    within 6 months of diagnosis and survived to 6 months after diagnosis, what is
+    the hazard ratio for overall survival (measured from a 6-month post-diagnosis
+    landmark) comparing those who received an adjuvant gemcitabine-containing regimen
+    as their first regimen after surgery within that 6-month window versus those who
+    received no systemic therapy within 6 months of diagnosis; assume any clinical-trial
+    regimen did not contain gemcitabine?
+- id: panc_1.2-Qae74ea33
+  category: 6
+  text: Among patients with Stage IV pancreatic cancer at diagnosis, is the presence
+    of a KRAS mutation (any non-synonymous variant, restricted to patients whose tumors
+    were sequenced on a panel covering KRAS) associated with overall survival from
+    diagnosis, reported as a Cox proportional hazards ratio (KRAS-mutant vs KRAS-wildtype),
+    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
+    date)?
+- id: panc_1.2-Qb15f7097
+  category: 1
+  text: How many unique patients in the pancreatic cancer cohort are categorized as
+    Non-Hispanic Black?
+- id: panc_1.2-Qb4b6232d
+  category: 1
+  text: What is the median age at diagnosis of pancreatic cancer (in years) for patients
+    in the pancreatic cancer cohort?
+- id: panc_1.2-Qbb928d2b
+  category: 1
+  text: Among all unique patients in the pancreatic cancer cohort, what proportion
+    are female?
+- id: panc_1.2-Qc216f271
+  category: 2
+  text: Among patients with pancreatic cancer diagnosed at Stage IV, what proportion
+    had liver metastases documented at diagnosis?
+- id: panc_1.2-Qe8681a92
+  category: 2
+  text: What proportion of patients in the pancreatic cohort presented with Stage
+    IV pancreatic cancer at diagnosis?
+- id: panc_1.2-Q0457f850
+  category: 8
+  text: In patients with metastatic pancreatic adenocarcinoma (de novo Stage IV or
+    recurrent/relapsed metastatic) treated with first-line gemcitabine-containing
+    regimens (where first-line refers to the first regimen after onset of metastatic
+    disease), does TP53 mutation status (ascertained before regimen start) modify
+    the treatment effect on PFS-I from regimen start when compared to fluoropyrimidine-only
+    first-line regimens, as measured by the interaction term hazard ratio (ratio of
+    HRs) with 95% CI?
+- id: panc_1.2-Q07d410a5
+  category: 8
+  text: Among patients with Stage IV pancreatic cancer receiving FOLFIRINOX as first-line
+    treatment for advanced disease, what is the hazard ratio (with 95% CI) for overall
+    survival from regimen start comparing patients whose tumors have a CDKN2A homozygous
+    deletion vs patients whose tumors have no CDKN2A deletion (restricted to patients
+    whose tested panel covered CDKN2A), with risk-set adjustment for delayed cohort
+    entry (left-truncating at NGS testing date), excluding patients whose first-line
+    regimen for advanced disease was a clinical-trial regimen (composition not annotated
+    in BPC)?
+- id: panc_1.2-Q2c0d889e
+  category: 6
+  text: Among patients with pancreatic cancer who received platinum-based therapy,
+    is a BRCA1 or BRCA2 tumor alteration associated with overall survival, with risk-set
+    adjustment for delayed cohort entry (left-truncating at NGS testing date)?
+- id: panc_1.2-Q33278d8d
+  category: 7
+  text: Do patients with pancreatic cancer who receive a platinum-based regimen have
+    improved progression-free survival compared with those who do not?
+- id: panc_1.2-Q3402c559
+  category: 8
+  text: Does SMAD4 alteration status (any mutation or homozygous deletion) modify
+    the effect of receiving any oxaliplatin-containing first-line regimen versus any
+    gemcitabine-containing first-line regimen on overall survival from regimen start
+    among patients with Stage IV pancreatic adenocarcinoma, as captured by the interaction
+    p-value in a Cox proportional hazards model, with risk-set adjustment for delayed
+    cohort entry (left-truncating at NGS testing date), excluding patients whose first-line
+    regimen was a clinical-trial regimen (composition not annotated in BPC)?
+- id: panc_1.2-Q4dd86a68
+  category: 7
+  text: Is receipt of neoadjuvant chemotherapy associated with better outcomes in
+    resectable pancreatic cancer?
+- id: panc_1.2-Q5dce70df
+  category: 4
+  text: Among patients with pancreatic cancer, what proportion ever received a regimen
+    containing gemcitabine (as a single agent or in combination) for their pancreatic
+    cancer; assume any clinical-trial regimen did not contain gemcitabine?
+- id: panc_1.2-Q66c1eccc
+  category: 2
+  text: What proportion of pancreatic cancers were diagnosed at an early stage?
+- id: panc_1.2-Q6a0dec24
+  category: 6
+  text: Among patients receiving FOLFIRINOX as the first-line regimen for Stage IV
+    pancreatic cancer, what is the median PFS-I from regimen start, comparing patients
+    with TP53-mutant vs TP53-wildtype tumors (restricted to sequencing assays covering
+    TP53)?
+- id: panc_1.2-Q75d370b9
+  category: 1
+  text: How does smoking status relate to demographics in the pancreatic cancer cohort?
+- id: panc_1.2-Q7c645417
+  category: 6
+  text: Among patients with Stage IV pancreatic cancer treated with first-line gemcitabine
+    + nab-paclitaxel, is CDKN2A homozygous deletion (ascertained before regimen start)
+    associated with overall survival from regimen start, reported as a Cox hazard
+    ratio, with risk-set adjustment for delayed cohort entry (left-truncating at NGS
+    testing date), excluding patients whose first-line regimen was a clinical-trial
+    regimen (composition not annotated in BPC)?
+- id: panc_1.2-Q834775b1
+  category: 8
+  text: In patients with locally advanced or metastatic pancreatic cancer, does the
+    effect of platinum-based chemotherapy on progression-free survival differ between
+    patients with BRCA-altered and BRCA-wildtype tumors?
+- id: panc_1.2-Q83aa69cc
+  category: 7
+  text: Among patients with Stage IV pancreatic cancer at diagnosis, what is the hazard
+    ratio for overall survival from start of first-line regimen for the cancer comparing
+    FOLFIRINOX (Fluorouracil + Leucovorin Calcium + Oxaliplatin + Irinotecan) to Gemcitabine
+    + nab-Paclitaxel, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
+    regimen (composition not annotated in BPC)?
+- id: panc_1.2-Q9ca4f452
+  category: 7
+  text: Among patients with Stage IV pancreatic cancer who received first-line FOLFIRINOX
+    (first regimen for the cancer), what is the median progression-free survival (PFS-I)
+    in months from regimen start, with 95% CI?
+- id: panc_1.2-Q9de6bfd5
+  category: 3
+  text: What proportion of patients with pancreatic cancer had a tumor with a pathogenic
+    KRAS mutation?
+- id: panc_1.2-Qb12e3347
+  category: 5
+  text: Do patients with pancreatic cancer treated with FOLFIRINOX have better outcomes
+    than those treated with gemcitabine-based regimens?
+- id: panc_1.2-Qbc99983f
+  category: 5
+  text: Among patients with Stage IV pancreatic cancer at diagnosis who received first-line
+    gemcitabine + nab-paclitaxel as their first treatment for the cancer, excluding
+    patients whose first-line regimen was a clinical-trial regimen (composition not
+    annotated in BPC), what is the median PFS-I in months from regimen start with
+    95% CI?
+- id: panc_1.2-Qc051a9e5
+  category: 5
+  text: Among patients with Stage IV pancreatic cancer at diagnosis who received FOLFIRINOX
+    (fluorouracil + leucovorin + oxaliplatin + irinotecan) as first-line therapy for
+    the cancer, what is the median overall survival in months from regimen start with
+    95% CI, with risk-set adjustment for delayed cohort entry (left-truncating at
+    NGS testing date); assume any clinical-trial regimen did not contain FOLFIRINOX?
+- id: panc_1.2-Qddc3b21c
+  category: 6
+  text: Does MMR-deficient status on pathology testing predict better outcomes than
+    MMR-proficient status in patients with pancreatic cancer?
+- id: panc_1.2-Qe65302a7
+  category: 5
+  text: Among patients with pancreatic cancer receiving first-line systemic therapy
+    for the cancer, do those with KRAS-mutated tumors have worse progression-free
+    survival than those with KRAS-wildtype tumors?
+- id: panc_1.2-Qf8273a02
+  category: 3
+  text: In the pancreatic cancer cohort, what fraction of patients had a tumor with
+    a MYC amplification in any pancreatic cancer specimen?

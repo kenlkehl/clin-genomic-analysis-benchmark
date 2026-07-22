@@ -1,0 +1,202 @@
+cohort: bladder_1.2
+generated_at: '2026-07-05T23:05:27.784069Z'
+model: claude-opus-4-8@vertex
+schema_version: '1'
+questions:
+- id: bladder_1.2-Q0f9b4db9
+  category: 1
+  text: What was the median age at bladder cancer diagnosis (in years), among patients
+    with bladder cancer in the bladder cohort? (Treat 'bladder cancer' here as urothelial
+    carcinoma arising from either the urinary bladder or the upper urinary tract /
+    renal pelvis.)
+- id: bladder_1.2-Q227dd2ba
+  category: 5
+  text: Among patients with Stage IV bladder cancer at diagnosis, what is the median
+    overall survival from diagnosis in months with 95% CI, with risk-set adjustment
+    for delayed cohort entry (left-truncating at NGS testing date)? (Treat 'bladder
+    cancer' here as urothelial carcinoma arising from either the urinary bladder or
+    the upper urinary tract / renal pelvis.)
+- id: bladder_1.2-Q45ea5e4b
+  category: 2
+  text: How many bladder cancers had squamous cell histology? (Treat 'bladder cancer'
+    here as urothelial carcinoma arising from either the urinary bladder or the upper
+    urinary tract / renal pelvis.)
+- id: bladder_1.2-Q6f9dd68e
+  category: 1
+  text: What proportion of patients in the bladder cancer cohort are female?
+- id: bladder_1.2-Qa0d4f13f
+  category: 6
+  text: Among patients with bladder cancer whose tumor was sequenced on the MSK-IMPACT468
+    panel, what is the hazard ratio (95% CI) for overall survival from diagnosis comparing
+    patients whose tumors harbor any non-synonymous TP53 mutation to those without,
+    using a univariate Cox proportional hazards model, with risk-set adjustment for
+    delayed cohort entry (left-truncating at NGS testing date)? (Treat 'bladder cancer'
+    here as urothelial carcinoma arising from either the urinary bladder or the upper
+    urinary tract / renal pelvis.)
+- id: bladder_1.2-Qeebfe861
+  category: 2
+  text: Among patients with bladder cancer, what proportion were diagnosed at Stage
+    IV? (Treat 'bladder cancer' here as urothelial carcinoma arising from either the
+    urinary bladder or the upper urinary tract / renal pelvis.)
+- id: bladder_1.2-Q0205dab1
+  category: 6
+  text: Among patients with bladder cancer who received a platinum-based first-line
+    regimen (without concurrent immunotherapy) for the cancer, does progression-free
+    survival differ between patients whose urothelial carcinoma harbored an FGFR3
+    alteration versus FGFR3-wildtype?
+- id: bladder_1.2-Q03b87b00
+  category: 4
+  text: Among patients with Stage IV bladder cancer at diagnosis, what proportion
+    received any immune checkpoint inhibitor as part of any regimen? Assume any clinical-trial
+    regimen did not contain an immune checkpoint inhibitor. (Treat 'bladder cancer'
+    here as urothelial carcinoma arising from either the urinary bladder or the upper
+    urinary tract / renal pelvis.)
+- id: bladder_1.2-Q06f1d1e4
+  category: 5
+  text: Among patients receiving a first-line regimen containing a PD-1/PD-L1 inhibitor
+    (atezolizumab, pembrolizumab, nivolumab, avelumab, or durvalumab) for bladder
+    cancer, what is the median overall survival from regimen start, in months, with
+    95% confidence interval, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date); assume any clinical-trial regimen did not contain a PD-1/PD-L1
+    inhibitor?
+- id: bladder_1.2-Q0b957b34
+  category: 8
+  text: Among patients with Stage IV bladder cancer who received first-line immune
+    checkpoint inhibitor monotherapy (atezolizumab, pembrolizumab, nivolumab, durvalumab,
+    or avelumab as a single-agent regimen) versus first-line platinum-based chemotherapy
+    without concurrent immunotherapy, does FGFR3 mutation status modify the treatment
+    effect on PFS-I from regimen start, reported as the hazard ratio (with 95% CI)
+    for the treatment×FGFR3 interaction term in a Cox PH model?
+- id: bladder_1.2-Q0bd947a3
+  category: 3
+  text: In the bladder cohort, what proportion of patients had a tumor with an FGFR3
+    alteration?
+- id: bladder_1.2-Q0c84ad6c
+  category: 8
+  text: Does TP53 mutation status modify the benefit of immunotherapy in muscle-invasive
+    bladder cancer, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date)?
+- id: bladder_1.2-Q1ce734c7
+  category: 7
+  text: Among patients with Stage IV bladder cancer at diagnosis, what is the hazard
+    ratio for overall survival from the start of the first-line regimen for the cancer,
+    comparing platinum-based regimens without concurrent immunotherapy versus single-agent
+    immune checkpoint inhibitor regimens (atezolizumab, pembrolizumab, nivolumab,
+    durvalumab, or avelumab as monotherapy), with risk-set adjustment for delayed
+    cohort entry (left-truncating at NGS testing date), excluding patients whose first-line
+    regimen was a clinical-trial regimen (composition not annotated in BPC)? (Treat
+    'bladder cancer' here as urothelial carcinoma arising from either the urinary
+    bladder or the upper urinary tract / renal pelvis.)
+- id: bladder_1.2-Q29edb9b4
+  category: 6
+  text: Among patients with advanced bladder cancer (Stage IV at diagnosis or Stage
+    I–III with subsequent distant metastasis), is the presence of a TP53 mutation
+    associated with worse overall survival measured from the onset of advanced disease,
+    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
+    date)?
+- id: bladder_1.2-Q3c606547
+  category: 2
+  text: How many bladder cancers had high-grade disease at diagnosis (missing/unknown
+    grade is treated as not high-grade)?
+- id: bladder_1.2-Q41ab4999
+  category: 5
+  text: Among patients with bladder cancer, do those treated with platinum-based chemotherapy
+    without concurrent immunotherapy have better outcomes than those treated with
+    immune checkpoint inhibitor immunotherapy?
+- id: bladder_1.2-Q45c05604
+  category: 7
+  text: Among patients with muscle-invasive bladder cancer who underwent cystectomy
+    and received neoadjuvant gemcitabine + cisplatin as their first regimen prior
+    to cystectomy, what is the median overall survival from regimen start with 95%
+    CI, with risk-set adjustment for delayed cohort entry (left-truncating at NGS
+    testing date); assume any clinical-trial regimen did not contain gemcitabine or
+    cisplatin?
+- id: bladder_1.2-Q4940c838
+  category: 4
+  text: How many unique patients in the bladder cancer cohort received atezolizumab
+    as a single-agent regimen at any point? Assume any clinical-trial regimen did
+    not contain atezolizumab. (Treat 'bladder cancer' here as urothelial carcinoma
+    arising from either the urinary bladder or the upper urinary tract / renal pelvis.)
+- id: bladder_1.2-Q5543a926
+  category: 4
+  text: What is the median number of cancer-directed regimens received per patient
+    in the bladder cancer cohort?
+- id: bladder_1.2-Q7381798f
+  category: 7
+  text: Is there an overall survival benefit to adding bevacizumab to chemotherapy
+    in patients with Stage IV bladder cancer, with risk-set adjustment for delayed
+    cohort entry (left-truncating at NGS testing date)?
+- id: bladder_1.2-Q79a8ab4a
+  category: 4
+  text: Among patients in the bladder cancer cohort, what proportion ever received
+    cisplatin as part of any cancer-directed regimen? Assume any clinical-trial regimen
+    did not contain cisplatin.
+- id: bladder_1.2-Q8688f291
+  category: 7
+  text: Among patients with Stage IV bladder cancer receiving first-line therapy for
+    the cancer, what is the log-rank p-value comparing PFS-I from regimen start between
+    cisplatin-containing regimens and carboplatin-containing regimens?
+- id: bladder_1.2-Q956a1bb5
+  category: 7
+  text: Among patients with metastatic bladder cancer, do those treated with platinum-based
+    chemotherapy without concurrent immunotherapy have better outcomes than those
+    treated with immune checkpoint inhibitor therapy?
+- id: bladder_1.2-Q9d756348
+  category: 5
+  text: How well do patients with bladder cancer respond to first-line treatment?
+- id: bladder_1.2-Q9da20c67
+  category: 3
+  text: Among patients with bladder cancer whose first sequenced sample was tested
+    on the MSK-IMPACT468 panel, what fraction harbor a CDKN2A homozygous deletion
+    in that sample?
+- id: bladder_1.2-Q9e3ce6d2
+  category: 4
+  text: Among patients with bladder cancer who received any platinum-based chemotherapy
+    (cisplatin or carboplatin, as single agent or in combination), what was the median
+    time in months from bladder cancer diagnosis to start of the first platinum-containing
+    regimen? Assume any clinical-trial regimen did not contain cisplatin or carboplatin.
+- id: bladder_1.2-Qa030511b
+  category: 3
+  text: Among all sequenced samples in the bladder cancer cohort, how many distinct
+    samples have at least one recorded fusion event involving FGFR3?
+- id: bladder_1.2-Qa1524899
+  category: 8
+  text: Among patients with Stage IV bladder cancer receiving first-line platinum-based
+    chemotherapy without concurrent immunotherapy for the cancer, does an ERCC2 mutation
+    modify the effect of cisplatin- versus carboplatin-containing regimens on overall
+    survival from regimen start, expressed as separate subgroup hazard ratios within
+    ERCC2-mutant and ERCC2-wildtype strata, with risk-set adjustment for delayed cohort
+    entry (left-truncating at NGS testing date), excluding patients whose first-line
+    regimen was a clinical-trial regimen (composition not annotated in BPC)? (Treat
+    'bladder cancer' here as urothelial carcinoma arising from either the urinary
+    bladder or the upper urinary tract / renal pelvis.)
+- id: bladder_1.2-Qb3f6a73a
+  category: 5
+  text: Among regimens containing cisplatin administered for bladder cancer, what
+    is the median PFS-I from regimen start in months with 95% CI? Assume any clinical-trial
+    regimen did not contain cisplatin.
+- id: bladder_1.2-Qb863d3fc
+  category: 8
+  text: Among patients with bladder cancer, do those whose tumors have DNA damage
+    repair gene alterations have better outcomes on cisplatin-based therapy than on
+    other regimens?
+- id: bladder_1.2-Qcd757c07
+  category: 1
+  text: What is the median age at bladder cancer diagnosis among patients in the bladder
+    cancer cohort, in years?
+- id: bladder_1.2-Qdb7b1cde
+  category: 3
+  text: Among patients in the bladder cohort whose tumors were sequenced, how many
+    have a tumor with any non-silent mutation in PIK3CA recorded?
+- id: bladder_1.2-Qde17cbb3
+  category: 1
+  text: What is the most common race/ethnicity category among patients in the bladder
+    cancer cohort?
+- id: bladder_1.2-Qef4973b7
+  category: 2
+  text: What fraction of patients with bladder cancer in the cohort had locally advanced
+    or metastatic disease at diagnosis?
+- id: bladder_1.2-Qf0cdbd7f
+  category: 3
+  text: Among patients with bladder cancer whose tumors were sequenced, what proportion
+    had a tumor with a TP53 mutation?
