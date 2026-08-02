@@ -1,14 +1,23 @@
-# Question
+## The question that was asked
+
 > {{ question_text }}
 
-## Gold-standard disambiguation concepts ({{ gold_concepts | length }})
+## Our list: the {{ gold_concepts | length }} thing(s) that needed pinning down
+
 {% for c in gold_concepts -%}
 {{ loop.index }}. {{ c }}
 {% endfor %}
 
-## Agent's listed concepts ({{ agent_concepts | length }})
+## The agent's list: what it said needed pinning down ({{ agent_concepts | length }} item(s))
+
 {% for c in agent_concepts -%}
 - {{ c }}
 {% endfor %}
 
-For each gold concept above (in order), decide whether the agent's list covers it. Reply with VALID JSON only.
+---
+
+For each of the {{ gold_concepts | length }} concept(s) on our list, in order: does the
+agent's list address that core concept at all? Answer `yes`, `no`, or
+`unable to determine`, with your one-sentence reasoning written first.
+
+Reply with valid JSON only.

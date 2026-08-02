@@ -7,6 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
+from .aggregator import SUBTASKS as _SUBTASKS
 from .aggregator import CohortAgg, QuestionScore
 
 
@@ -18,38 +19,59 @@ def _pct(num: float, den: float) -> str:
 
 def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
                 question_scores: list[QuestionScore], agent_name: str, run_id: str,
-                review_queue_size: int = 0) -> str:
+                n_missing_verdicts: int = 0) -> str:
     lines: list[str] = []
     lines.append(f"# clin-genomic-analysis-benchmark scorecard\n")
     lines.append(f"- **Agent**: `{agent_name}`")
     lines.append(f"- **Run id**: `{run_id}`")
     lines.append(f"- **Cohorts**: {len(per_cohort)}")
+    lines.append("- **Disambiguation scorer**: two LLM judges, "
+                 "yes/unable/no = 2/1/0 each, summed (0–4 pts per concept)")
     lines.append(f"- **Questions scored**: {overall.n}")
-    lines.append(f"- **Total points**: {overall.points:.1f} / {overall.points_possible:.1f} "
-                 f"({_pct(overall.points, overall.points_possible)})")
+    if overall.overall_score is not None:
+        lines.append(f"- **SCORE: {overall.overall_score * 100:.1f}%** "
+                     f"— weighted mean of the three subtasks")
+    lines.append("")
+    lines.append("| subtask | earned | possible | score | weight |")
+    lines.append("|---|---:|---:|---:|---:|")
+    for name in _SUBTASKS:
+        sc = overall.subtask_scores.get(name)
+        lines.append(
+            f"| {name} | {overall.subtask_points[name]:.1f} | "
+            f"{overall.subtask_possible[name]:.1f} | "
+            f"{(f'{sc * 100:.1f}%' if sc is not None else '—')} | "
+            f"{overall.subtask_weights.get(name, 0) * 100:.0f}% |")
+    lines.append("")
+    lines.append(f"- Raw points (unweighted, diagnostic only): {overall.points:.1f} / "
+                 f"{overall.points_possible:.1f} ({_pct(overall.points, overall.points_possible)})")
     lines.append(f"- **Classification accuracy**: {overall.classify_accuracy * 100:.1f}%")
     if overall.mean_concept_recall is not None:
-        lines.append(f"- **Mean concept recall (disambiguation)**: {overall.mean_concept_recall * 100:.1f}%")
+        lines.append(f"- Mean concept recall: {overall.mean_concept_recall * 100:.1f}% "
+                     f"_(mean of per-question fractions — unlike the subtask score "
+                     f"above, every question counts equally regardless of how many "
+                     f"concepts it has)_")
     if overall.mean_analysis_score_norm is not None:
-        lines.append(f"- **Mean analysis score (0–1)**: {overall.mean_analysis_score_norm:.3f}")
-    if review_queue_size > 0:
-        lines.append(f"- **Items needing manual review**: {review_queue_size}")
+        lines.append(f"- Mean analysis score (0–1): {overall.mean_analysis_score_norm:.3f} "
+                     f"_(over analyses actually attempted; the subtask score above "
+                     f"divides by every gold-unambiguous question, so skipping one "
+                     f"costs you there but not here)_")
+    if n_missing_verdicts > 0:
+        lines.append(f"- **Judge verdicts missing/unparseable** (scored "
+                     f"'unable to determine'): {n_missing_verdicts}")
 
     lines.append("\n## Per cohort\n")
-    lines.append("| cohort | n | points | / possible | % | classify acc | concept recall | analysis (0–1) |")
-    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append("| cohort | n | SCORE | classify | disambiguate | analyze | raw pts |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|")
     for cn in sorted(per_cohort):
         a = per_cohort[cn]
+        f = lambda k: (f"{a.subtask_scores[k] * 100:.1f}%"      # noqa: E731
+                       if a.subtask_scores.get(k) is not None else "—")
         lines.append(
-            f"| {cn} | {a.n} | {a.points:.1f} | {a.points_possible:.1f} | "
-            f"{_pct(a.points, a.points_possible)} | {a.classify_accuracy * 100:.1f}% | "
-            f"{(a.mean_concept_recall * 100):.1f}% | "
-            f"{(a.mean_analysis_score_norm if a.mean_analysis_score_norm is not None else 0):.3f} |"
-            if a.mean_concept_recall is not None
-            else f"| {cn} | {a.n} | {a.points:.1f} | {a.points_possible:.1f} | "
-                 f"{_pct(a.points, a.points_possible)} | {a.classify_accuracy * 100:.1f}% | — | "
-                 f"{(a.mean_analysis_score_norm if a.mean_analysis_score_norm is not None else 0):.3f} |"
-        )
+            f"| {cn} | {a.n} | "
+            f"**{(a.overall_score * 100):.1f}%** | " if a.overall_score is not None
+            else f"| {cn} | {a.n} | — | ")
+        lines[-1] += (f"{f('classify')} | {f('disambiguate')} | {f('analyze')} | "
+                      f"{a.points:.0f}/{a.points_possible:.0f} |")
 
     lines.append("\n## Per category (aggregate across cohorts)\n")
     lines.append("| cat | n | points | / possible | % | classify acc | analysis bands (acc/min/maj) |")
@@ -76,15 +98,17 @@ def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
         lines.append("(no analyses attempted)")
 
     lines.append("\n## Per question\n")
-    lines.append("| qid | cohort | cat | gold_class | agent_class | classify | disambig pts (n_covered/n_gold) | analysis pts (band) | total |")
+    lines.append("| qid | cohort | cat | gold_class | agent_class | classify | disambig pts (of possible) | analysis pts (band) | total |")
     lines.append("|---|---|---:|---|---|---:|---|---|---:|")
     for q in sorted(question_scores, key=lambda x: (x.cohort, x.category, x.question_id)):
         agent_cls = q.classification.agent_label if q.classification else "—"
         cls_pts = q.classification.points if q.classification else 0
         if q.disambiguation:
-            disamb_str = f"{q.disambiguation.points:.1f} ({q.disambiguation.n_covered}/{q.disambiguation.n_gold})"
-            if q.disambiguation.n_disagreed:
-                disamb_str += f" *⊘{q.disambiguation.n_disagreed} review*"
+            disamb_str = (f"{q.disambiguation.points:.1f}/"
+                          f"{q.disambiguation.points_possible:.0f} "
+                          f"({q.disambiguation.n_gold} concepts)")
+            if q.disambiguation.n_split:
+                disamb_str += f" *{q.disambiguation.n_split} split*"
         else:
             disamb_str = "—"
         if q.analysis:
@@ -101,10 +125,13 @@ def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
 
 
 def to_json(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
-            question_scores: list[QuestionScore], agent_name: str, run_id: str) -> str:
+            question_scores: list[QuestionScore], agent_name: str, run_id: str,
+            n_missing_verdicts: int = 0) -> str:
     return json.dumps({
         "agent_name": agent_name,
         "run_id": run_id,
+        "scorer": "llm-judge",
+        "n_missing_judge_verdicts": n_missing_verdicts,
         "overall": _agg_to_dict(overall),
         "per_cohort": {k: _agg_to_dict(v) for k, v in per_cohort.items()},
         "questions": [_question_to_dict(q) for q in question_scores],

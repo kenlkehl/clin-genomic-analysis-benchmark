@@ -26,10 +26,19 @@ The agent under evaluation runs with broad filesystem read access, so **no gold 
 
 ## What it measures
 
-For each clinical question, an agent is graded on three subtasks:
+For each clinical question, an agent is graded on three subtasks. **The headline
+score is an equal-weighted mean of the three**, each first normalised to its own
+possible points — it is *not* a raw point sum. The raw scales are far apart
+(classify 211 pts, disambiguate 1,668, analyze 192), so summing them would hand
+81% of the benchmark to concept-spotting and 9% to actual computation. Weights
+live in `scoring_configs/default.yaml` and default to a third each.
+
+Note that no single question carries all three subtasks: every question is
+classify, then *either* disambiguate (gold says ambiguous) *or* analyze (gold
+says unambiguous). The balance is therefore only meaningful in aggregate.
 
 1. **Classify** the question as `ambiguous` or `unambiguous` — 1 pt correct, 0 pt incorrect.
-2. **Disambiguate** (only if the agent says ambiguous) — list the concepts a questioner would need to specify to make the question deterministically answerable. 1 pt per gold concept covered, judged by two independent LLMs (Claude Vertex + Azure OpenAI gpt-5). Disagreements go to `runs/<agent>/<run_id>/review_queue.yaml` with provisional 0.5 pt for human tiebreak.
+2. **Disambiguate** (only if the agent says ambiguous) — list the concepts a questioner would need to specify to make the question deterministically answerable. Two LLM judges (Claude Vertex + Azure OpenAI gpt-5) each answer, per gold concept, *does the agent's list address this core concept at all?* — **yes = 2 pts, unable to determine = 1 pt, no = 0 pts** — and the two judges' points are summed, so each gold concept is worth 0–4. See [Scoring the disambiguation subtask](#scoring-the-disambiguation-subtask).
 3. **Analyze** (only if the agent says unambiguous) — compute the answer.
    - 2 pts: ≤5% discrepancy from gold (or correct bucket / exact category match)
    - 1 pt: 5–15% discrepancy
@@ -103,8 +112,8 @@ The harness is model- and framework-agnostic. The reference adapter (`adapters/c
 - `scripts/sync_yaml_from_review.py` — workbook → public + gold `questions/*.yaml` sync
 - `adapters/` — agent adapters (reference: `claude_code/`; open-model: `codex_qwen3.6-35B-A3B/`)
 - `questions/<cohort>.yaml` — **public, gold-free** per-cohort banks the eval reads (regenerated from the workbook)
-- `runs/<agent>/<run_id>/` — evaluation outputs + `scorecard.{md,json}` + `review_queue.yaml`
-- `scoring_configs/` — optional band thresholds + per-question overrides (defaults are in code)
+- `runs/<agent>/<run_id>/` — evaluation outputs + `scorecard.{md,json}`
+- `scoring_configs/default.yaml` — subtask weights (default 1/3 each) + optional band thresholds and per-question overrides
 
 **Outside the repo** — under `$CLINGEN_GOLD_ROOT` (default `../clin-genomic-analysis-benchmark_gold`), kept away from the agent:
 - `bpc_benchmark_review_6-19-26.xlsx` — current human-curated bank (source of truth)
@@ -130,15 +139,55 @@ The harness is model- and framework-agnostic. The reference adapter (`adapters/c
 
 When a question is well-specified but the cohort data are structurally insufficient to identify the estimand (e.g. a Cox interaction whose 2×2 design has a ~empty cell — see `prostate_1.2-Qf17acd7c`, docetaxel × PTEN-homozygous-deletion with one near-empty cell / complete separation), the question stays `classification: unambiguous` and the gold marks `unanswerable: true` (with `n_total`/`n_events`/cell counts and an explanation). The scorer credits agents that flag `unanswerable: true` themselves (or match the placeholder) as ACCURATE; a confidently different value is MAJOR. **Do not** flip such questions to `ambiguous` — the question is fine; the data are insufficient.
 
-## Review queue (manual disambiguation triage)
+## Scoring the disambiguation subtask
 
-Items where the two LLM judges disagree on whether the agent covered a gold concept land in `runs/<agent>/<run_id>/review_queue.yaml`, each entry self-contained (question text, agent concepts, the gold concept, both verdicts + justifications, `human_decision: null`). Resolve by setting each `null` to `true`/`false`, then re-score:
+Two LLM judges — Claude on Vertex and gpt-5 on Azure — each read the question,
+our list of gold concepts, and the agent's list. For every gold concept they
+answer one plain question: *does the agent's list address this core concept at
+all?*
 
-```bash
-uv run clingen-bench score --run claude_code/<run_id> --resolve-reviews
-```
+| judge answer | points (each judge) |
+|---|---:|
+| yes | 2 |
+| unable to determine | 1 |
+| no | 0 |
 
-> Note: the Azure (gpt-5) judge is called with a large output budget (`max_tokens=16000` in `clin_genomic_analysis_benchmark/scoring/judge.py`) because gpt-5 spends most of a small budget on hidden reasoning and truncates the verdict JSON. If the judge ever returns all-`needs_review`, check for truncated `judge_azure_raw.txt`.
+Both judges' points are **summed**, so a gold concept is worth **0–4**. Two
+`yes` gives 4; a split gives 2; two `no` gives 0.
+
+**There is no tie-break and no human step.** The judges are never asked to
+agree — a disagreement simply lands mid-scale, which is the honest reading of a
+borderline answer. The old `review_queue.yaml` / `--resolve-reviews` path is
+gone.
+
+The prompts are `clin_genomic_analysis_benchmark/prompts/judge_disambiguation_{system.md,user.md.j2}`.
+Three things in there are load-bearing:
+
+- **"at all"** is the standard. Different wording is fine, and the agent need
+  not resolve the issue — naming the choice that has to be made is enough.
+- Touching the same clinical topic without reaching the actual decision is a
+  `no`. The prompt gives the worked example: if the concept is whether the
+  sequencing panel even tested a gene, an agent that only discusses which
+  alterations in that gene count has **not** addressed it.
+- One agent item can normally only be credited to one gold concept, so a single
+  vague statement cannot sweep credit across the whole list.
+
+The judge writes its one-sentence reasoning *before* its answer, and every
+verdict, reason, and raw response is stored on the scorecard and under
+`runs/<agent>/<run_id>/per_question/<cohort>/<qid>/judge_*_raw.txt`.
+
+If a judge returns nothing usable for a concept, that judge scores it
+`unable to determine` (1 pt) and the scorecard reports
+`Judge verdicts missing/unparseable`, so a flaky endpoint can never be mistaken
+for a hard call.
+
+> **Raw points are not the score.** With 417 gold concepts at 0–4 each,
+> disambiguation is 81% of the 2,071 raw points and analysis is 9%. That is why
+> the headline normalises each subtask to its own possible before combining
+> them — see [What it measures](#what-it-measures). Raw points still appear on
+> the scorecard, labelled as diagnostic.
+
+> Note: the Azure (gpt-5) judge is called with a large output budget (`max_tokens=16000` in `clin_genomic_analysis_benchmark/scoring/judge.py`) because gpt-5 spends most of a small budget on hidden reasoning and truncates the verdict JSON. If a run reports many missing verdicts, check for truncated `judge_azure_raw.txt`.
 
 ## Pointers
 

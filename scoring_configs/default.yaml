@@ -1,0 +1,27 @@
+# Scoring configuration.
+#
+# subtask_weights: how the three subtasks combine into the headline score.
+# Each subtask is first scored as a fraction of its own possible points, then
+# these weights are applied. They are renormalised if they do not sum to 1, and
+# a subtask with nothing to score in a given cohort drops out.
+#
+# This is deliberately NOT a raw point sum. The raw scales are very different
+# (classify 1 pt/question = 211; disambiguate up to 4 pts/concept = 1668;
+# analyze 2 pts/question = 192), so summing raw points would hand ~81% of the
+# benchmark to disambiguation and ~9% to actual computation.
+subtask_weights:
+  classify: 0.3333
+  disambiguate: 0.3333
+  analyze: 0.3333
+
+# Per-answer-type discrepancy options, e.g.:
+# defaults:
+#   proportion:
+#     mode: absolute_pp
+#     accurate_threshold: 0.05
+#     minor_threshold: 0.15
+# overrides:
+#   bladder_1.2-Qabc12345:
+#     proportion: {mode: relative}
+defaults: {}
+overrides: {}

@@ -19,6 +19,7 @@ from . import discrepancy as disc_mod
 from . import judge as judge_mod
 from . import report as report_mod
 from .aggregator import QuestionScore, aggregate
+from .types import JUDGE_MAX_PER_CONCEPT, DisambiguationScoreResult
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +41,14 @@ def score_run(
     *,
     run_path: str,
     scoring_config_path: Optional[Path] = None,
-    resolve_reviews: bool = False,
 ) -> Path:
-    """Score a run dir and write scorecard.{json,md} + review_queue.yaml."""
+    """Score a run dir and write scorecard.{json,md}.
+
+    Disambiguation is scored by two LLM judges, each answering per gold concept
+    "does the agent address this core concept at all?" as yes / unable to
+    determine / no (2 / 1 / 0 pts). Their points are summed, so a concept is
+    worth 0-4. There is no tie-break and no human step.
+    """
     if Path(run_path).is_absolute():
         run_dir = Path(run_path)
     else:
@@ -70,7 +76,6 @@ def score_run(
     azure_client: Optional[AzureClient] = None
 
     question_scores: list[QuestionScore] = []
-    review_queue_path = run_dir / "review_queue.yaml"
 
     for qrun in runs_raw:
         cohort = qrun["cohort"]
@@ -85,6 +90,7 @@ def score_run(
             # (runs/ lives in the agent-reachable repo and is kept gold-free).
             gold_classification=gold_q.classification,
             gold_disambiguation_n=len(gold_q.disambiguation_concepts or []),
+            disambig_points_per_concept=JUDGE_MAX_PER_CONCEPT,
         )
 
         # 1) Classification
@@ -106,9 +112,9 @@ def score_run(
             gold_concepts = list(gold_q.disambiguation_concepts or [])
             if not gold_concepts:
                 # Gold says unambiguous; the agent went down disambig path → 0 pts
-                qs.disambiguation = judge_mod.DisambiguationScoreResult(
-                    question_id=qid, cohort=cohort, n_gold=0, n_covered=0,
-                    n_disagreed=0, points=0.0, decisions=[],
+                qs.disambiguation = DisambiguationScoreResult(
+                    question_id=qid, cohort=cohort, n_gold=0, points=0.0,
+                    decisions=[], points_per_concept=JUDGE_MAX_PER_CONCEPT,
                 )
             else:
                 if claude_client is None:
@@ -163,36 +169,28 @@ def score_run(
 
         question_scores.append(qs)
 
-    # Persist judge review queue
-    n_review = sum(
-        sum(1 for d in q.disambiguation.decisions if d.decision == "needs_review")
-        for q in question_scores if q.disambiguation is not None
-    )
-    if n_review:
-        judge_mod.write_review_queue(
-            [q.disambiguation for q in question_scores if q.disambiguation is not None],
-            review_queue_path,
-        )
+    # A judge that returns no usable verdict is scored "unable to determine";
+    # surface the count so a flaky endpoint cannot pass for a hard call.
+    n_missing = sum(q.disambiguation.n_missing_verdicts for q in question_scores
+                    if q.disambiguation is not None)
+    if n_missing:
+        logger.warning("%d judge verdicts were missing or unparseable and scored "
+                       "'unable to determine'", n_missing)
 
-    if resolve_reviews and review_queue_path.exists():
-        n_resolved = judge_mod.apply_human_resolutions(
-            [q.disambiguation for q in question_scores if q.disambiguation is not None],
-            review_queue_path,
-        )
-        logger.info("Applied %d human resolutions from %s", n_resolved, review_queue_path.name)
-
-    overall, per_cohort = aggregate(question_scores)
+    weights = scoring_config.get("subtask_weights") or None
+    overall, per_cohort = aggregate(question_scores, subtask_weights=weights)
 
     md = report_mod.to_markdown(
         overall=overall, per_cohort=per_cohort,
         question_scores=question_scores,
         agent_name=agent_name, run_id=run_id,
-        review_queue_size=n_review,
+        n_missing_verdicts=n_missing,
     )
     js = report_mod.to_json(
         overall=overall, per_cohort=per_cohort,
         question_scores=question_scores,
         agent_name=agent_name, run_id=run_id,
+        n_missing_verdicts=n_missing,
     )
     atomic_write_text(run_dir / "scorecard.md", md)
     atomic_write_text(run_dir / "scorecard.json", js)

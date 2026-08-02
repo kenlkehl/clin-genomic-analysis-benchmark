@@ -188,12 +188,10 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
 @cli.command()
 @click.option("--run", required=True,
               help="Run dir: relative under runs/ (e.g. claude_code/20260422T...) or absolute.")
-@click.option("--resolve-reviews", is_flag=True,
-              help="Re-score after applying human decisions in the review queue.")
 @click.option("--config", default=None, type=click.Path(exists=True),
               help="Path to scoring config YAML (defaults to scoring_configs/default.yaml if present).")
 @click.option("--verbose", is_flag=True)
-def score(run: str, resolve_reviews: bool, config: str | None, verbose: bool) -> None:
+def score(run: str, config: str | None, verbose: bool) -> None:
     """Score a run (Phase E)."""
     import logging as _logging
     _logging.basicConfig(level=_logging.INFO if verbose else _logging.WARNING,
@@ -205,7 +203,7 @@ def score(run: str, resolve_reviews: bool, config: str | None, verbose: bool) ->
     cfg_path = _P(config) if config else (SCORING_CONFIG_DIR / "default.yaml")
     if not cfg_path.exists():
         cfg_path = None  # use built-in defaults
-    out = score_run(run_path=run, scoring_config_path=cfg_path, resolve_reviews=resolve_reviews)
+    out = score_run(run_path=run, scoring_config_path=cfg_path)
     click.echo(f"Scorecard written to {out / 'scorecard.md'}")
 
 

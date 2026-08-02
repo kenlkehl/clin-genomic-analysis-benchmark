@@ -8,7 +8,25 @@ from typing import Optional
 
 from .classification import ClassificationResult
 from .discrepancy import Band, DiscrepancyResult
-from .judge import DisambiguationScoreResult
+from .types import DisambiguationScoreResult
+
+# The three subtasks are graded on wildly different raw scales — 1 pt per
+# question for classify, 0-4 per gold concept for disambiguate (two judges x
+# 2 pts), 0-2 per unambiguous question for analyze — and the bank keeps changing
+# (237 -> 223 -> 211 questions so far). So the headline is NOT a raw point sum.
+# Each subtask is scored as a fraction of its own possible, then the three are
+# combined with these weights. That keeps the balance fixed no matter how many
+# concepts or questions the bank gains or loses.
+#
+# Note that no single question carries all three subtasks: every question is
+# classify, then EITHER disambiguate (gold says ambiguous) OR analyze (gold says
+# unambiguous). The weighting is therefore only meaningful in aggregate.
+SUBTASKS = ("classify", "disambiguate", "analyze")
+DEFAULT_SUBTASK_WEIGHTS: dict[str, float] = {
+    "classify": 1 / 3,
+    "disambiguate": 1 / 3,
+    "analyze": 1 / 3,
+}
 
 
 @dataclass
@@ -18,6 +36,10 @@ class QuestionScore:
     category: int
     gold_classification: str               # "ambiguous" | "unambiguous"
     gold_disambiguation_n: int = 0         # gold concepts, independent of agent path
+    # Max points one gold concept can earn under the active scorer: 4 for the
+    # two-judge panel (2 pts each). Needed so a question the
+    # agent never reached still gets the right denominator.
+    disambig_points_per_concept: float = 1.0
     classification: Optional[ClassificationResult] = None
     disambiguation: Optional[DisambiguationScoreResult] = None
     analysis: Optional[DiscrepancyResult] = None
@@ -40,18 +62,21 @@ class QuestionScore:
         # 1 (classify) + (n_gold disambig OR 2 analyze pts max)
         possible = 1.0  # classify
         if self.gold_classification == "ambiguous":
-            possible += float(self.disambiguation_points_possible)
+            possible += self.disambiguation_points_possible
         else:
             possible += 2.0
         return possible
 
     @property
-    def disambiguation_points_possible(self) -> int:
+    def disambiguation_points_possible(self) -> float:
+        per = (self.disambiguation.points_per_concept
+               if self.disambiguation is not None
+               else self.disambig_points_per_concept)
         if self.gold_disambiguation_n:
-            return self.gold_disambiguation_n
+            return self.gold_disambiguation_n * per
         if self.disambiguation is not None:
-            return self.disambiguation.n_gold
-        return 0
+            return self.disambiguation.n_gold * per
+        return 0.0
 
 
 @dataclass
@@ -71,7 +96,7 @@ class CategoryAgg:
 class CohortAgg:
     cohort: str
     n: int = 0
-    points: float = 0.0
+    points: float = 0.0                 # raw, unweighted — diagnostic only
     points_possible: float = 0.0
     classify_accuracy: float = 0.0
     mean_concept_recall: Optional[float] = None
@@ -79,11 +104,35 @@ class CohortAgg:
     by_category: dict[int, CategoryAgg] = field(default_factory=dict)
     by_answer_type: dict[str, dict[str, int]] = field(default_factory=dict)
 
+    # Raw points earned / available per subtask.
+    subtask_points: dict[str, float] = field(
+        default_factory=lambda: {k: 0.0 for k in SUBTASKS})
+    subtask_possible: dict[str, float] = field(
+        default_factory=lambda: {k: 0.0 for k in SUBTASKS})
+    # Each subtask as a fraction of its own possible, and the weighted headline.
+    subtask_scores: dict[str, Optional[float]] = field(
+        default_factory=lambda: {k: None for k in SUBTASKS})
+    subtask_weights: dict[str, float] = field(
+        default_factory=lambda: dict(DEFAULT_SUBTASK_WEIGHTS))
+    overall_score: Optional[float] = None    # THE headline, 0-1
+
 
 def _accumulate(agg: CohortAgg, q: QuestionScore) -> None:
     agg.n += 1
     agg.points += q.total_points
     agg.points_possible += q.points_possible
+
+    # Per-subtask tallies. Denominators come from the GOLD classification, so an
+    # agent that misroutes a question still owes the points it skipped.
+    agg.subtask_points["classify"] += q.classification.points if q.classification else 0.0
+    agg.subtask_possible["classify"] += 1.0
+    if q.gold_classification == "ambiguous":
+        agg.subtask_points["disambiguate"] += (
+            q.disambiguation.points if q.disambiguation is not None else 0.0)
+        agg.subtask_possible["disambiguate"] += q.disambiguation_points_possible
+    else:
+        agg.subtask_points["analyze"] += q.analysis.points if q.analysis else 0.0
+        agg.subtask_possible["analyze"] += 2.0
     cat = agg.by_category.setdefault(q.category, CategoryAgg(category=q.category))
     cat.n += 1
     cat.points += q.total_points
@@ -99,8 +148,11 @@ def _accumulate(agg: CohortAgg, q: QuestionScore) -> None:
             atype[q.analysis.band.value] += 1
     if q.gold_classification == "ambiguous" and q.disambiguation_points_possible > 0:
         cat._disambig_n_qs += 1
+        # Recall is points / points_possible, so it stays on the same footing as
+        # the points column whichever scorer ran (0-4 per concept for the judge
+        # panel, 0-1 for rules).
         cat.disambig_concept_recall += (
-            q.disambiguation.n_covered / q.disambiguation_points_possible
+            q.disambiguation.points / q.disambiguation_points_possible
             if q.disambiguation is not None else 0.0
         )
 
@@ -118,7 +170,7 @@ def _finalise_cohort(agg: CohortAgg, qs: list[QuestionScore]) -> CohortAgg:
     ]
     if disambig_questions:
         recall = sum(
-            q.disambiguation.n_covered / q.disambiguation_points_possible
+            q.disambiguation.points / q.disambiguation_points_possible
             if q.disambiguation is not None else 0.0
             for q in disambig_questions
         )
@@ -131,12 +183,36 @@ def _finalise_cohort(agg: CohortAgg, qs: list[QuestionScore]) -> CohortAgg:
     for cat in agg.by_category.values():
         if cat._disambig_n_qs > 0:
             cat.disambig_concept_recall = cat.disambig_concept_recall / cat._disambig_n_qs
+
+    # Subtask fractions, then the weighted headline. A subtask with nothing to
+    # score (e.g. a cohort with no ambiguous questions) drops out and the
+    # remaining weights are renormalised rather than counting it as zero.
+    num = den = 0.0
+    for name in SUBTASKS:
+        possible = agg.subtask_possible[name]
+        if possible <= 0:
+            agg.subtask_scores[name] = None
+            continue
+        frac = agg.subtask_points[name] / possible
+        agg.subtask_scores[name] = frac
+        w = agg.subtask_weights.get(name, 0.0)
+        num += w * frac
+        den += w
+    agg.overall_score = (num / den) if den > 0 else None
     return agg
 
 
-def aggregate(question_scores: list[QuestionScore]) -> tuple[CohortAgg, dict[str, CohortAgg]]:
-    """Return (overall_agg, {cohort_name: cohort_agg})."""
-    overall = CohortAgg(cohort="ALL")
+def aggregate(
+    question_scores: list[QuestionScore],
+    subtask_weights: Optional[dict[str, float]] = None,
+) -> tuple[CohortAgg, dict[str, CohortAgg]]:
+    """Return (overall_agg, {cohort_name: cohort_agg}).
+
+    `subtask_weights` defaults to an equal third each; pass e.g.
+    {"classify": 0.2, "disambiguate": 0.4, "analyze": 0.4} to reweight.
+    """
+    weights = dict(subtask_weights or DEFAULT_SUBTASK_WEIGHTS)
+    overall = CohortAgg(cohort="ALL", subtask_weights=weights)
     per_cohort: dict[str, list[QuestionScore]] = defaultdict(list)
     for q in question_scores:
         per_cohort[q.cohort].append(q)
@@ -145,7 +221,7 @@ def aggregate(question_scores: list[QuestionScore]) -> tuple[CohortAgg, dict[str
 
     cohort_aggs: dict[str, CohortAgg] = {}
     for cname, qs in per_cohort.items():
-        agg = CohortAgg(cohort=cname)
+        agg = CohortAgg(cohort=cname, subtask_weights=dict(weights))
         for q in qs:
             _accumulate(agg, q)
         cohort_aggs[cname] = _finalise_cohort(agg, qs)
