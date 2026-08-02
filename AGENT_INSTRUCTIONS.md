@@ -331,6 +331,26 @@ fields are JSON numbers; integer counts are JSON integers.
 | `odds_ratio_with_ci`       | `value` (float), `ci_low` (float), `ci_high` (float), `p_value` (float), `n_total` (int) |
 | `pvalue`                   | `value` (float), `test_name` (str), `n_total` (int) |
 | `categorical`              | `value` (str), `n_total` (int) |
+| `categorical_distribution` | `proportions_by_category` (object: category name → float), `counts_by_category` (object: category name → int), `denominator` (int) |
+
+For `categorical_distribution`, use the category labels exactly as the question
+names them, and cover every category it lists — scoring compares your category
+set against the reference set and a mismatch scores zero. Proportions are of
+`denominator`, so they should sum to ~1.0 unless the question asks otherwise.
+Each category is scored separately and the **worst-fitting one sets the grade**,
+so a small category estimated badly is not offset by large ones estimated well.
+
+```json
+{ "answer_type": "categorical_distribution",
+  "answer": {
+    "denominator": 1484,
+    "proportions_by_category": {"Left colon": 0.2925, "Right colon": 0.3288,
+                                "Rectal": 0.3342, "Other": 0.0445},
+    "counts_by_category":      {"Left colon": 434, "Right colon": 488,
+                                "Rectal": 496, "Other": 66}
+  }
+}
+```
 
 **Full `analyze` output:**
 

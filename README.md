@@ -123,8 +123,6 @@ Two details worth knowing:
 
 Thresholds are configurable per answer type and per question in `scoring_configs/default.yaml`.
 
-> `categorical_distribution` is implemented in the scorer but is not yet in the answer-type table in `AGENT_INSTRUCTIONS.md`.
-
 #### Unanswerable questions
 
 Occasionally a question is perfectly well specified but the data cannot identify the estimand — for example `prostate_1.2-Qf17acd7c`, a Cox interaction between docetaxel and PTEN homozygous deletion where one cell of the 2×2 is nearly empty and the model separates.
