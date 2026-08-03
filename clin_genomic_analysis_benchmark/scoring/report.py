@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from pathlib import Path
-from typing import Optional
 
 from .aggregator import SUBTASKS as _SUBTASKS
 from .aggregator import CohortAgg, QuestionScore
@@ -19,14 +17,16 @@ def _pct(num: float, den: float) -> str:
 
 def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
                 question_scores: list[QuestionScore], agent_name: str, run_id: str,
-                n_missing_verdicts: int = 0) -> str:
+                correct_concept_points: float = 1.0,
+                incorrect_concept_penalty: float = 0.25) -> str:
     lines: list[str] = []
-    lines.append(f"# clin-genomic-analysis-benchmark scorecard\n")
+    lines.append("# clin-genomic-analysis-benchmark scorecard\n")
     lines.append(f"- **Agent**: `{agent_name}`")
     lines.append(f"- **Run id**: `{run_id}`")
     lines.append(f"- **Cohorts**: {len(per_cohort)}")
-    lines.append("- **Disambiguation scorer**: two LLM judges, "
-                 "yes/unable/no = 2/1/0 each, summed (0–4 pts per concept)")
+    lines.append("- **Disambiguation scorer**: exact concept-ID match; "
+                 f"+{correct_concept_points:g} per correct selection, "
+                 f"−{incorrect_concept_penalty:g} per incorrect selection, floor 0")
     lines.append(f"- **Questions scored**: {overall.n}")
     if overall.overall_score is not None:
         lines.append(f"- **SCORE: {overall.overall_score * 100:.1f}%** "
@@ -45,8 +45,8 @@ def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
     lines.append(f"- Raw points (unweighted, diagnostic only): {overall.points:.1f} / "
                  f"{overall.points_possible:.1f} ({_pct(overall.points, overall.points_possible)})")
     lines.append(f"- **Classification accuracy**: {overall.classify_accuracy * 100:.1f}%")
-    if overall.mean_concept_recall is not None:
-        lines.append(f"- Mean concept recall: {overall.mean_concept_recall * 100:.1f}% "
+    if overall.mean_disambiguation_score is not None:
+        lines.append(f"- Mean disambiguation score: {overall.mean_disambiguation_score * 100:.1f}% "
                      f"_(mean of per-question fractions — unlike the subtask score "
                      f"above, every question counts equally regardless of how many "
                      f"concepts it has)_")
@@ -55,10 +55,6 @@ def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
                      f"_(over analyses actually attempted; the subtask score above "
                      f"divides by every gold-unambiguous question, so skipping one "
                      f"costs you there but not here)_")
-    if n_missing_verdicts > 0:
-        lines.append(f"- **Judge verdicts missing/unparseable** (scored "
-                     f"'unable to determine'): {n_missing_verdicts}")
-
     lines.append("\n## Per cohort\n")
     lines.append("| cohort | n | SCORE | classify | disambiguate | analyze | raw pts |")
     lines.append("|---|---:|---:|---:|---:|---:|---:|")
@@ -106,9 +102,9 @@ def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
         if q.disambiguation:
             disamb_str = (f"{q.disambiguation.points:.1f}/"
                           f"{q.disambiguation.points_possible:.0f} "
-                          f"({q.disambiguation.n_gold} concepts)")
-            if q.disambiguation.n_split:
-                disamb_str += f" *{q.disambiguation.n_split} split*"
+                          f"(TP={len(q.disambiguation.correct_concept_ids)}, "
+                          f"FP={len(q.disambiguation.incorrect_concept_ids)}, "
+                          f"FN={len(q.disambiguation.missed_concept_ids)})")
         else:
             disamb_str = "—"
         if q.analysis:
@@ -126,12 +122,18 @@ def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
 
 def to_json(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
             question_scores: list[QuestionScore], agent_name: str, run_id: str,
-            n_missing_verdicts: int = 0) -> str:
+            correct_concept_points: float = 1.0,
+            incorrect_concept_penalty: float = 0.25) -> str:
     return json.dumps({
         "agent_name": agent_name,
         "run_id": run_id,
-        "scorer": "llm-judge",
-        "n_missing_judge_verdicts": n_missing_verdicts,
+        "scorer": "deterministic-rules-v2",
+        "disambiguation_scoring": {
+            "match": "exact_concept_id",
+            "correct_concept_points": correct_concept_points,
+            "incorrect_concept_penalty": incorrect_concept_penalty,
+            "question_floor": 0.0,
+        },
         "overall": _agg_to_dict(overall),
         "per_cohort": {k: _agg_to_dict(v) for k, v in per_cohort.items()},
         "questions": [_question_to_dict(q) for q in question_scores],

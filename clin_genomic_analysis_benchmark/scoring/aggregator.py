@@ -7,12 +7,12 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .classification import ClassificationResult
-from .discrepancy import Band, DiscrepancyResult
+from .discrepancy import DiscrepancyResult
 from .types import DisambiguationScoreResult
 
 # The three subtasks are graded on wildly different raw scales — 1 pt per
-# question for classify, 0-4 per gold concept for disambiguate (two judges x
-# 2 pts), 0-2 per unambiguous question for analyze — and the bank keeps changing
+# question for classify, 0-1 per gold concept before false-positive penalties
+# for disambiguate, and 0-2 per unambiguous question for analyze — and the bank keeps changing
 # (237 -> 223 -> 211 questions so far). So the headline is NOT a raw point sum.
 # Each subtask is scored as a fraction of its own possible, then the three are
 # combined with these weights. That keeps the balance fixed no matter how many
@@ -36,9 +36,8 @@ class QuestionScore:
     category: int
     gold_classification: str               # "ambiguous" | "unambiguous"
     gold_disambiguation_n: int = 0         # gold concepts, independent of agent path
-    # Max points one gold concept can earn under the active scorer: 4 for the
-    # two-judge panel (2 pts each). Needed so a question the
-    # agent never reached still gets the right denominator.
+    # Max points one gold concept can earn. Needed so a question the agent never
+    # reached still gets the right denominator.
     disambig_points_per_concept: float = 1.0
     classification: Optional[ClassificationResult] = None
     disambiguation: Optional[DisambiguationScoreResult] = None
@@ -88,7 +87,7 @@ class CategoryAgg:
     classify_correct: int = 0
     classify_n: int = 0
     analysis_band_counts: dict[str, int] = field(default_factory=lambda: {"accurate": 0, "minor": 0, "major": 0})
-    disambig_concept_recall: float = 0.0   # mean across ambiguous questions
+    mean_disambiguation_score: float = 0.0  # mean penalized score across ambiguous questions
     _disambig_n_qs: int = 0
 
 
@@ -99,7 +98,7 @@ class CohortAgg:
     points: float = 0.0                 # raw, unweighted — diagnostic only
     points_possible: float = 0.0
     classify_accuracy: float = 0.0
-    mean_concept_recall: Optional[float] = None
+    mean_disambiguation_score: Optional[float] = None
     mean_analysis_score_norm: Optional[float] = None     # scaled to [0,1] over 2 max pts
     by_category: dict[int, CategoryAgg] = field(default_factory=dict)
     by_answer_type: dict[str, dict[str, int]] = field(default_factory=dict)
@@ -148,10 +147,7 @@ def _accumulate(agg: CohortAgg, q: QuestionScore) -> None:
             atype[q.analysis.band.value] += 1
     if q.gold_classification == "ambiguous" and q.disambiguation_points_possible > 0:
         cat._disambig_n_qs += 1
-        # Recall is points / points_possible, so it stays on the same footing as
-        # the points column whichever scorer ran (0-4 per concept for the judge
-        # panel, 0-1 for rules).
-        cat.disambig_concept_recall += (
+        cat.mean_disambiguation_score += (
             q.disambiguation.points / q.disambiguation_points_possible
             if q.disambiguation is not None else 0.0
         )
@@ -169,12 +165,12 @@ def _finalise_cohort(agg: CohortAgg, qs: list[QuestionScore]) -> CohortAgg:
         if q.gold_classification == "ambiguous" and q.disambiguation_points_possible > 0
     ]
     if disambig_questions:
-        recall = sum(
+        score = sum(
             q.disambiguation.points / q.disambiguation_points_possible
             if q.disambiguation is not None else 0.0
             for q in disambig_questions
         )
-        agg.mean_concept_recall = recall / len(disambig_questions)
+        agg.mean_disambiguation_score = score / len(disambig_questions)
     analysis_questions = [q for q in qs if q.analysis is not None]
     if analysis_questions:
         # Normalise to [0, 1] (analysis max is 2 pts per question)
@@ -182,7 +178,8 @@ def _finalise_cohort(agg: CohortAgg, qs: list[QuestionScore]) -> CohortAgg:
 
     for cat in agg.by_category.values():
         if cat._disambig_n_qs > 0:
-            cat.disambig_concept_recall = cat.disambig_concept_recall / cat._disambig_n_qs
+            cat.mean_disambiguation_score = (
+                cat.mean_disambiguation_score / cat._disambig_n_qs)
 
     # Subtask fractions, then the weighted headline. A subtask with nothing to
     # score (e.g. a cohort with no ambiguous questions) drops out and the

@@ -13,15 +13,15 @@ import logging
 import os
 import platform
 import socket
-import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from ..cohorts import Cohort, get_cohort, resolve_cohorts
+from ..cohorts import Cohort, resolve_cohorts
+from ..concepts import concept_menu_payload
 from ..config import RUNS_DIR, settings
 from ..questions import io as q_io
 from ..questions.schema import PublicQuestion
@@ -37,20 +37,23 @@ _DEFAULT_INSTRUCTIONS = {
         "The cohort folder and a data dictionary are provided. Your task is to decide whether "
         "the question is ANSWERABLE deterministically given the data, or whether it is "
         "AMBIGUOUS such that two competent analysts could reasonably compute different numbers. "
+        "A question is ambiguous when one or more items from the supplied concept menu must be "
+        "specified before a deterministic analysis can be chosen. "
         "Read enough of the data dictionary and file inventory to make an informed call. "
         "Return strictly: {\"classification\": \"ambiguous\"|\"unambiguous\", \"rationale\": \"...\"}."
     ),
     "disambiguate": (
-        "You previously classified this question as AMBIGUOUS. List the concrete concepts a "
-        "questioner would need to specify in order to make the question deterministically "
-        "answerable from this cohort's data. Each concept should be a short noun-phrase (≤ ~12 words). "
-        "Return strictly: {\"concepts\": [\"...\", \"...\"]}."
+        "You previously classified this question as AMBIGUOUS. Select every material concept the "
+        "questioner must specify to make the analysis deterministic, using only IDs from "
+        "disambiguation_concept_menu. Select an ID only when that choice is genuinely unresolved "
+        "after applying the benchmark conventions; incorrect selections are penalized. "
+        "Return strictly: {\"concept_ids\": [\"MENU_ID\", \"...\"]}."
     ),
     "analyze": (
         "You previously classified this question as UNAMBIGUOUS. Compute the answer using the "
         "cohort data files. Use Python (pandas/numpy/scipy/statsmodels/lifelines as needed). "
         "Return strictly: "
-        "{\"answer_type\": \"count|proportion|median_with_ci|hazard_ratio_with_ci|odds_ratio_with_ci|pvalue|categorical\", "
+        "{\"answer_type\": \"count|proportion|median_with_ci|hazard_ratio_with_ci|odds_ratio_with_ci|pvalue|categorical|categorical_distribution\", "
         "\"answer\": {<typed fields>}, \"methods\": \"...\", \"supporting_evidence\": {...}}."
     ),
 }
@@ -80,7 +83,74 @@ class RunManifest:
     cohorts: list[str]
     n_questions: int
     n_completed: int
+    agent_provenance: dict
     settings: dict
+
+
+_SAFE_AGENT_ENV_VARS = (
+    "CLINGEN_CLAUDE_MODEL",
+    "CLAUDE_CODE_USE_VERTEX",
+    "ANTHROPIC_VERTEX_PROJECT_ID",
+    "CLOUD_ML_REGION",
+    "ANTHROPIC_VERTEX_REGION",
+    "ANTHROPIC_MODEL",
+    "CODEX_MODEL",
+    "CODEX_PROFILE",
+    "CODEX_SANDBOX_MODE",
+)
+
+
+def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) -> dict:
+    """Capture reproducibility metadata from a strict, non-secret allow-list.
+
+    For the reference Claude Code adapter, also record the effective defaults
+    applied by the adapter so a manifest remains informative when an operator
+    did not explicitly export every setting.
+    """
+    env = os.environ if environ is None else environ
+    explicit_env = {
+        name: env[name]
+        for name in _SAFE_AGENT_ENV_VARS
+        if env.get(name, "").strip()
+    }
+    provenance: dict = {"environment": explicit_env}
+
+    if "adapters/claude_code/" not in agent_cmd:
+        return provenance
+
+    use_vertex = env.get("CLAUDE_CODE_USE_VERTEX", "1") == "1"
+    provenance.update({
+        "adapter": "claude_code",
+        "provider": "google_vertex_ai" if use_vertex else "anthropic_api",
+        "model": env.get("CLINGEN_CLAUDE_MODEL", "claude-opus-4-8"),
+        "model_source": (
+            "CLINGEN_CLAUDE_MODEL"
+            if env.get("CLINGEN_CLAUDE_MODEL", "").strip()
+            else "adapter_default"
+        ),
+    })
+
+    if use_vertex:
+        # Claude Code gives the Google project variables precedence over
+        # ANTHROPIC_VERTEX_PROJECT_ID. Mirror that ordering in the manifest.
+        project_candidates = (
+            "GOOGLE_CLOUD_PROJECT",
+            "GCLOUD_PROJECT",
+            "ANTHROPIC_VERTEX_PROJECT_ID",
+        )
+        project_source = next(
+            (name for name in project_candidates if env.get(name, "").strip()),
+            None,
+        )
+        provenance["project_id"] = (
+            env[project_source] if project_source else "kehllab-caia-v2"
+        )
+        provenance["project_id_source"] = project_source or "adapter_default"
+        region = env.get("CLOUD_ML_REGION", "").strip()
+        provenance["region"] = region or None
+        provenance["region_source"] = "CLOUD_ML_REGION" if region else "unknown"
+
+    return provenance
 
 
 def _serialise(inv: StageInvocation) -> dict:
@@ -100,6 +170,7 @@ def _build_question_payload(*, q: PublicQuestion, cohort: Cohort, stage: str, sc
                             prior_classification: Optional[str] = None,
                             max_runtime_seconds: Optional[int] = None) -> dict:
     payload = {
+        "contract_version": "2",
         "question_id": q.id,
         "question_text": q.text,
         "cohort": cohort.name,
@@ -109,6 +180,7 @@ def _build_question_payload(*, q: PublicQuestion, cohort: Cohort, stage: str, sc
         "data_dictionary_path": str(data_dictionary_path.resolve()),
         "scratch_dir": str(scratch_dir.resolve()),
         "instructions": _DEFAULT_INSTRUCTIONS[stage],
+        "disambiguation_concept_menu": concept_menu_payload(),
     }
     if prior_classification is not None:
         payload["prior_classification"] = prior_classification
@@ -272,6 +344,7 @@ def run_eval(
         cohorts=[c.name for c in cohorts],
         n_questions=n_total,
         n_completed=sum(1 for r in runs if r.error is None),
+        agent_provenance=_agent_provenance(agent_cmd),
         settings={
             "stages": stages,
             "max_parallel": max_parallel,

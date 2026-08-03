@@ -15,13 +15,13 @@ All six cohorts are wired end to end. The reference adapter drives Claude Code o
 | Question bank | **211 questions — 96 unambiguous, 115 ambiguous**, after four rounds of oncologist review. Curated in `bpc_benchmark_review_6-19-26.xlsx` under `$CLINGEN_GOLD_ROOT` |
 | Gold answers | 96 / 96 unambiguous questions have a computed, re-runnable gold answer; 1 is marked `unanswerable` (see below) |
 | Agent-facing bank | `questions/<cohort>.yaml` — `id`, `category`, `text` only. This is everything the agent under test ever sees |
-| Gold bank | `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` — answers, concepts, classifications. Read by the scorer, never by the agent |
+| Gold bank | `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` — answers, canonical concept IDs, classifications, and audit prose. Read by the scorer, never by the agent |
 | Agent guidance | `AGENT_INSTRUCTIONS.md` — served verbatim to the agent by the reference adapter |
 | Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_qwen3.6-35B-A3B/` (Codex CLI against a local vLLM server), `adapters/template/` to write your own |
 
 ### Keeping the answers away from the agent
 
-The agent under evaluation runs with broad filesystem read access, so **no gold sits in this repo**. The gold question bank, the computed gold answers, and the review workbook all live under **`$CLINGEN_GOLD_ROOT`** (default: sibling directory `../clin-genomic-analysis-benchmark_gold`).
+The agent under evaluation runs with broad filesystem read access, so **no gold sits in this repo**. The gold question bank, the computed gold answers, and the review workbook all live under **`$CLINGEN_GOLD_ROOT`** (default: `../chatbpc/chatbpc_benchmark_gold`).
 
 The repo's `questions/<cohort>.yaml` is a projection with the answers stripped out — it is a different Pydantic model with no fields for classification, concepts, or gold answers, so leaking through it is a type error rather than an oversight. Evaluation reads the public bank; only the scorer, a trusted harness process, reads the gold bank.
 
@@ -37,7 +37,7 @@ The headline score is the **equal-weighted mean of the three subtasks**, each fi
 SCORE = (classify% + disambiguate% + analyze%) / 3
 ```
 
-It is deliberately not a sum of raw points. The three subtasks sit on very different scales — 211 raw points for classify, 1,668 for disambiguate, 192 for analyze — so a raw sum would make concept-spotting 81% of the benchmark and actual computation 9%. Normalising each subtask first also keeps the balance stable as the bank gains or loses questions. Weights live in `scoring_configs/default.yaml` if you want something other than thirds.
+It is deliberately not a sum of raw points. The three subtasks sit on different scales — 211 raw points for classify, 420 gold concept points for disambiguate before false-positive penalties, and 192 for analyze. Normalising each subtask first keeps the balance stable as the bank gains or loses questions. Weights live in `scoring_configs/default.yaml` if you want something other than thirds.
 
 A scorecard looks like this:
 
@@ -46,7 +46,7 @@ A scorecard looks like this:
 
 | subtask      | earned | possible | score | weight |
 | classify     |  172.0 |    211.0 | 81.5% |    33% |
-| disambiguate |  750.0 |   1668.0 | 45.0% |    33% |
+| disambiguate |  189.0 |    420.0 | 45.0% |    33% |
 | analyze      |  150.0 |    192.0 | 78.1% |    33% |
 ```
 
@@ -58,31 +58,23 @@ Is this question answerable as written, or does it leave a material analytic cho
 
 ### 2. Disambiguate
 
-Only asked when the agent said the question was ambiguous. The agent lists what a questioner would have to pin down.
+Only asked when the agent said the question was ambiguous. The task payload contains a fixed menu of canonical concept IDs (for example `OUTCOME_METRIC`, `LINE_OF_THERAPY`, and `PANEL_COVERAGE`), and the agent returns JSON such as:
 
-Two LLM judges — Claude on Vertex and gpt-5 on Azure — each read the question, our list of gold concepts, and the agent's list. For every gold concept, each judge answers one question: **does the agent's list address this core concept at all?**
+```json
+{"concept_ids": ["OUTCOME_METRIC", "TIME_ORIGIN"]}
+```
 
-| judge answer | points, per judge |
+Scoring is an exact set comparison—there is no semantic matcher and no LLM call:
+
+| selection | default points |
 |---|---:|
-| yes | 2 |
-| unable to determine | 1 |
-| no | 0 |
+| ID is in the question's gold set | +1.00 |
+| ID is not in the gold set | −0.25 |
+| gold ID was omitted | 0 |
 
-The two judges' points are **summed**, so a gold concept is worth **0–4**. Two `yes` gives 4, a split gives 2, two `no` gives 0.
+Per-question points are floored at zero and capped at the number of gold IDs. The false-positive penalty discourages selecting the whole menu: four incorrect selections cancel one correct selection. Both the reward and penalty are configurable in `scoring_configs/default.yaml`.
 
-**The judges are never asked to agree, and nothing waits on a human.** A disagreement lands mid-scale on its own, which is the honest reading of a borderline answer.
-
-The prompts are in `clin_genomic_analysis_benchmark/prompts/`. Three things in them carry most of the weight:
-
-- **"At all"** is the bar. Different wording is fine, and the agent does not have to resolve the issue — naming the choice that has to be made is enough.
-- **Touching the same clinical topic without reaching the actual decision is a `no`.** The prompt works through an example: if the concept is whether the sequencing panel even tested a gene, an agent that only discusses which alterations in that gene should count has not addressed it. Those are different problems that happen to share a gene name.
-- **One item from the agent can normally only be credited once**, so a single vague statement cannot collect credit across the whole list.
-
-Each judge writes its one-sentence reasoning before its verdict. Every verdict, reason, and raw response is kept — on the scorecard and in `runs/<agent>/<run_id>/per_question/<cohort>/<qid>/judge_*_raw.txt`.
-
-If a judge returns nothing usable for a concept, that judge scores it `unable to determine` and the scorecard reports a `Judge verdicts missing/unparseable` count, so a flaky endpoint is never mistaken for a hard call.
-
-> The gpt-5 judge is called with `max_tokens=16000`. gpt-5 spends most of a small budget on hidden reasoning and then truncates its JSON. If a run reports many missing verdicts, check `judge_azure_raw.txt` for a cut-off response.
+The scorecard JSON records the selected, correct, incorrect, and missed IDs for every question. The reviewed prose concepts remain in the out-of-repo workbook for auditability, while the adjacent `disambiguation_concept_ids` column is the machine-scored gold.
 
 ### 3. Analyze
 
@@ -137,7 +129,7 @@ These stay `classification: unambiguous`, and the gold carries `unanswerable: tr
 
 ## The question bank and how to change it
 
-The source of truth is the **review workbook**, `$CLINGEN_GOLD_ROOT/bpc_benchmark_review_6-19-26.xlsx`: one row per question, holding the classification, question text, disambiguation concepts, analysis plan, expected answer type, gold answer, gold script, and the per-round review columns that record how the bank got here.
+The source of truth is the **review workbook**, `$CLINGEN_GOLD_ROOT/bpc_benchmark_review_6-19-26.xlsx`: one row per question, holding the classification, question text, reviewed prose concepts, canonical disambiguation concept IDs, analysis plan, expected answer type, gold answer, gold script, and the per-round review columns that record how the bank got here. In this workspace the default resolves to `~/Partners HealthCare Dropbox/Kenneth Kehl/chatbpc/chatbpc_benchmark_gold/bpc_benchmark_review_6-19-26.xlsx`.
 
 The harness never reads the workbook. After any edit, regenerate both YAML banks:
 
@@ -146,6 +138,8 @@ The harness never reads the workbook. After any edit, regenerate both YAML banks
 ```
 
 That validates the workbook against the `Question` schema and writes the gold bank to `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` and the stripped public bank to `questions/<cohort>.yaml`. **Skip it and the agent and scorer are working from a stale bank.**
+
+For an older workbook that has reviewed prose concepts but no canonical-ID column, run `scripts/migrate_workbook_concepts.py` once. It adds `disambiguation_concept_ids`, creates a `concept_menu` sheet, and preserves a `.pre_rules_backup.xlsx` copy before saving.
 
 ## Quickstart
 
@@ -164,7 +158,7 @@ uv run clingen-bench eval \
   --cohort bladder_1.2 \
   --max-parallel 4
 
-# Score it. The disambiguation judges need Vertex + Azure.
+# Score it locally. Scoring makes no model or network calls.
 uv run clingen-bench score --run claude_code/<new_run_id>
 
 # One question, for a smoke test
@@ -175,7 +169,13 @@ uv run clingen-bench eval --agent "bash adapters/claude_code/run.sh" \
 uv run clingen-bench inspect --cohort bladder_1.2
 ```
 
-`CLINGEN_CLAUDE_MODEL` (default `claude-opus-4-8`) sets both the reference agent and the Claude judge.
+`CLINGEN_CLAUDE_MODEL` (default `claude-opus-4-8`) sets the reference agent model. It has no role in scoring.
+
+Every run's `manifest.json` includes a non-secret `agent_provenance` block. For
+the Claude Code adapter this records the effective model, provider, Vertex
+project, region, the source of each resolved value, and an allow-listed snapshot
+of relevant environment settings. API keys and credential paths are never
+included.
 
 `generate-questions` and `compute-gold` build a bank and its gold answers with an LLM. They are how the bank started, but it is now curated by hand in the workbook, so day to day you want `sync_yaml_from_review.py` instead.
 
@@ -194,10 +194,12 @@ Start from `adapters/template/`.
 ## Repo layout
 
 - `clin_genomic_analysis_benchmark/` — the Python package: CLI `clingen-bench`, evaluation pipeline, scoring
+- `clin_genomic_analysis_benchmark/concepts.py` — canonical concept menu and one-time legacy migration rules
 - `AGENT_INSTRUCTIONS.md` — the rules the agent under test follows; the authoritative statement of the conventions below
 - `questions/<cohort>.yaml` — public, answer-free question banks
 - `adapters/` — agent adapters
 - `scripts/sync_yaml_from_review.py` — workbook → both YAML banks
+- `scripts/migrate_workbook_concepts.py` — one-time prose-concept → canonical-ID workbook migration
 - `scoring_configs/default.yaml` — subtask weights, discrepancy thresholds, per-question overrides
 - `runs/<agent>/<run_id>/` — evaluation output and `scorecard.{md,json}` (not in git)
 

@@ -12,13 +12,19 @@ Maps the review columns into the CohortQuestionFile / Question Pydantic schema a
 Keeping the answers out of the in-repo bank is what prevents the agent from reading gold.
 """
 from __future__ import annotations
-import json, re, sys
+import json
+import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 import openpyxl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from clin_genomic_analysis_benchmark import config  # noqa: E402
+from clin_genomic_analysis_benchmark.concepts import (  # noqa: E402
+    infer_legacy_concept_list,
+    validate_concept_ids,
+)
 ROOT = config.REPO_ROOT
 from clin_genomic_analysis_benchmark.questions.schema import (  # noqa: E402
     CohortQuestionFile, Question, AnalysisSpec, GoldAnswer, SupportingEvidence,
@@ -51,23 +57,48 @@ def population_unit(text: str, atype: str) -> str:
     return "patient"
 
 def build_gold_answer(qid: str, raw: str, atype: str) -> dict:
-    d = json.loads(raw)
-    d = {k: v for k, v in d.items() if k not in DIAG_KEYS}
+    full = json.loads(raw)
+    d = {k: v for k, v in full.items() if k not in DIAG_KEYS}
     if qid == "prostate_1.2-Qf17acd7c":   # well-posed but not estimable in this cohort
         d["unanswerable"] = True
+        d["unanswerable_reason"] = str(
+            full.get("failure_reason") or full.get("value") or "estimand is not identifiable")
     return d
+
+
+def parse_concept_ids(raw: object, prose_concepts: list[str]) -> list[str]:
+    """Read canonical IDs, falling back to deterministic legacy migration."""
+    if raw:
+        text = str(raw).strip()
+        try:
+            decoded = json.loads(text)
+        except json.JSONDecodeError:
+            decoded = None
+        if isinstance(decoded, list):
+            ids = [str(value).strip() for value in decoded if str(value).strip()]
+        else:
+            ids = [value.strip() for value in re.split(r"[\n,]", text) if value.strip()]
+    else:
+        ids = infer_legacy_concept_list(prose_concepts)
+    errors = validate_concept_ids(ids)
+    if errors:
+        raise ValueError("; ".join(errors))
+    return ids
 
 def main() -> int:
     wb = openpyxl.load_workbook(SRC)
     ws = wb["questions"]
     hdr = [c.value for c in ws[1]]
     ci = {n: i + 1 for i, n in enumerate(hdr)}
-    g = lambda r, n: ws.cell(r, ci[n]).value
+    def g(row: int, name: str):
+        return ws.cell(row, ci[name]).value
 
     by_cohort: dict[str, list[Question]] = {}
     n_un = n_amb = 0
     for r in range(2, ws.max_row + 1):
-        qid = g(r, "qid"); cohort = g(r, "cohort"); cls = g(r, "classification")
+        qid = g(r, "qid")
+        cohort = g(r, "cohort")
+        cls = g(r, "classification")
         common = dict(
             id=qid, category=int(g(r, "category")), text=g(r, "question_text"),
             classification=cls, source=(g(r, "source") or "llm"), review_status="reviewed",
@@ -90,7 +121,17 @@ def main() -> int:
         else:
             n_amb += 1
             concepts = [ln.strip() for ln in str(g(r, "disambiguation_concepts") or "").split("\n") if ln.strip()]
-            q = Question(**common, disambiguation_concepts=concepts)
+            raw_ids = (g(r, "disambiguation_concept_ids")
+                       if "disambiguation_concept_ids" in ci else None)
+            try:
+                concept_ids = parse_concept_ids(raw_ids, concepts)
+            except ValueError as exc:
+                raise ValueError(f"{qid}: invalid disambiguation concept IDs: {exc}") from exc
+            q = Question(
+                **common,
+                disambiguation_concept_ids=concept_ids,
+                disambiguation_concepts=concepts,
+            )
         by_cohort.setdefault(cohort, []).append(q)
 
     now = datetime.now(timezone.utc)

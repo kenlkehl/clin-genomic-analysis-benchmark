@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Literal
 
 import jsonschema
+
+from ..concepts import CONCEPT_IDS
+from ..gold_standard.answer_types import validate_answer
 
 Stage = Literal["classify", "disambiguate", "analyze"]
 
@@ -18,10 +20,12 @@ QUESTION_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
     "required": [
-        "question_id", "question_text", "cohort", "category", "stage",
-        "cohort_dir", "data_dictionary_path", "scratch_dir", "instructions",
+        "contract_version", "question_id", "question_text", "cohort", "category",
+        "stage", "cohort_dir", "data_dictionary_path", "scratch_dir",
+        "instructions", "disambiguation_concept_menu",
     ],
     "properties": {
+        "contract_version": {"const": "2"},
         "question_id": {"type": "string"},
         "question_text": {"type": "string"},
         "cohort": {"type": "string"},
@@ -31,6 +35,21 @@ QUESTION_SCHEMA: dict[str, Any] = {
         "data_dictionary_path": {"type": "string"},
         "scratch_dir": {"type": "string"},
         "instructions": {"type": "string"},
+        "disambiguation_concept_menu": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["id", "label", "description"],
+                "properties": {
+                    "id": {"enum": list(CONCEPT_IDS)},
+                    "label": {"type": "string", "minLength": 1},
+                    "description": {"type": "string", "minLength": 1},
+                },
+            },
+            "minItems": len(CONCEPT_IDS),
+            "maxItems": len(CONCEPT_IDS),
+        },
         # Optional: for `disambiguate` and `analyze` stages, agents may want
         # to know what they classified the question as (defensive only — they can
         # also store this themselves between stages).
@@ -45,7 +64,7 @@ QUESTION_SCHEMA: dict[str, Any] = {
 
 _CLASSIFY_RESULT: dict[str, Any] = {
     "type": "object",
-    "additionalProperties": True,
+    "additionalProperties": False,
     "required": ["classification"],
     "properties": {
         "classification": {"enum": ["ambiguous", "unambiguous"]},
@@ -55,20 +74,21 @@ _CLASSIFY_RESULT: dict[str, Any] = {
 
 _DISAMBIGUATE_RESULT: dict[str, Any] = {
     "type": "object",
-    "additionalProperties": True,
-    "required": ["concepts"],
+    "additionalProperties": False,
+    "required": ["concept_ids"],
     "properties": {
-        "concepts": {
+        "concept_ids": {
             "type": "array",
-            "items": {"type": "string", "minLength": 1},
+            "items": {"enum": list(CONCEPT_IDS)},
             "minItems": 1,
+            "uniqueItems": True,
         },
     },
 }
 
 _ANALYZE_RESULT: dict[str, Any] = {
     "type": "object",
-    "additionalProperties": True,
+    "additionalProperties": False,
     "required": ["answer_type", "answer"],
     "properties": {
         "answer_type": {
@@ -95,10 +115,19 @@ _RESULT_SCHEMAS: dict[str, dict] = {
 def validate_question(payload: dict) -> list[str]:
     """Return a list of validation errors (empty if valid)."""
     validator = jsonschema.Draft202012Validator(QUESTION_SCHEMA)
-    return [e.message for e in validator.iter_errors(payload)]
+    errors = [e.message for e in validator.iter_errors(payload)]
+    menu = payload.get("disambiguation_concept_menu")
+    if isinstance(menu, list):
+        menu_ids = [item.get("id") for item in menu if isinstance(item, dict)]
+        if menu_ids != list(CONCEPT_IDS):
+            errors.append("disambiguation_concept_menu must contain the canonical menu in order")
+    return errors
 
 
 def validate_result(payload: dict, stage: Stage) -> list[str]:
     schema = _RESULT_SCHEMAS[stage]
     validator = jsonschema.Draft202012Validator(schema)
-    return [e.message for e in validator.iter_errors(payload)]
+    errors = [e.message for e in validator.iter_errors(payload)]
+    if stage == "analyze" and not errors:
+        errors.extend(validate_answer(payload["answer_type"], payload["answer"]))
+    return errors

@@ -22,7 +22,6 @@ import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
 from jinja2 import Template
@@ -151,7 +150,6 @@ def compute_one(
         logger.info("%s", msg)
 
     answer_type = question.analysis_spec.expected_answer_type
-    script_p = script_writer.script_path(cohort.name, question.id)
     result_p = script_writer.result_path(cohort.name, question.id)
     log_p = script_writer.log_path(cohort.name, question.id)
 

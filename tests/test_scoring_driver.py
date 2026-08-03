@@ -9,6 +9,62 @@ from clin_genomic_analysis_benchmark.questions.schema import CohortQuestionFile,
 from clin_genomic_analysis_benchmark.scoring import driver
 
 
+def _write_run(run_dir, *, classify_result: dict, disambiguate_result: dict | None = None,
+               analyze_result: dict | None = None) -> None:
+    run_dir.mkdir(parents=True)
+    (run_dir / "manifest.json").write_text(json.dumps({
+        "agent_name": "agent",
+        "run_id": "run-1",
+        "cohorts": ["cohort_1"],
+    }))
+    qrun = {
+        "cohort": "cohort_1",
+        "question_id": "cohort_1-Q1",
+        "category": 1,
+        "classify": {"success": True, "result": classify_result},
+    }
+    if disambiguate_result is not None:
+        qrun["disambiguate"] = {"success": True, "result": disambiguate_result}
+    if analyze_result is not None:
+        qrun["analyze"] = {"success": True, "result": analyze_result}
+    (run_dir / "runs.json").write_text(json.dumps([qrun]))
+
+
+def test_driver_scores_exact_ids_and_false_positive_penalty(tmp_path, monkeypatch):
+    run_dir = tmp_path / "runs" / "agent" / "run-1"
+    _write_run(
+        run_dir,
+        classify_result={"classification": "ambiguous"},
+        disambiguate_result={
+            "concept_ids": ["OUTCOME_METRIC", "MODEL_SPECIFICATION"],
+        },
+    )
+    gold = CohortQuestionFile(
+        cohort="cohort_1",
+        generated_at=datetime.now(timezone.utc),
+        model="test",
+        questions=[Question(
+            id="cohort_1-Q1",
+            category=1,
+            text="How well did treatment work?",
+            classification="ambiguous",
+            disambiguation_concept_ids=["OUTCOME_METRIC", "TIME_ORIGIN"],
+        )],
+    )
+    monkeypatch.setattr(driver.q_io, "load_gold", lambda cohort: gold)
+
+    driver.score_run(run_path=str(run_dir))
+
+    scorecard = json.loads((run_dir / "scorecard.json").read_text())
+    assert scorecard["scorer"] == "deterministic-rules-v2"
+    result = scorecard["questions"][0]["disambiguation"]
+    assert result["points"] == 0.75  # one correct − one 0.25 false positive
+    assert result["correct_concept_ids"] == ["OUTCOME_METRIC"]
+    assert result["incorrect_concept_ids"] == ["MODEL_SPECIFICATION"]
+    assert result["missed_concept_ids"] == ["TIME_ORIGIN"]
+    assert not list(run_dir.rglob("judge_*"))
+
+
 def test_ambiguous_gold_unambiguous_agent_does_not_claim_missing_gold(tmp_path, monkeypatch):
     run_dir = tmp_path / "runs" / "agent" / "run-1"
     run_dir.mkdir(parents=True)
@@ -44,7 +100,7 @@ def test_ambiguous_gold_unambiguous_agent_does_not_claim_missing_gold(tmp_path, 
                 category=1,
                 text="Which treatment is best?",
                 classification="ambiguous",
-                disambiguation_concepts=["outcome definition"],
+                disambiguation_concept_ids=["OUTCOME_METRIC"],
             )
         ],
     )
@@ -60,26 +116,25 @@ def test_ambiguous_gold_unambiguous_agent_does_not_claim_missing_gold(tmp_path, 
     )
     assert scorecard["questions"][0]["gold_disambiguation_n"] == 1
     assert scorecard["overall"]["points"] == 0
-    # 1 pt classify + 1 gold concept x 4 (two judges x 2 pts).
-    assert scorecard["overall"]["points_possible"] == 5
-    assert scorecard["overall"]["mean_concept_recall"] == 0
+    # 1 pt classify + 1 gold concept x 1 point.
+    assert scorecard["overall"]["points_possible"] == 2
+    assert scorecard["overall"]["mean_disambiguation_score"] == 0
     assert "compute-gold" not in (run_dir / "scorecard.md").read_text()
 
 def test_subtask_weighting_is_equal_thirds_by_default():
     """Headline is the mean of three self-normalised subtask scores, not a point sum."""
     from clin_genomic_analysis_benchmark.scoring.aggregator import QuestionScore, aggregate
     from clin_genomic_analysis_benchmark.scoring.classification import ClassificationResult
-    from clin_genomic_analysis_benchmark.scoring.discrepancy import Band, DiscrepancyResult
     from clin_genomic_analysis_benchmark.scoring.types import DisambiguationScoreResult
 
     # One ambiguous question: classify right, half the disambiguation points.
     amb = QuestionScore(
         question_id="a", cohort="c", category=1, gold_classification="ambiguous",
-        gold_disambiguation_n=2, disambig_points_per_concept=4.0,
+        gold_disambiguation_n=2, disambig_points_per_concept=1.0,
         classification=ClassificationResult(True, 1, "ambiguous", "ambiguous"),
         disambiguation=DisambiguationScoreResult(
-            question_id="a", cohort="c", n_gold=2, points=4.0, decisions=[],
-            points_per_concept=4.0),
+            question_id="a", cohort="c", n_gold=2, points=1.0, decisions=[],
+            points_per_concept=1.0),
     )
     # One unambiguous question: classify wrong, no analysis attempted.
     unamb = QuestionScore(
@@ -89,7 +144,7 @@ def test_subtask_weighting_is_equal_thirds_by_default():
     overall, _ = aggregate([amb, unamb])
 
     assert overall.subtask_scores["classify"] == 0.5        # 1 of 2
-    assert overall.subtask_scores["disambiguate"] == 0.5    # 4 of 8
+    assert overall.subtask_scores["disambiguate"] == 0.5    # 1 of 2
     assert overall.subtask_scores["analyze"] == 0.0         # 0 of 2, never attempted
     assert abs(overall.overall_score - (0.5 + 0.5 + 0.0) / 3) < 1e-9
 

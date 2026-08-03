@@ -5,8 +5,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 DATA_ROOT_ENV = "CLINGEN_DATA_ROOT"
@@ -17,7 +15,7 @@ DEFAULT_DATA_ROOT = REPO_ROOT / "bpc_from_synapse"
 # lives OUTSIDE the repo so an agent exploring the repo (from runs/.../scratch)
 # cannot reach it. Overridable via CLINGEN_GOLD_ROOT.
 GOLD_ROOT_ENV = "CLINGEN_GOLD_ROOT"
-DEFAULT_GOLD_ROOT = REPO_ROOT.parent / "clin-genomic-analysis-benchmark_gold"
+DEFAULT_GOLD_ROOT = REPO_ROOT.parent / "chatbpc" / "chatbpc_benchmark_gold"
 WORKBOOK_NAME = "bpc_benchmark_review_6-19-26.xlsx"
 
 # Public, gold-free, agent-facing question bank (safe to keep in the repo).
@@ -39,7 +37,7 @@ def data_root() -> Path:
 
 def gold_root() -> Path:
     """Root for all gold-bearing artifacts, kept out of the repo. Overridable
-    via CLINGEN_GOLD_ROOT (default: sibling `../clin-genomic-analysis-benchmark_gold`)."""
+    via CLINGEN_GOLD_ROOT (default: `../chatbpc/chatbpc_benchmark_gold`)."""
     p = os.environ.get(GOLD_ROOT_ENV)
     return Path(p) if p else DEFAULT_GOLD_ROOT
 

@@ -28,6 +28,16 @@ import sys
 from pathlib import Path
 
 ADAPTER_DIR = Path(__file__).resolve().parent
+_MAX_ERROR_STREAM_CHARS = 4000
+_PROJECT_ID_PLACEHOLDERS = {
+    "your_gcp_project_id",
+    "your-gcp-project-id",
+    "your-project-id",
+}
+
+
+class ClaudeInvocationError(RuntimeError):
+    """Claude Code failed before returning a usable assistant response."""
 
 
 def _read(path: Path) -> str:
@@ -265,6 +275,29 @@ def _allowed_tools_for(stage: str) -> str:
     return "Read,Glob,Grep"
 
 
+def _truncate_error_stream(text: str, limit: int = _MAX_ERROR_STREAM_CHARS) -> str:
+    """Bound subprocess diagnostics while making truncation explicit."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    omitted = len(text) - limit
+    return f"{text[:limit]}\n...[truncated {omitted} characters]"
+
+
+def _claude_failure_message(proc: subprocess.CompletedProcess[str]) -> str:
+    """Preserve both CLI streams; Claude may emit structured errors on stdout."""
+    parts = [f"claude exited {proc.returncode}"]
+    for label, stream in (("stdout", proc.stdout), ("stderr", proc.stderr)):
+        diagnostic = _truncate_error_stream(stream or "")
+        if diagnostic:
+            parts.append(f"--- {label} ---\n{diagnostic}")
+    if len(parts) == 1:
+        parts.append(
+            "Claude Code produced no stdout or stderr; check its session/debug logs"
+        )
+    return "\n".join(parts)
+
+
 def _claude_call(*, system_prompt: str, user_prompt: str, cohort_dir: str,
                  scratch_dir: str, allowed_tools: str) -> str:
     model = os.environ.get("CLINGEN_CLAUDE_MODEL", "claude-opus-4-8")
@@ -283,9 +316,17 @@ def _claude_call(*, system_prompt: str, user_prompt: str, cohort_dir: str,
     env.setdefault("ANTHROPIC_VERTEX_PROJECT_ID", "kehllab-caia-v2")
     env["CLAUDE_CODE_USE_VERTEX"] = env.get("CLAUDE_CODE_USE_VERTEX", "1")
 
+    project_id = env.get("ANTHROPIC_VERTEX_PROJECT_ID", "").strip()
+    if (env["CLAUDE_CODE_USE_VERTEX"] == "1"
+            and project_id.lower() in _PROJECT_ID_PLACEHOLDERS):
+        raise ClaudeInvocationError(
+            "ANTHROPIC_VERTEX_PROJECT_ID is still a placeholder "
+            f"({project_id!r}); set it to a real GCP project ID"
+        )
+
     proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
     if proc.returncode != 0:
-        raise RuntimeError(f"claude exited {proc.returncode}: {proc.stderr[:1000]}")
+        raise ClaudeInvocationError(_claude_failure_message(proc))
     # `--output-format json` returns: {"type":"result","result":"<final assistant text>",...}
     try:
         outer = json.loads(proc.stdout)
@@ -316,13 +357,19 @@ def main() -> int:
     stage = question["stage"]
     system_prompt, user_prompt = _build_prompt(question)
 
-    text = _claude_call(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        cohort_dir=question["cohort_dir"],
-        scratch_dir=question["scratch_dir"],
-        allowed_tools=_allowed_tools_for(stage),
-    )
+    try:
+        text = _claude_call(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            cohort_dir=question["cohort_dir"],
+            scratch_dir=question["scratch_dir"],
+            allowed_tools=_allowed_tools_for(stage),
+        )
+    except ClaudeInvocationError as exc:
+        # Keep the harness log concise and actionable rather than burying the
+        # provider response in an uncaught Python traceback.
+        sys.stderr.write(f"adapter: {exc}\n")
+        return 4
 
     obj = _extract_json(text)
     if obj is None:

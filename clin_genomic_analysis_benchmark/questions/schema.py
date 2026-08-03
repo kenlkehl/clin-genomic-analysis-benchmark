@@ -7,6 +7,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ..concepts import validate_concept_ids
+
 Classification = Literal["ambiguous", "unambiguous"]
 AnswerType = Literal[
     "count",
@@ -73,6 +75,9 @@ class Question(BaseModel):
     gold_supporting_evidence: Optional[SupportingEvidence] = None
 
     # If ambiguous:
+    disambiguation_concept_ids: Optional[list[str]] = None
+    # Retained in the out-of-repo gold bank as human-readable audit context.
+    # Scoring uses only ``disambiguation_concept_ids``.
     disambiguation_concepts: Optional[list[str]] = None
 
     # Provenance:
@@ -85,6 +90,16 @@ class Question(BaseModel):
     def _strip_text(cls, v: str) -> str:
         return v.strip()
 
+    @field_validator("disambiguation_concept_ids")
+    @classmethod
+    def _valid_concept_ids(cls, values: Optional[list[str]]) -> Optional[list[str]]:
+        if values is None:
+            return values
+        errors = validate_concept_ids(values)
+        if errors:
+            raise ValueError("; ".join(errors))
+        return values
+
 
 class CohortQuestionFile(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -92,7 +107,7 @@ class CohortQuestionFile(BaseModel):
     cohort: str
     generated_at: datetime
     model: str                               # e.g. "claude-opus-4-7@vertex"
-    schema_version: str = "1"
+    schema_version: str = "2"
     questions: list[Question] = Field(default_factory=list)
 
     def by_category(self, category: int) -> list[Question]:
@@ -131,7 +146,7 @@ class PublicCohortQuestionFile(BaseModel):
     cohort: str
     generated_at: datetime
     model: str
-    schema_version: str = "1"
+    schema_version: str = "2"
     questions: list[PublicQuestion] = Field(default_factory=list)
 
     def by_id(self, qid: str) -> Optional[PublicQuestion]:

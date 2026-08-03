@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from .cohorts import Cohort, categorize_files, list_files
+from .cohorts import Cohort, categorize_files
 from .config import CACHE_DIR
 
 # Tabular-file extensions we'll inspect

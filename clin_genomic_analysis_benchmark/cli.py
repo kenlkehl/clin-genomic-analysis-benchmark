@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import sys
 from pathlib import Path
 
 import click
@@ -40,7 +38,7 @@ def inspect(cohort: str, rebuild: bool, max_cols_listed: int) -> None:
             click.echo(f"  - {ds}: {n} vars")
 
         ctx = sampling.build(c, use_cache=not rebuild)
-        click.echo(f"\nFiles by category:")
+        click.echo("\nFiles by category:")
         for cat, names in ctx.files_by_category.items():
             if names:
                 click.echo(f"  - {cat}: {len(names)} file(s)")

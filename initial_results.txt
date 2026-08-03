@@ -1,5 +1,8 @@
 # clin-genomic-analysis-benchmark — initial scorecards
 
+> Historical v1 results: these runs used the retired dual-LLM disambiguation
+> judge and are not comparable with deterministic rules-v2 scorecards.
+
 Aggregate results across 6 cohorts / 211 scored questions (820.0 total points).
 
 ## claude_opus_4_8_vertex

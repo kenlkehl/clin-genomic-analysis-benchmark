@@ -6,13 +6,21 @@
 # a subtask with nothing to score in a given cohort drops out.
 #
 # This is deliberately NOT a raw point sum. The raw scales are very different
-# (classify 1 pt/question = 211; disambiguate up to 4 pts/concept = 1668;
-# analyze 2 pts/question = 192), so summing raw points would hand ~81% of the
-# benchmark to disambiguation and ~9% to actual computation.
+# (classify 1 pt/question, disambiguate 1 pt/gold concept before penalties,
+# analyze 2 pts/question), so raw point totals would still overweight questions
+# with long disambiguation lists.
 subtask_weights:
   classify: 0.3333
   disambiguate: 0.3333
   analyze: 0.3333
+
+# Exact concept-ID scoring. Correct selections earn points; selections that are
+# absent from the gold set subtract points. Each question is floored at zero.
+# With the default 0.25 penalty, four false positives cancel one true positive,
+# while selecting the whole menu is still strongly disfavored.
+disambiguation:
+  correct_concept_points: 1.0
+  incorrect_concept_penalty: 0.25
 
 # Per-answer-type discrepancy options, e.g.:
 # defaults:

@@ -35,8 +35,8 @@ a conventionally answerable one, (b) naming the *material* gaps when a question 
 4. **Flag AMBIGUOUS only for a trigger in "What still counts as AMBIGUOUS"** (e.g. unanchored
    line-of-therapy, undefined outcome metric, missing/underivable comparator, cancer-level
    anatomic/histologic scope in a heterogeneous cohort, biomarker-frequency denominator, unaddressed
-   delayed cohort entry or immortal time bias, missing time origin or filter cut-off). Then list 3–6
-   short concept noun-phrases that together close every reasonable gap.
+   delayed cohort entry or immortal time bias, missing time origin or filter cut-off). Then select
+   only the applicable IDs from the supplied concept menu. Correct IDs earn credit and incorrect IDs lose credit.
 5. **When unambiguous, compute deterministically and return only the typed JSON** (see "Answer-type
    schemas" and "Output discipline"): use the conventional statistic, exclude unsequenced patients
    for mutation exposures, and adjust for left truncation whenever the time-origin precedes sequencing.
@@ -65,17 +65,60 @@ an informed decision.
 
 ### 2. disambiguate
 
-Only invoked if the agent classified the question as AMBIGUOUS. List the
+Only invoked if the agent classified the question as AMBIGUOUS. Select the
 concrete concepts a questioner would need to specify to make the question
-deterministically answerable from the cohort data. Each concept should be
-a short noun-phrase (≤ ~12 words), not a sentence. Aim for 3–6 concepts
-that together close every reasonable interpretive gap.
+deterministically answerable from the cohort data. Use only IDs from the
+`disambiguation_concept_menu` supplied in `question.json`. Select every
+material unresolved concept, but do not select merely related concepts:
+exact gold IDs earn points and non-gold IDs incur a false-positive penalty.
 
 **Output:**
 
 ```json
-{ "concepts": ["<concept 1>", "<concept 2>", "..."] }
+{ "concept_ids": ["OUTCOME_METRIC", "TIME_ORIGIN"] }
 ```
+
+### Disambiguation concept menu
+
+The same menu is included as structured data in every `question.json`.
+
+| ID | Select when the question needs... |
+|---|---|
+| `ANATOMIC_HISTOLOGIC_SCOPE` | eligible cancer sites, `ca_type` values, histologies, or sidedness groups |
+| `DISEASE_EXTENT_SCOPE` | a stage or extent restriction, such as all stages versus Stage IV |
+| `DISEASE_STATE_DEFINITION` | a definition of advanced, metastatic, early, resectable, or mCRPC disease |
+| `CLINICAL_SUBGROUP_DEFINITION` | a clinical/molecular subgroup, subtype, age cutoff, or population stratum |
+| `VARIABLE_OR_CATEGORY_DEFINITION` | a source variable, coding system, grouping, or demographic dimension |
+| `MISSING_DATA_HANDLING` | a rule for unknown, missing, or not-applicable values |
+| `TREATMENT_DEFINITION` | drugs, classes, backbones, combinations, or procedures that count as treatment |
+| `COMPARATOR_DEFINITION` | a reference or control group |
+| `LINE_OF_THERAPY` | an analytic anchor for first line or another line |
+| `TREATMENT_SETTING` | an adjuvant, neoadjuvant, metastatic, castration-state, or other setting |
+| `REGIMEN_SELECTION` | which qualifying regimen per patient, or whether mono/combination therapy qualifies |
+| `CLINICAL_TRIAL_HANDLING` | a rule for clinical-trial regimens with unannotated composition |
+| `PROCEDURE_OR_TIMING_DEFINITION` | an operational definition of surgery/adjuvant/neoadjuvant timing |
+| `GENE_OR_GENE_SET` | the genes or pathway members that define a biomarker |
+| `ALTERATION_TYPE` | alteration classes such as SNV/indel, CNA, fusion, or structural variant |
+| `VARIANT_INCLUSION_CRITERIA` | consequence, pathogenicity, hotspot, or call-confidence filters |
+| `CNA_THRESHOLD` | a copy-number threshold for gain/amplification/loss/deletion |
+| `GERMLINE_SOMATIC_SCOPE` | whether germline, somatic, or both alterations count |
+| `PANEL_COVERAGE` | eligibility based on an assay's ability to detect the gene/event |
+| `SPECIMEN_SELECTION` | which specimen or sequencing event to use |
+| `BIOMARKER_TEST_DEFINITION` | the assay/result defining a biomarker, such as MSI versus MMR |
+| `OUTCOME_METRIC` | the endpoint/version, such as OS, PFS-I, PFS-M, response, or TTNT |
+| `RESPONSE_DEFINITION` | how response is measured or categorized |
+| `TIME_ORIGIN` | the date/event from which follow-up begins |
+| `TIME_HORIZON` | a follow-up horizon or summary time point |
+| `SUMMARY_MEASURE` | mean, median, count, proportion, or survival probability |
+| `STATISTICAL_ESTIMAND` | the target contrast/statistic, such as subgroup HRs or an interaction |
+| `MODEL_SPECIFICATION` | the model, test, covariates, or interaction terms |
+| `CENSORING_RULE` | handling of ongoing follow-up or competing/absent events |
+| `DELAYED_ENTRY` | risk-set entry after the outcome time origin / left truncation |
+| `IMMORTAL_TIME_BIAS` | temporal handling of post-origin exposure or biomarker ascertainment |
+| `ASCERTAINMENT_WINDOW` | when a characteristic is measured, such as at diagnosis versus ever |
+| `REPEATED_OBSERVATIONS` | multiple regimens, samples, treatments, or observations per patient |
+| `DENOMINATOR_DEFINITION` | a non-panel-related eligible or tested denominator |
+| `DATA_AVAILABILITY` | whether a required variable/measurement exists and is populated |
 
 ### 3. analyze
 
@@ -321,6 +364,19 @@ underspecified, either upfront, or based on the actual cohort data.
 
 Return one matching the question's expected answer type. All numeric
 fields are JSON numbers; integer counts are JSON integers.
+
+If the question is well specified but the requested estimand cannot be
+estimated from the supplied data (for example, separation or an empty model
+cell), keep it `unambiguous` and return its expected `answer_type` with an
+`answer` of this form:
+
+```json
+{ "unanswerable": true,
+  "value": 1.0,
+  "unanswerable_reason": "<specific data limitation>" }
+```
+
+Use an appropriate placeholder `value` (normally the null value for a ratio).
 
 | `answer_type`              | Required `answer` fields |
 |---|---|

@@ -18,6 +18,7 @@ $ ./run.sh --question-file <abs question.json> --output <abs result.json>
 
 ```jsonc
 {
+  "contract_version": "2",
   "question_id": "bladder_1.2-Qabc12345",
   "question_text": "What proportion of patients ...",
   "cohort": "bladder_1.2",
@@ -27,6 +28,11 @@ $ ./run.sh --question-file <abs question.json> --output <abs result.json>
   "data_dictionary_path": "/abs/path/.../simple_variable_synopsis.xlsx",
   "scratch_dir": "/abs/path/.../scratch",
   "instructions": "Stage-specific instructions from the harness",
+  "disambiguation_concept_menu": [
+    {"id": "ANATOMIC_HISTOLOGIC_SCOPE", "label": "...", "description": "..."},
+    {"id": "DISEASE_EXTENT_SCOPE", "label": "...", "description": "..."}
+    // ...the complete canonical menu...
+  ],
   "prior_classification": "ambiguous"     // present on disambiguate / analyze stages
 }
 ```
@@ -34,7 +40,8 @@ $ ./run.sh --question-file <abs question.json> --output <abs result.json>
 ### `result.json` per stage
 
 - `classify`     → `{ "classification": "ambiguous"|"unambiguous", "rationale": "..." }`
-- `disambiguate` → `{ "concepts": ["...", "..."] }`
+- `disambiguate` → `{ "concept_ids": ["OUTCOME_METRIC", "TIME_ORIGIN"] }`
+  using only IDs from `question["disambiguation_concept_menu"]`
 - `analyze`      → `{ "answer_type": "...", "answer": {...typed fields...}, "methods": "...", "supporting_evidence": {...} }`
 
 See `clin_genomic_analysis_benchmark/agent/contract.py` for full JSON schemas.

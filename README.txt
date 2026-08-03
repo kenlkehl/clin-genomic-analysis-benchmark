@@ -1,6 +1,6 @@
 ===============================================================================
 Clinical Genomic Analysis Benchmark — Orientation for Colleagues
-Last updated: 2026-06-20
+Last updated: 2026-08-03
 ===============================================================================
 
 WHAT THIS BENCHMARK IS
@@ -40,8 +40,9 @@ data dictionary, and a scratch directory. All agent outputs are JSON.
      competent analysts would resolve differently, changing the result.
 
   2. DISAMBIGUATE  (only if the agent said AMBIGUOUS)
-     List the concrete concepts a questioner would have to specify to make the
-     question deterministically answerable (short noun-phrases; ~3-6 of them).
+     Select the concrete concepts a questioner would have to specify from a
+     fixed menu included in question.json. The result is structured JSON such
+     as {"concept_ids": ["OUTCOME_METRIC", "TIME_ORIGIN"]}.
 
   3. ANALYZE  (only if the agent said UNAMBIGUOUS)
      Actually compute the answer from the cohort data files (Python: pandas,
@@ -50,6 +51,12 @@ data dictionary, and a scratch directory. All agent outputs are JSON.
 Scoring rewards: correct ambiguous/unambiguous classification; naming the right
 gaps when ambiguous; and computing the correct conventional answer when
 unambiguous.
+
+All scoring is deterministic. Classification is exact-label match. For
+disambiguation, each selected gold concept ID earns 1 point and each selected
+non-gold ID subtracts 0.25 points (question floor = 0). For analysis, typed
+results are compared with gold_answer using documented discrepancy thresholds.
+Scoring makes no LLM or network calls.
 
 
 AGENT_INSTRUCTIONS.md  (the rulebook shown to the agent)
@@ -97,8 +104,13 @@ questions). It contains:
 
 THE REVIEW EXCEL FILE  (bpc_benchmark_review_6-19-26.xlsx)
 -------------------------------------------------------------------------------
-This is the authoritative question bank + gold standard + review trail. Two
-sheets:
+This is the authoritative question bank + gold standard + review trail. The
+default path is:
+
+  ~/Partners HealthCare Dropbox/Kenneth Kehl/chatbpc/chatbpc_benchmark_gold/
+    bpc_benchmark_review_6-19-26.xlsx
+
+It has three sheets:
 
   * "questions" — one row per benchmark question (211 rows). Columns:
 
@@ -108,34 +120,39 @@ sheets:
       D  classification          "unambiguous" or "ambiguous".  <-- the gold verdict
       E  question_text           The question exactly as posed to the agent.
       F  disambiguation_concepts (AMBIGUOUS rows) newline-separated list of the
-                                 concepts that must be specified. The gold set of
-                                 "gaps" for the disambiguate stage.
-      G  analysis_plan_summary   (UNAMBIGUOUS rows) ~80-200 word prose spec an
+                                 concepts that must be specified, retained as
+                                 human-readable review context.
+      G  disambiguation_concept_ids (AMBIGUOUS rows) canonical menu IDs used by
+                                 the exact rules-based scorer.
+      H  analysis_plan_summary   (UNAMBIGUOUS rows) ~80-200 word prose spec an
                                  analyst could follow alone to reproduce the
                                  analysis: population unit, every eligibility
                                  filter, arm composition, statistic, and
                                  time-to-event / censoring / left-truncation
                                  rules. This is the human-readable gold method.
-      H  expected_answer_type    (UNAMBIGUOUS) one of: count, proportion,
+      I  expected_answer_type    (UNAMBIGUOUS) one of: count, proportion,
                                  median_with_ci, hazard_ratio_with_ci,
                                  odds_ratio_with_ci, pvalue, categorical,
                                  categorical_distribution. Determines the shape
                                  of the gold_answer.
-      I  gold_answer             (UNAMBIGUOUS) the pre-computed reference answer
+      J  gold_answer             (UNAMBIGUOUS) the pre-computed reference answer
                                  as JSON, with fields matching expected_answer_type.
                                  This is exactly what the gold script prints.
-      J  gold_script             (UNAMBIGUOUS) path (relative to repo root) of the
+      K  gold_script             (UNAMBIGUOUS) path (relative to gold root) of the
                                  Python script that produced gold_answer.
 
 
     Conventions inside the sheet:
       - Rows are tinted white for unambiguous, pale orange for ambiguous.
-      - For an UNAMBIGUOUS row, columns G/H/I/J are filled and F is blank.
-      - For an AMBIGUOUS row, column F is filled and G/H/I/J are blank.
+      - For an UNAMBIGUOUS row, columns H/I/J/K are filled and F/G are blank.
+      - For an AMBIGUOUS row, columns F/G are filled and H/I/J/K are blank.
 
   * "legend" — a field glossary. NOTE: its summary "Note" lines (e.g. "221
     questions") are stale from an earlier version; the live counts are 211
     questions / 96 unambiguous / 115 ambiguous as above.
+
+  * "concept_menu" — every valid canonical ID, its label, and the analytic
+    decision it represents.
 
 
 THE GOLD STANDARD SCRIPTS  (gold_standard/)
@@ -168,7 +185,7 @@ computes the reference answer directly from the cohort data. Layout:
   NOTE: the gold_standard/ folders may also contain leftover scripts from
   questions that were later removed or reclassified to ambiguous. The
   authoritative list of *active* gold scripts is the set of paths in the
-  gold_script column (J) of the current workbook.
+  gold_script column (K) of the current workbook.
 
 
 THE UNDERLYING DATA  (bpc_from_synapse/)
@@ -204,9 +221,9 @@ HOW IT FITS TOGETHER
   - To inspect the data being analyzed:           browse bpc_from_synapse/<cohort>/.
 
 A typical evaluation: serve column E (question_text) to the agent with the cohort
-directory; compare the agent's classify verdict to column D; for ambiguous, score
-the agent's concepts against column F; for unambiguous, score the agent's computed
-answer against column I (gold_answer).
+directory; compare the agent's classify verdict to column D; for ambiguous,
+exact-match the agent's concept IDs against column G; for unambiguous, compare
+the agent's computed answer against column J (gold_answer).
 
 
 REVISION NOTES
