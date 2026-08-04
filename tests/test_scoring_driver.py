@@ -10,12 +10,14 @@ from clin_genomic_analysis_benchmark.scoring import driver
 
 
 def _write_run(run_dir, *, classify_result: dict, disambiguate_result: dict | None = None,
-               analyze_result: dict | None = None) -> None:
+               analyze_result: dict | None = None,
+               agent_provenance: dict | None = None) -> None:
     run_dir.mkdir(parents=True)
     (run_dir / "manifest.json").write_text(json.dumps({
         "agent_name": "agent",
         "run_id": "run-1",
         "cohorts": ["cohort_1"],
+        "agent_provenance": agent_provenance or {},
     }))
     qrun = {
         "cohort": "cohort_1",
@@ -38,6 +40,13 @@ def test_driver_scores_exact_ids_and_false_positive_penalty(tmp_path, monkeypatc
         disambiguate_result={
             "concept_ids": ["OUTCOME_METRIC", "MODEL_SPECIFICATION"],
         },
+        agent_provenance={
+            "model": "claude-sonnet-5@20260203",
+            "provider": "google_vertex_ai",
+            "effort_level": "xhigh",
+            "effort_supported": True,
+            "effort_source": "CLINGEN_CLAUDE_EFFORT",
+        },
     )
     gold = CohortQuestionFile(
         cohort="cohort_1",
@@ -57,6 +66,8 @@ def test_driver_scores_exact_ids_and_false_positive_penalty(tmp_path, monkeypatc
 
     scorecard = json.loads((run_dir / "scorecard.json").read_text())
     assert scorecard["scorer"] == "deterministic-rules-v2"
+    assert scorecard["agent_provenance"]["effort_level"] == "xhigh"
+    assert "- **Effort**: `xhigh`" in (run_dir / "scorecard.md").read_text()
     result = scorecard["questions"][0]["disambiguation"]
     assert result["points"] == 0.75  # one correct − one 0.25 false positive
     assert result["correct_concept_ids"] == ["OUTCOME_METRIC"]

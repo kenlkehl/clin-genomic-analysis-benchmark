@@ -17,7 +17,7 @@ All six cohorts are wired end to end. The reference adapter drives Claude Code o
 | Agent-facing bank | `questions/<cohort>.yaml` — `id`, `category`, `text` only. This is everything the agent under test ever sees |
 | Gold bank | `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` — answers, canonical concept IDs, classifications, and audit prose. Read by the scorer, never by the agent |
 | Agent guidance | `AGENT_INSTRUCTIONS.md` — served verbatim to the agent by the reference adapter |
-| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_qwen3.6-35B-A3B/` (Codex CLI against a local vLLM server), `adapters/template/` to write your own |
+| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/template/` to write your own |
 
 ### Keeping the answers away from the agent
 
@@ -169,13 +169,19 @@ uv run clingen-bench eval --agent "bash adapters/claude_code/run.sh" \
 uv run clingen-bench inspect --cohort bladder_1.2
 ```
 
-`CLINGEN_CLAUDE_MODEL` (default `claude-opus-4-8`) sets the reference agent model. It has no role in scoring.
+`CLINGEN_CLAUDE_MODEL` (default `claude-opus-4-8`) sets the reference agent
+model. `CLINGEN_CLAUDE_EFFORT` optionally pins Claude Code's effort level by
+passing `--effort` (for example, `xhigh`). Claude Haiku 4.5 does not support
+configurable effort, so leave the variable unset for that model. Neither setting
+has any role in scoring.
 
-Every run's `manifest.json` includes a non-secret `agent_provenance` block. For
-the Claude Code adapter this records the effective model, provider, Vertex
-project, region, the source of each resolved value, and an allow-listed snapshot
-of relevant environment settings. API keys and credential paths are never
-included.
+Every run's `manifest.json` includes a non-secret `agent_provenance` block. The
+Claude Code and Codex adapters record the effective model, provider, effort
+level, and the source of each resolved value; Claude Vertex runs also record the
+project and region. Codex values are resolved from explicit `CODEX_*` overrides,
+the selected profile, or the base user config in precedence order. The same
+provenance appears at the top of generated scorecards. API keys and credential
+paths are never included.
 
 `generate-questions` and `compute-gold` build a bank and its gold answers with an LLM. They are how the bank started, but it is now curated by hand in the workbook, so day to day you want `sync_yaml_from_review.py` instead.
 

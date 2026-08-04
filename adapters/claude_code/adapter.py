@@ -12,6 +12,7 @@ For each stage, this adapter:
 Environment expected:
   - ANTHROPIC_VERTEX_PROJECT_ID (we'll default to kehllab-caia-v2 if unset)
   - CLAUDE_CODE_USE_VERTEX=1
+  - CLINGEN_CLAUDE_EFFORT (optional; explicitly passes Claude's effort level)
   - claude CLI on PATH
 
 This adapter is intentionally short — the harness is what ensures correctness.
@@ -34,6 +35,7 @@ _PROJECT_ID_PLACEHOLDERS = {
     "your-gcp-project-id",
     "your-project-id",
 }
+_CLAUDE_EFFORT_LEVELS = {"low", "medium", "high", "xhigh", "max"}
 
 
 class ClaudeInvocationError(RuntimeError):
@@ -300,7 +302,23 @@ def _claude_failure_message(proc: subprocess.CompletedProcess[str]) -> str:
 
 def _claude_call(*, system_prompt: str, user_prompt: str, cohort_dir: str,
                  scratch_dir: str, allowed_tools: str) -> str:
-    model = os.environ.get("CLINGEN_CLAUDE_MODEL", "claude-opus-4-8")
+    env = os.environ.copy()
+    env.setdefault("ANTHROPIC_VERTEX_PROJECT_ID", "kehllab-caia-v2")
+    env["CLAUDE_CODE_USE_VERTEX"] = env.get("CLAUDE_CODE_USE_VERTEX", "1")
+
+    model = env.get("CLINGEN_CLAUDE_MODEL", "claude-opus-4-8")
+    effort = env.get("CLINGEN_CLAUDE_EFFORT", "").strip().lower()
+    if effort and effort not in _CLAUDE_EFFORT_LEVELS:
+        allowed = ", ".join(sorted(_CLAUDE_EFFORT_LEVELS))
+        raise ClaudeInvocationError(
+            f"invalid CLINGEN_CLAUDE_EFFORT={effort!r}; choose one of: {allowed}"
+        )
+    if effort and "haiku-4-5" in model.lower():
+        raise ClaudeInvocationError(
+            f"CLINGEN_CLAUDE_EFFORT is set to {effort!r}, but {model!r} "
+            "does not support configurable effort"
+        )
+
     cmd = [
         "claude",
         "--print",
@@ -310,11 +328,10 @@ def _claude_call(*, system_prompt: str, user_prompt: str, cohort_dir: str,
         "--add-dir", scratch_dir,
         "--allowedTools", allowed_tools,
         "--append-system-prompt", system_prompt,
-        user_prompt,
     ]
-    env = os.environ.copy()
-    env.setdefault("ANTHROPIC_VERTEX_PROJECT_ID", "kehllab-caia-v2")
-    env["CLAUDE_CODE_USE_VERTEX"] = env.get("CLAUDE_CODE_USE_VERTEX", "1")
+    if effort:
+        cmd.extend(["--effort", effort])
+    cmd.append(user_prompt)
 
     project_id = env.get("ANTHROPIC_VERTEX_PROJECT_ID", "").strip()
     if (env["CLAUDE_CODE_USE_VERTEX"] == "1"

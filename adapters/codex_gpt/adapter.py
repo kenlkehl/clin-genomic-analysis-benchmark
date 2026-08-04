@@ -1,9 +1,10 @@
-"""Codex CLI adapter using the user's default GPT-5.4 Azure config.
+"""Codex CLI adapter with Azure authentication and runtime model overrides.
 
-This adapter intentionally does not override model/provider settings. It relies
-on ~/.codex/config.toml, which currently selects Azure + gpt-5.4. Before every
-Codex invocation it refreshes AZURE_OPENAI_API_KEY with `az account
-get-access-token` because Azure bearer tokens expire frequently.
+By default this adapter uses the active ~/.codex/config.toml settings. Operators
+can pin CODEX_MODEL, CODEX_MODEL_PROVIDER, and CODEX_REASONING_EFFORT for a
+reproducible benchmark run. Before every Codex invocation it refreshes
+AZURE_OPENAI_API_KEY with `az account get-access-token` because Azure bearer
+tokens expire frequently.
 """
 
 from __future__ import annotations
@@ -345,6 +346,16 @@ def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
         cmd.append("--ephemeral")
     if os.environ.get("CODEX_PROFILE"):
         cmd += ["--profile", os.environ["CODEX_PROFILE"]]
+    if os.environ.get("CODEX_MODEL_PROVIDER"):
+        cmd += [
+            "-c",
+            f"model_provider={json.dumps(os.environ['CODEX_MODEL_PROVIDER'])}",
+        ]
+    if os.environ.get("CODEX_REASONING_EFFORT"):
+        cmd += [
+            "-c",
+            f"model_reasoning_effort={json.dumps(os.environ['CODEX_REASONING_EFFORT'])}",
+        ]
     if os.environ.get("CODEX_MODEL"):
         cmd += ["--model", os.environ["CODEX_MODEL"]]
     cmd.append("-")

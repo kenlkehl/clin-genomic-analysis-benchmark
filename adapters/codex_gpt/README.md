@@ -1,11 +1,11 @@
-# Codex GPT-5.4 adapter
+# Codex Azure/OpenAI adapter
 
-This adapter evaluates the Codex CLI using the default model/provider from
-`~/.codex/config.toml`. On this machine, that config currently selects Azure
-and `gpt-5.4`.
+This adapter evaluates the Codex CLI using either explicit environment overrides
+or the default model/provider from `~/.codex/config.toml`. The directory name is
+historical; `CODEX_MODEL` can select any model available from the provider.
 
-Unlike the Unsloth Codex adapter, this one does not override provider settings
-by default. It lets Codex load your normal user config, then refreshes
+It lets Codex load your normal user config, applies any explicit provider/model/
+effort overrides, then refreshes
 `AZURE_OPENAI_API_KEY` immediately before every `codex exec` attempt:
 
 ```bash
@@ -20,7 +20,7 @@ az account get-access-token \
 The benchmark harness calls:
 
 ```bash
-bash adapters/codex_gpt_5.4/run.sh \
+bash adapters/codex_gpt/run.sh \
   --question-file <abs question.json> \
   --output <abs result.json>
 ```
@@ -47,14 +47,19 @@ runs `codex exec` non-interactively, reads Codex's final message via
 | `CODEX_SANDBOX_MODE_ANALYZE` | `workspace-write` | analyze sandbox |
 | `CODEX_SANDBOX_MODE` | unset | fallback sandbox for all stages |
 | `CODEX_PROFILE` | unset | optional Codex profile override |
+| `CODEX_MODEL_PROVIDER` | unset | optional provider key, such as `azure` |
 | `CODEX_MODEL` | unset | optional model override; leave unset to use `~/.codex/config.toml` |
+| `CODEX_REASONING_EFFORT` | unset | optional reasoning effort, such as `xhigh` |
 
 ## Smoke test
 
 ```bash
+CODEX_MODEL_PROVIDER=azure \
+CODEX_MODEL=gpt-5.6-terra \
+CODEX_REASONING_EFFORT=xhigh \
 uv run clingen-bench eval \
-  --agent "bash adapters/codex_gpt_5.4/run.sh" \
-  --agent-name codex_gpt_5.4 \
+  --agent "bash adapters/codex_gpt/run.sh" \
+  --agent-name codex_azure_gpt_5_6_terra_xhigh \
   --question bladder_1.2-Q6f9dd68e \
   --max-parallel 1
 ```
@@ -62,9 +67,12 @@ uv run clingen-bench eval \
 ## Full run
 
 ```bash
+CODEX_MODEL_PROVIDER=azure \
+CODEX_MODEL=gpt-5.6-terra \
+CODEX_REASONING_EFFORT=xhigh \
 uv run clingen-bench eval \
-  --agent "bash adapters/codex_gpt_5.4/run.sh" \
-  --agent-name codex_gpt_5.4 \
+  --agent "bash adapters/codex_gpt/run.sh" \
+  --agent-name codex_azure_gpt_5_6_terra_xhigh \
   --cohort all \
   --max-parallel 4
 ```
@@ -72,12 +80,14 @@ uv run clingen-bench eval \
 Then score the run:
 
 ```bash
-uv run clingen-bench score --run 'codex_gpt_5.4/<run_id>'
+uv run clingen-bench score --run 'codex_azure_gpt_5_6_terra_xhigh/<run_id>'
 ```
 
 ## Notes
 
 - The adapter adds the cohort directory with `--add-dir` and runs Codex from
   the per-question scratch directory.
+- Explicit provider, model, and effort values are recorded in `manifest.json`
+  and displayed at the top of generated scorecards.
 - The prompt instructs Codex to treat the cohort directory as read-only.
 - Token values are never printed by the adapter.

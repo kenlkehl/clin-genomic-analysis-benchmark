@@ -9,11 +9,15 @@ Builds a per-run manifest.json with agent_cmd, run start/end, env (no secrets).
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import platform
+import re
 import socket
+import tomllib
 import uuid
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -89,23 +93,173 @@ class RunManifest:
 
 _SAFE_AGENT_ENV_VARS = (
     "CLINGEN_CLAUDE_MODEL",
+    "CLINGEN_CLAUDE_EFFORT",
+    "CLAUDE_CODE_EFFORT_LEVEL",
     "CLAUDE_CODE_USE_VERTEX",
     "ANTHROPIC_VERTEX_PROJECT_ID",
     "CLOUD_ML_REGION",
     "ANTHROPIC_VERTEX_REGION",
     "ANTHROPIC_MODEL",
     "CODEX_MODEL",
+    "CODEX_MODEL_PROVIDER",
+    "CODEX_REASONING_EFFORT",
     "CODEX_PROFILE",
     "CODEX_SANDBOX_MODE",
 )
 
 
+def _read_codex_config(path: Path) -> dict:
+    """Read a Codex TOML layer, returning no data when it is unavailable."""
+    try:
+        config = tomllib.loads(path.read_text())
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+    return config if isinstance(config, dict) else {}
+
+
+def _codex_config_value(
+    *,
+    env: Mapping[str, str],
+    env_var: str,
+    config_key: str,
+    profile_name: str | None,
+    profile_config: dict,
+    base_config: dict,
+    default: str | None = None,
+) -> tuple[str | None, str]:
+    explicit = env.get(env_var, "").strip()
+    if explicit:
+        return explicit, env_var
+    profile_value = profile_config.get(config_key)
+    if profile_value is not None and str(profile_value).strip():
+        return str(profile_value).strip(), f"codex_profile:{profile_name}"
+    base_value = base_config.get(config_key)
+    if base_value is not None and str(base_value).strip():
+        return str(base_value).strip(), "codex_user_config"
+    return default, "codex_default" if default is not None else "unresolved"
+
+
+def _codex_provenance(
+    *, agent_cmd: str, env: Mapping[str, str], read_user_config: bool
+) -> dict | None:
+    """Resolve effective Codex model settings without capturing credentials."""
+    adapter_match = re.search(r"adapters/(codex_[^/\s\"']+)/", agent_cmd)
+    if adapter_match is None:
+        return None
+
+    explicit_profile_name = env.get("CODEX_PROFILE", "").strip() or None
+    base_config: dict = {}
+    profile_config: dict = {}
+    if read_user_config:
+        codex_home_value = env.get("CODEX_HOME", "").strip()
+        codex_home = (Path(codex_home_value).expanduser() if codex_home_value
+                      else Path.home() / ".codex")
+        base_config = _read_codex_config(codex_home / "config.toml")
+    configured_profile = str(base_config.get("profile", "")).strip() or None
+    profile_name = explicit_profile_name or configured_profile
+    if read_user_config:
+        if (profile_name
+                and Path(profile_name).name == profile_name
+                and profile_name not in {".", ".."}):
+            profile_config = _read_codex_config(
+                codex_home / f"{profile_name}.config.toml"
+            )
+
+    model, model_source = _codex_config_value(
+        env=env,
+        env_var="CODEX_MODEL",
+        config_key="model",
+        profile_name=profile_name,
+        profile_config=profile_config,
+        base_config=base_config,
+    )
+    provider, provider_source = _codex_config_value(
+        env=env,
+        env_var="CODEX_MODEL_PROVIDER",
+        config_key="model_provider",
+        profile_name=profile_name,
+        profile_config=profile_config,
+        base_config=base_config,
+        default="openai",
+    )
+    effort, effort_source = _codex_config_value(
+        env=env,
+        env_var="CODEX_REASONING_EFFORT",
+        config_key="model_reasoning_effort",
+        profile_name=profile_name,
+        profile_config=profile_config,
+        base_config=base_config,
+    )
+
+    provenance = {
+        "adapter": adapter_match.group(1),
+        "provider": provider,
+        "provider_source": provider_source,
+        "model": model,
+        "model_source": model_source,
+        "effort_level": effort,
+        "effort_supported": True,
+        "effort_source": effort_source,
+    }
+    if profile_name:
+        provenance["profile"] = profile_name
+        provenance["profile_source"] = (
+            "CODEX_PROFILE" if explicit_profile_name else "codex_user_config"
+        )
+    return provenance
+
+
+def _claude_effort_provenance(
+    *, model: str, env: Mapping[str, str], read_user_settings: bool
+) -> dict:
+    """Resolve Claude effort metadata without recording unrelated user settings."""
+    if "haiku-4-5" in model.lower():
+        return {
+            "effort_level": None,
+            "effort_supported": False,
+            "effort_source": "unsupported_by_model",
+        }
+
+    for variable in ("CLINGEN_CLAUDE_EFFORT", "CLAUDE_CODE_EFFORT_LEVEL"):
+        level = env.get(variable, "").strip().lower()
+        if level:
+            return {
+                "effort_level": level,
+                "effort_supported": True,
+                "effort_source": variable,
+            }
+
+    # Claude Code also accepts effortLevel in its user settings. Read only that
+    # single non-secret field so the manifest records the effective configuration.
+    if read_user_settings:
+        config_dir_value = env.get("CLAUDE_CONFIG_DIR", "").strip()
+        config_dir = (Path(config_dir_value).expanduser() if config_dir_value
+                      else Path.home() / ".claude")
+        settings_path = config_dir / "settings.json"
+        try:
+            user_settings = json.loads(settings_path.read_text())
+            level = str(user_settings.get("effortLevel", "")).strip().lower()
+        except (OSError, ValueError, TypeError):
+            level = ""
+        if level:
+            return {
+                "effort_level": level,
+                "effort_supported": True,
+                "effort_source": "claude_user_settings",
+            }
+
+    return {
+        "effort_level": None,
+        "effort_supported": True,
+        "effort_source": "model_default_unpinned",
+    }
+
+
 def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) -> dict:
     """Capture reproducibility metadata from a strict, non-secret allow-list.
 
-    For the reference Claude Code adapter, also record the effective defaults
-    applied by the adapter so a manifest remains informative when an operator
-    did not explicitly export every setting.
+    For supported Claude Code and Codex adapters, also resolve effective model
+    configuration from their explicit environment and non-secret config layers.
     """
     env = os.environ if environ is None else environ
     explicit_env = {
@@ -115,20 +269,35 @@ def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) 
     }
     provenance: dict = {"environment": explicit_env}
 
+    codex = _codex_provenance(
+        agent_cmd=agent_cmd,
+        env=env,
+        read_user_config=environ is None or bool(env.get("CODEX_HOME", "").strip()),
+    )
+    if codex is not None:
+        provenance.update(codex)
+        return provenance
+
     if "adapters/claude_code/" not in agent_cmd:
         return provenance
 
     use_vertex = env.get("CLAUDE_CODE_USE_VERTEX", "1") == "1"
+    model = env.get("CLINGEN_CLAUDE_MODEL", "claude-opus-4-8")
     provenance.update({
         "adapter": "claude_code",
         "provider": "google_vertex_ai" if use_vertex else "anthropic_api",
-        "model": env.get("CLINGEN_CLAUDE_MODEL", "claude-opus-4-8"),
+        "model": model,
         "model_source": (
             "CLINGEN_CLAUDE_MODEL"
             if env.get("CLINGEN_CLAUDE_MODEL", "").strip()
             else "adapter_default"
         ),
     })
+    provenance.update(_claude_effort_provenance(
+        model=model,
+        env=env,
+        read_user_settings=environ is None or bool(env.get("CLAUDE_CONFIG_DIR", "").strip()),
+    ))
 
     if use_vertex:
         # Claude Code gives the Google project variables precedence over

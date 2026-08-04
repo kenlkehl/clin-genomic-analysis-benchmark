@@ -17,12 +17,24 @@ def _pct(num: float, den: float) -> str:
 
 def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
                 question_scores: list[QuestionScore], agent_name: str, run_id: str,
+                agent_provenance: dict | None = None,
                 correct_concept_points: float = 1.0,
                 incorrect_concept_penalty: float = 0.25) -> str:
     lines: list[str] = []
     lines.append("# clin-genomic-analysis-benchmark scorecard\n")
     lines.append(f"- **Agent**: `{agent_name}`")
     lines.append(f"- **Run id**: `{run_id}`")
+    if agent_provenance:
+        if agent_provenance.get("model"):
+            lines.append(f"- **Model**: `{agent_provenance['model']}`")
+        if agent_provenance.get("provider"):
+            lines.append(f"- **Provider**: `{agent_provenance['provider']}`")
+        if agent_provenance.get("effort_supported") is False:
+            lines.append("- **Effort**: not applicable (model does not support configurable effort)")
+        elif agent_provenance.get("effort_level"):
+            lines.append(f"- **Effort**: `{agent_provenance['effort_level']}`")
+        else:
+            lines.append("- **Effort**: model default (not pinned)")
     lines.append(f"- **Cohorts**: {len(per_cohort)}")
     lines.append("- **Disambiguation scorer**: exact concept-ID match; "
                  f"+{correct_concept_points:g} per correct selection, "
@@ -122,11 +134,13 @@ def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
 
 def to_json(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
             question_scores: list[QuestionScore], agent_name: str, run_id: str,
+            agent_provenance: dict | None = None,
             correct_concept_points: float = 1.0,
             incorrect_concept_penalty: float = 0.25) -> str:
     return json.dumps({
         "agent_name": agent_name,
         "run_id": run_id,
+        "agent_provenance": agent_provenance or {},
         "scorer": "deterministic-rules-v2",
         "disambiguation_scoring": {
             "match": "exact_concept_id",

@@ -69,3 +69,31 @@ def test_vertex_project_placeholder_fails_before_subprocess(monkeypatch):
 
     with pytest.raises(adapter.ClaudeInvocationError, match="still a placeholder"):
         _call_adapter()
+
+
+def test_explicit_effort_is_passed_to_claude(monkeypatch):
+    captured = {}
+    completed = subprocess.CompletedProcess(
+        args=["claude"], returncode=0, stdout='{"result":"done"}', stderr=""
+    )
+    monkeypatch.setenv("ANTHROPIC_VERTEX_PROJECT_ID", "real-project")
+    monkeypatch.setenv("CLINGEN_CLAUDE_MODEL", "claude-sonnet-5@20260203")
+    monkeypatch.setenv("CLINGEN_CLAUDE_EFFORT", "xhigh")
+
+    def fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return completed
+
+    monkeypatch.setattr(adapter.subprocess, "run", fake_run)
+
+    assert _call_adapter() == "done"
+    effort_index = captured["cmd"].index("--effort")
+    assert captured["cmd"][effort_index + 1] == "xhigh"
+
+
+def test_explicit_effort_rejected_for_haiku(monkeypatch):
+    monkeypatch.setenv("CLINGEN_CLAUDE_MODEL", "claude-haiku-4-5@20251001")
+    monkeypatch.setenv("CLINGEN_CLAUDE_EFFORT", "xhigh")
+
+    with pytest.raises(adapter.ClaudeInvocationError, match="does not support"):
+        _call_adapter()

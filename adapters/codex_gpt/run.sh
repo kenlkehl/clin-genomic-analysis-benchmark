@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codex CLI adapter using the user's default Azure GPT-5.4 config.
+# Codex CLI adapter with configurable provider, model, and reasoning effort.
 #
 # Contract: invoked by the harness as
 #   run.sh --question-file <abs question.json> --output <abs result.json>
@@ -16,7 +16,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --question-file) QFILE="$2"; shift 2 ;;
     --output)        OUT="$2";    shift 2 ;;
-    *) echo "codex_gpt_5.4 adapter: unknown arg $1" >&2; exit 2 ;;
+    *) echo "codex_gpt adapter: unknown arg $1" >&2; exit 2 ;;
   esac
 done
 if [[ -z "$QFILE" || -z "$OUT" ]]; then
