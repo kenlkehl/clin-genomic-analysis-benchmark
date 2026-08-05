@@ -5,6 +5,13 @@
 **Incident class:** Benchmark data leakage / evaluation contamination  
 **Severity:** High for benchmark validity  
 
+**Remediation update (2026-08-05):** The repository now has a mandatory,
+fail-closed `bubblewrap` boundary for the Claude Code and Codex adapters,
+gold-free retry staging, isolation preflight/postflight checks, preserved
+agent-session audit logs outside model-visible scratch, and integrity status in
+manifests/scorecards. The incident remains open until clean replacement runs
+complete and their manifests report `integrity.status: valid`.
+
 > The filename uses “cheating” as shorthand. The more precise diagnosis is a
 > harness isolation failure: evaluated agents could read answer-bearing files
 > that should have been technically inaccessible. The models then used those

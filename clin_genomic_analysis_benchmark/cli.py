@@ -178,20 +178,24 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
     import logging as _logging
     _logging.basicConfig(level=_logging.INFO if verbose else _logging.WARNING,
                          format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    from .agent.isolation import AgentIsolationError
     from .agent.orchestrator import run_eval
 
     stages_list = [s.strip() for s in stages.split(",") if s.strip()]
-    run_dir = run_eval(
-        agent_cmd=agent,
-        agent_name=agent_name,
-        cohort_spec=cohort,
-        question_id=question,
-        stages=stages_list,
-        max_parallel=max_parallel,
-        agent_max_attempts=agent_max_attempts,
-        agent_retry_base_seconds=agent_retry_base_seconds,
-        run_id=run_id,
-    )
+    try:
+        run_dir = run_eval(
+            agent_cmd=agent,
+            agent_name=agent_name,
+            cohort_spec=cohort,
+            question_id=question,
+            stages=stages_list,
+            max_parallel=max_parallel,
+            agent_max_attempts=agent_max_attempts,
+            agent_retry_base_seconds=agent_retry_base_seconds,
+            run_id=run_id,
+        )
+    except AgentIsolationError as exc:
+        raise click.ClickException(f"agent isolation failed: {exc}") from exc
     click.echo(f"Eval written to {run_dir}")
     if not retry_failures:
         return
@@ -222,7 +226,7 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
             agent_retry_base_seconds=agent_retry_base_seconds,
             scoring_config_path=cfg_path,
         )
-    except (FileNotFoundError, FileExistsError, ValueError) as exc:
+    except (AgentIsolationError, FileNotFoundError, FileExistsError, ValueError) as exc:
         raise click.ClickException(
             f"Eval completed at {run_dir}, but post-run repair failed: {exc}"
         ) from exc
@@ -260,6 +264,7 @@ def retry_failures(run: str, output_run_id: str | None, agent: str | None,
     """Retry technical failures in a copied run and regenerate its scorecard."""
     import logging as _logging
 
+    from .agent.isolation import AgentIsolationError
     from .agent.repair import plan_failed_run, retry_failed_run
     from .config import SCORING_CONFIG_DIR
 
@@ -296,7 +301,7 @@ def retry_failures(run: str, output_run_id: str | None, agent: str | None,
             agent_retry_base_seconds=agent_retry_base_seconds,
             scoring_config_path=cfg_path,
         )
-    except (FileNotFoundError, FileExistsError, ValueError) as exc:
+    except (AgentIsolationError, FileNotFoundError, FileExistsError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
     click.echo(

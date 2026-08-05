@@ -31,6 +31,12 @@ from .orchestrator import (
     _agent_provenance,
     _run_one_question,
 )
+from .isolation import (
+    audit_agent_artifacts,
+    require_supported_adapter,
+    run_isolation_preflight,
+    sandbox_backend_provenance,
+)
 
 
 @dataclass(frozen=True)
@@ -200,6 +206,12 @@ def _load_gold_questions(manifest: dict) -> dict[tuple[str, str], Any]:
 def plan_failed_run(run_path: str | Path) -> tuple[Path, list[RepairTarget]]:
     """Return the source directory and score-relevant repair targets."""
     source_dir, manifest, runs = _load_source(run_path)
+    source_integrity = manifest.get("integrity") or {"status": "unaudited"}
+    if source_integrity.get("status") == "quarantined":
+        raise ValueError(
+            "refusing to repair a quarantined run; rerun it from scratch in the "
+            "hardened sandbox"
+        )
     configured = set((manifest.get("settings") or {}).get("stages") or _STAGES)
     targets = find_score_relevant_failures(
         runs,
@@ -336,6 +348,12 @@ def retry_failed_run(
         raise ValueError("agent_retry_base_seconds must be >= 0")
 
     source_dir, manifest, runs = _load_source(run_path)
+    source_integrity = manifest.get("integrity") or {"status": "unaudited"}
+    if source_integrity.get("status") == "quarantined":
+        raise ValueError(
+            "refusing to repair a quarantined run; rerun it from scratch in the "
+            "hardened sandbox"
+        )
     configured_stages = set((manifest.get("settings") or {}).get("stages") or _STAGES)
     targets = find_score_relevant_failures(
         runs,
@@ -350,6 +368,9 @@ def retry_failed_run(
     effective_agent_cmd = agent_cmd or manifest.get("agent_cmd")
     if not effective_agent_cmd:
         raise ValueError("Run manifest has no agent_cmd; provide --agent explicitly")
+    adapter_name = require_supported_adapter(effective_agent_cmd)
+    sandbox = sandbox_backend_provenance()
+    preflight = run_isolation_preflight()
     retry_provenance = _agent_provenance(effective_agent_cmd, environ=repair_env)
     mismatches = _provenance_mismatches(original_provenance, retry_provenance)
     if mismatches:
@@ -374,9 +395,16 @@ def retry_failed_run(
         "runs.json": _file_sha256(source_dir / "runs.json"),
     }
 
-    # copytree refuses an existing destination, preserving the source and any
-    # previous repair rather than merging directory trees accidentally.
-    shutil.copytree(source_dir, repaired_dir)
+    # A scorecard is gold data.  Preserve the source run, but never place its
+    # scorecard in the repair tree before model-controlled retries execute.
+    # copytree still refuses an existing destination, avoiding accidental merges.
+    shutil.copytree(
+        source_dir,
+        repaired_dir,
+        ignore=lambda _directory, names: [
+            name for name in names if name in {"scorecard.json", "scorecard.md"}
+        ],
+    )
     attempt_root = repaired_dir / "repairs" / repair_id
 
     def execute(target: RepairTarget) -> tuple[RepairTarget, QuestionRun]:
@@ -413,21 +441,32 @@ def retry_failed_run(
     runs_by_key = {(q["cohort"], q["question_id"]): q for q in runs}
     audit_outcomes: list[dict[str, Any]] = []
     successful_merges = 0
+    retry_findings: list[dict[str, str]] = []
     for target, replacement in sorted(
         outcomes, key=lambda item: (item[0].cohort, item[0].question_id, item[0].stage)
     ):
         original = runs_by_key[(target.cohort, target.question_id)]
         replacement_raw = asdict(replacement)
+        question_attempt_dir = (
+            attempt_root / "per_question" / target.cohort / target.question_id
+        )
+        target_findings = audit_agent_artifacts(question_attempt_dir)
+        retry_findings.extend({
+            **finding,
+            "question_id": target.question_id,
+            "cohort": target.cohort,
+            "stage": target.stage,
+        } for finding in target_findings)
         if target.stage == "classify":
             invocation = replacement_raw.get("classify") or {}
-            merged = bool(invocation.get("success"))
+            merged = bool(invocation.get("success")) and not target_findings
             if merged:
                 for stage in _STAGES:
                     original[stage] = replacement_raw.get(stage)
                 original["error"] = replacement_raw.get("error")
         else:
             invocation = replacement_raw.get(target.stage) or {}
-            merged = bool(invocation.get("success"))
+            merged = bool(invocation.get("success")) and not target_findings
             if merged:
                 original[target.stage] = replacement_raw[target.stage]
                 if original.get("error"):
@@ -439,6 +478,7 @@ def retry_failed_run(
             "merged": merged,
             "retry_failure_reason": invocation.get("failure_reason"),
             "attempt_count": invocation.get("attempt_count", 1),
+            "integrity_findings": target_findings,
         })
 
     atomic_write_json(repaired_dir / "runs.json", runs)
@@ -471,6 +511,26 @@ def retry_failed_run(
     manifest["n_completed"] = sum(1 for qrun in runs if not qrun.get("error"))
     manifest["derived_from_run"] = _run_reference(source_dir)
     manifest.setdefault("repair_history", []).append(repair_record)
+    source_status = str(source_integrity.get("status") or "unaudited")
+    if retry_findings:
+        integrity_status = "quarantined"
+    elif source_status == "valid":
+        integrity_status = "valid"
+    else:
+        # Sandboxing the retries cannot retroactively certify successful stages
+        # inherited from an older, unisolated source run.
+        integrity_status = "unaudited"
+    manifest["integrity"] = {
+        "status": integrity_status,
+        "adapter": adapter_name,
+        "sandbox": sandbox,
+        "preflight": preflight,
+        "postflight": {
+            "passed": not retry_findings,
+            "forbidden_marker_findings": retry_findings,
+        },
+        "source_run_status": source_status,
+    }
     atomic_write_json(repaired_dir / "manifest.json", manifest)
 
     score_run(

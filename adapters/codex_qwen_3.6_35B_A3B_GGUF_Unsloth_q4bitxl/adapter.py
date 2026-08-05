@@ -43,6 +43,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+from clin_genomic_analysis_benchmark.agent.isolation import (
+    SANDBOX_COHORT_DIR,
+    SANDBOX_SCRATCH_DIR,
+    export_agent_session_audit,
+    sandbox_question_view,
+    sandboxed_agent_command,
+)
+
 ADAPTER_DIR = Path(__file__).resolve().parent
 DEFAULT_CODEX_PROFILE = "unsloth_api"
 DEFAULT_CODEX_PROVIDER = "unsloth_api"
@@ -63,6 +71,7 @@ def _build_prompt(question: dict) -> str:
     the user prompt so the model gets the same guidance the Claude adapter serves
     as a system prompt. Single source of truth: repo-root AGENT_INSTRUCTIONS.md.
     """
+    question = sandbox_question_view(question)
     repo_root = ADAPTER_DIR.parent.parent
     instructions_doc = (repo_root / "AGENT_INSTRUCTIONS.md").read_text()
     stage = question["stage"]
@@ -287,7 +296,8 @@ def _sandbox_for(stage: str) -> str:
     return "read-only"
 
 
-def _codex_call(*, prompt: str, scratch_dir: str, sandbox_mode: str,
+def _codex_call(*, prompt: str, cohort_dir: str, data_dictionary_path: str,
+                scratch_dir: str, sandbox_mode: str,
                 last_message_file: Path) -> str:
     profile = os.environ.get("CODEX_PROFILE", DEFAULT_CODEX_PROFILE)
     provider = os.environ.get("CODEX_MODEL_PROVIDER", DEFAULT_CODEX_PROVIDER)
@@ -297,7 +307,8 @@ def _codex_call(*, prompt: str, scratch_dir: str, sandbox_mode: str,
     cmd = [
         codex_bin, "exec",
         "--profile", profile,
-        "-C", scratch_dir,               # working root = writable scratch dir
+        "-C", str(SANDBOX_SCRATCH_DIR),  # bwrap-backed writable scratch dir
+        "--add-dir", str(SANDBOX_COHORT_DIR),
         "--skip-git-repo-check",         # scratch dir is not a git repo
         "--sandbox", sandbox_mode,
         "-c", 'approval_policy="never"',  # fully non-interactive, no reviewer
@@ -309,7 +320,7 @@ def _codex_call(*, prompt: str, scratch_dir: str, sandbox_mode: str,
         "-c", f"model_providers.{provider}.wire_api={json.dumps('responses')}",
         "-c", f"model_providers.{provider}.requires_openai_auth=false",
         "--color", "never",
-        "-o", str(last_message_file),    # final agent message → file
+        "-o", str(SANDBOX_SCRATCH_DIR / last_message_file.name),
     ]
     model = os.environ.get("CODEX_MODEL", DEFAULT_CODEX_MODEL)
     if model:
@@ -320,8 +331,33 @@ def _codex_call(*, prompt: str, scratch_dir: str, sandbox_mode: str,
     token = env.get(UNSLOTH_TOKEN_ENV) or env.get("API_TOKEN") or "EMPTY"
     env[UNSLOTH_TOKEN_ENV] = token
     env.setdefault("API_TOKEN", token)
+    # Seed the disposable Codex home with this selected profile/provider. These
+    # configuration variables are consumed by the trusted sandbox builder and
+    # are not passed through to the model-controlled process environment.
+    env["CODEX_PROFILE"] = profile
+    env["CODEX_MODEL_PROVIDER"] = provider
+    env["CODEX_MODEL"] = model
 
-    proc = subprocess.run(cmd, input=prompt, env=env, capture_output=True, text=True)
+    with sandboxed_agent_command(
+        cmd,
+        cohort_dir=cohort_dir,
+        data_dictionary_path=data_dictionary_path,
+        scratch_dir=scratch_dir,
+        environment=env,
+        home_kind="codex_qwen",
+    ) as launch:
+        proc = subprocess.run(
+            launch.command,
+            input=prompt,
+            env=launch.environment,
+            capture_output=True,
+            text=True,
+        )
+        export_agent_session_audit(
+            launch,
+            destination=Path(scratch_dir).resolve().parent / "agent_session_audit",
+            home_kind="codex_qwen",
+        )
     if proc.returncode != 0:
         raise RuntimeError(
             f"codex exited {proc.returncode}: {proc.stderr[-1500:]}"
@@ -351,6 +387,8 @@ def main() -> int:
     prompt = _build_prompt(question)
     text = _codex_call(
         prompt=prompt,
+        cohort_dir=question["cohort_dir"],
+        data_dictionary_path=question["data_dictionary_path"],
         scratch_dir=scratch_dir,
         sandbox_mode=_sandbox_for(stage),
         last_message_file=last_message_file,

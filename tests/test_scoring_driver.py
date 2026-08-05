@@ -11,13 +11,15 @@ from clin_genomic_analysis_benchmark.scoring import driver
 
 def _write_run(run_dir, *, classify_result: dict, disambiguate_result: dict | None = None,
                analyze_result: dict | None = None,
-               agent_provenance: dict | None = None) -> None:
+               agent_provenance: dict | None = None,
+               integrity: dict | None = None) -> None:
     run_dir.mkdir(parents=True)
     (run_dir / "manifest.json").write_text(json.dumps({
         "agent_name": "agent",
         "run_id": "run-1",
         "cohorts": ["cohort_1"],
         "agent_provenance": agent_provenance or {},
+        "integrity": integrity or {"status": "unaudited"},
     }))
     qrun = {
         "cohort": "cohort_1",
@@ -47,6 +49,7 @@ def test_driver_scores_exact_ids_and_false_positive_penalty(tmp_path, monkeypatc
             "effort_supported": True,
             "effort_source": "CLINGEN_CLAUDE_EFFORT",
         },
+        integrity={"status": "valid", "sandbox": {"backend": "bubblewrap"}},
     )
     gold = CohortQuestionFile(
         cohort="cohort_1",
@@ -67,7 +70,9 @@ def test_driver_scores_exact_ids_and_false_positive_penalty(tmp_path, monkeypatc
     scorecard = json.loads((run_dir / "scorecard.json").read_text())
     assert scorecard["scorer"] == "deterministic-rules-v2"
     assert scorecard["agent_provenance"]["effort_level"] == "xhigh"
+    assert scorecard["integrity"]["status"] == "valid"
     assert "- **Effort**: `xhigh`" in (run_dir / "scorecard.md").read_text()
+    assert "- **Integrity**: `valid`" in (run_dir / "scorecard.md").read_text()
     result = scorecard["questions"][0]["disambiguation"]
     assert result["points"] == 0.75  # one correct − one 0.25 false positive
     assert result["correct_concept_ids"] == ["OUTCOME_METRIC"]

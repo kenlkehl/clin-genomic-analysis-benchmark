@@ -28,6 +28,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+from clin_genomic_analysis_benchmark.agent.isolation import (
+    SANDBOX_COHORT_DIR,
+    SANDBOX_SCRATCH_DIR,
+    export_agent_session_audit,
+    sandbox_question_view,
+    sandboxed_agent_command,
+)
+
 ADAPTER_DIR = Path(__file__).resolve().parent
 _MAX_ERROR_STREAM_CHARS = 4000
 _PROJECT_ID_PLACEHOLDERS = {
@@ -53,6 +61,7 @@ def _load_question(path: Path) -> dict:
 
 def _build_prompt(question: dict) -> tuple[str, str]:
     """Return (system_prompt, user_prompt) for the requested stage."""
+    question = sandbox_question_view(question)
     stage = question["stage"]
     # Single source of truth: the repo-root AGENT_INSTRUCTIONS.md (covers all three
     # stages, the current conventions, and the answer schemas). The user payload below
@@ -301,7 +310,8 @@ def _claude_failure_message(proc: subprocess.CompletedProcess[str]) -> str:
 
 
 def _claude_call(*, system_prompt: str, user_prompt: str, cohort_dir: str,
-                 scratch_dir: str, allowed_tools: str) -> str:
+                 data_dictionary_path: str, scratch_dir: str,
+                 allowed_tools: str) -> str:
     env = os.environ.copy()
     env.setdefault("ANTHROPIC_VERTEX_PROJECT_ID", "kehllab-caia-v2")
     env["CLAUDE_CODE_USE_VERTEX"] = env.get("CLAUDE_CODE_USE_VERTEX", "1")
@@ -320,12 +330,12 @@ def _claude_call(*, system_prompt: str, user_prompt: str, cohort_dir: str,
         )
 
     cmd = [
-        "claude",
+        env.get("CLAUDE_BIN", "claude"),
         "--print",
         "--output-format", "json",
         "--model", model,
-        "--add-dir", cohort_dir,
-        "--add-dir", scratch_dir,
+        "--add-dir", str(SANDBOX_COHORT_DIR),
+        "--add-dir", str(SANDBOX_SCRATCH_DIR),
         "--allowedTools", allowed_tools,
         "--append-system-prompt", system_prompt,
     ]
@@ -341,7 +351,25 @@ def _claude_call(*, system_prompt: str, user_prompt: str, cohort_dir: str,
             f"({project_id!r}); set it to a real GCP project ID"
         )
 
-    proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    with sandboxed_agent_command(
+        cmd,
+        cohort_dir=cohort_dir,
+        data_dictionary_path=data_dictionary_path,
+        scratch_dir=scratch_dir,
+        environment=env,
+        home_kind="claude",
+    ) as launch:
+        proc = subprocess.run(
+            launch.command,
+            env=launch.environment,
+            capture_output=True,
+            text=True,
+        )
+        export_agent_session_audit(
+            launch,
+            destination=Path(scratch_dir).resolve().parent / "agent_session_audit",
+            home_kind="claude",
+        )
     if proc.returncode != 0:
         raise ClaudeInvocationError(_claude_failure_message(proc))
     # `--output-format json` returns: {"type":"result","result":"<final assistant text>",...}
@@ -379,6 +407,7 @@ def main() -> int:
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             cohort_dir=question["cohort_dir"],
+            data_dictionary_path=question["data_dictionary_path"],
             scratch_dir=question["scratch_dir"],
             allowed_tools=_allowed_tools_for(stage),
         )

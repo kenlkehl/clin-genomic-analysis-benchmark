@@ -4,8 +4,9 @@ This adapter evaluates the Codex CLI using either explicit environment overrides
 or the default model/provider from `~/.codex/config.toml`. The directory name is
 historical; `CODEX_MODEL` can select any model available from the provider.
 
-It lets Codex load your normal user config, applies any explicit provider/model/
-effort overrides, then refreshes
+It reads the selected runtime values from your normal user config, writes only
+those values and the selected provider definition into a disposable Codex
+home, applies explicit provider/model/effort overrides, then refreshes
 `AZURE_OPENAI_API_KEY` immediately before every `codex exec` attempt:
 
 ```bash
@@ -28,7 +29,9 @@ bash adapters/codex_gpt/run.sh \
 The adapter builds a prompt from `AGENT_INSTRUCTIONS.md` plus the stage payload,
 runs `codex exec` non-interactively, reads Codex's final message via
 `--output-last-message`, extracts the final JSON object, and writes it to
-`result.json`.
+`result.json`. The Codex process is enclosed in a mandatory outer `bubblewrap`
+namespace; it cannot see the host repository, prior runs, scorecards, normal
+Codex history, or gold root.
 
 ## Defaults
 
@@ -85,8 +88,13 @@ uv run clingen-bench score --run 'codex_azure_gpt_5_6_terra_xhigh/<run_id>'
 
 ## Notes
 
-- The adapter adds the cohort directory with `--add-dir` and runs Codex from
-  the per-question scratch directory.
+- The outer sandbox exposes the cohort as read-only `/data/cohort` and runs
+  Codex from writable `/work`. `--add-dir` and Codex's own sandbox remain as
+  defense in depth, not as the confidentiality boundary.
+- The model sees canonical sandbox paths rather than host absolute paths.
+- Only selected Codex runtime/provider configuration is copied into an
+  ephemeral home; projects, histories, memories, logs, and prior sessions are
+  excluded.
 - Explicit provider, model, and effort values are recorded in `manifest.json`
   and displayed at the top of generated scorecards.
 - The prompt instructs Codex to treat the cohort directory as read-only.

@@ -18,6 +18,14 @@ import sys
 import time
 from pathlib import Path
 
+from clin_genomic_analysis_benchmark.agent.isolation import (
+    SANDBOX_COHORT_DIR,
+    SANDBOX_SCRATCH_DIR,
+    export_agent_session_audit,
+    sandbox_question_view,
+    sandboxed_agent_command,
+)
+
 ADAPTER_DIR = Path(__file__).resolve().parent
 AZURE_RESOURCE = "https://cognitiveservices.azure.com/"
 
@@ -28,6 +36,9 @@ def _load_question(path: Path) -> dict:
 
 
 def _build_prompt(question: dict) -> str:
+    # Never disclose host paths to the model.  These aliases are backed by the
+    # outer bubblewrap mounts created immediately before launching Codex.
+    question = sandbox_question_view(question)
     repo_root = ADAPTER_DIR.parent.parent
     instructions_doc = (repo_root / "AGENT_INSTRUCTIONS.md").read_text()
     stage = question["stage"]
@@ -315,10 +326,12 @@ def _save_attempt_logs(
 ) -> None:
     if not _env_truthy("CODEX_SAVE_ATTEMPT_LOGS", True):
         return
-    (scratch_dir / f".codex_attempt.{stage}.{attempt}.stdout.txt").write_text(
+    audit_dir = scratch_dir.parent / "adapter_audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    (audit_dir / f"codex_attempt.{stage}.{attempt}.stdout.txt").write_text(
         proc.stdout or ""
     )
-    (scratch_dir / f".codex_attempt.{stage}.{attempt}.stderr.txt").write_text(
+    (audit_dir / f"codex_attempt.{stage}.{attempt}.stderr.txt").write_text(
         proc.stderr or ""
     )
 
@@ -337,13 +350,13 @@ def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
     codex_bin = os.environ.get("CODEX_BIN", "codex")
     cmd = [
         codex_bin, "exec",
-        "-C", str(scratch_dir),
-        "--add-dir", str(cohort_dir),
+        "-C", str(SANDBOX_SCRATCH_DIR),
+        "--add-dir", str(SANDBOX_COHORT_DIR),
         "--skip-git-repo-check",
         "--sandbox", _sandbox_for(stage),
         "-c", 'approval_policy="never"',
         "--color", "never",
-        "-o", str(last_message_file),
+        "-o", str(SANDBOX_SCRATCH_DIR / last_message_file.name),
     ]
     if _env_truthy("CODEX_EPHEMERAL", True):
         cmd.append("--ephemeral")
@@ -370,13 +383,29 @@ def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
         if last_message_file.exists():
             last_message_file.unlink()
 
-        proc = subprocess.run(
+        with sandboxed_agent_command(
             cmd,
-            input=prompt,
-            env=env,
-            capture_output=True,
-            text=True,
-        )
+            cohort_dir=cohort_dir,
+            data_dictionary_path=question["data_dictionary_path"],
+            scratch_dir=scratch_dir,
+            environment=env,
+            home_kind="codex",
+        ) as launch:
+            proc = subprocess.run(
+                launch.command,
+                input=prompt,
+                env=launch.environment,
+                capture_output=True,
+                text=True,
+            )
+            export_agent_session_audit(
+                launch,
+                destination=(
+                    scratch_dir.parent / "agent_session_audit"
+                    / f"codex_attempt_{stage}_{attempt}"
+                ),
+                home_kind="codex",
+            )
         _save_attempt_logs(
             scratch_dir=scratch_dir,
             stage=stage,

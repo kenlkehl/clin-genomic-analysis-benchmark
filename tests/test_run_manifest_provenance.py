@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
-from clin_genomic_analysis_benchmark.agent.orchestrator import _agent_provenance
+from clin_genomic_analysis_benchmark.agent import orchestrator
+from clin_genomic_analysis_benchmark.agent.orchestrator import (
+    QuestionRun,
+    _agent_provenance,
+)
+from clin_genomic_analysis_benchmark.questions.schema import PublicQuestion
 
 
 def test_claude_vertex_provenance_records_effective_runtime():
@@ -146,3 +152,53 @@ def test_non_claude_adapter_only_gets_allowlisted_environment():
     )
 
     assert provenance == {"environment": {"CODEX_MODEL": "example-model"}}
+
+
+def test_run_manifest_records_passed_isolation_checks(tmp_path, monkeypatch):
+    cohort = SimpleNamespace(name="c", path=tmp_path / "cohort")
+    cohort.path.mkdir()
+    question = PublicQuestion(id="c-Q1", category=1, text="Question?")
+    bank = SimpleNamespace(questions=[question])
+    monkeypatch.setattr(orchestrator, "RUNS_DIR", tmp_path / "runs")
+    monkeypatch.setattr(orchestrator, "resolve_cohorts", lambda spec: [cohort])
+    monkeypatch.setattr(orchestrator.q_io, "load_public", lambda name: bank)
+    monkeypatch.setattr(
+        orchestrator,
+        "require_supported_adapter",
+        lambda command: "claude_code",
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "sandbox_backend_provenance",
+        lambda: {"backend": "bubblewrap", "mode": "required_fail_closed"},
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "run_isolation_preflight",
+        lambda: {"passed": True},
+    )
+    monkeypatch.setattr(orchestrator, "audit_agent_artifacts", lambda root: [])
+    monkeypatch.setattr(
+        orchestrator,
+        "_run_one_question",
+        lambda **kwargs: QuestionRun(
+            question_id="c-Q1",
+            cohort="c",
+            category=1,
+            classification_gold="",
+        ),
+    )
+
+    run_dir = orchestrator.run_eval(
+        agent_cmd="bash adapters/claude_code/run.sh",
+        agent_name="claude",
+        max_parallel=1,
+        run_id="isolated-run",
+    )
+
+    manifest = json.loads((run_dir / "manifest.json").read_text())
+    assert manifest["integrity"]["status"] == "valid"
+    assert manifest["integrity"]["adapter"] == "claude_code"
+    assert manifest["integrity"]["sandbox"]["backend"] == "bubblewrap"
+    assert manifest["integrity"]["preflight"]["passed"] is True
+    assert manifest["integrity"]["postflight"]["passed"] is True

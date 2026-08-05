@@ -51,8 +51,14 @@ See `clin_genomic_analysis_benchmark/agent/contract.py` for full JSON schemas.
 ## Wiring up your adapter
 
 1. Edit `adapter.py` and implement `answer_classify`, `answer_disambiguate`, `answer_analyze`.
-2. Make sure `run.sh` is executable.
-3. Run the harness:
+2. Put every model-controlled CLI subprocess through
+   `clin_genomic_analysis_benchmark.agent.isolation.sandboxed_agent_command`.
+   Do not pass host paths into its prompt; use `sandbox_question_view`.
+3. Register the reviewed adapter in `_SUPPORTED_ADAPTER_DIRS` in
+   `agent/isolation.py`. The harness intentionally fails closed for an
+   unregistered adapter.
+4. Make sure `run.sh` is executable.
+5. Run the harness:
    ```
    clingen-bench eval --agent "bash adapters/<your-name>/run.sh" --agent-name <your-name> --cohort bladder_1.2
    ```
@@ -60,5 +66,7 @@ See `clin_genomic_analysis_benchmark/agent/contract.py` for full JSON schemas.
 ## Notes
 
 - The harness is model-agnostic — your adapter is the only model-specific code.
+- The template itself is not registered or safe to evaluate until its
+  model-controlled subprocess uses the mandatory outer sandbox.
 - Privacy: the cohort directory may contain de-identified PHI. Only transmit data over BAA-covered endpoints.
 - The reference adapter at `adapters/claude_code/` demonstrates a working implementation against Claude Code on Vertex.

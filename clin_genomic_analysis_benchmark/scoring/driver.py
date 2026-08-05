@@ -187,6 +187,7 @@ def score_run(
         question_scores=question_scores,
         agent_name=agent_name, run_id=run_id,
         agent_provenance=manifest.get("agent_provenance"),
+        integrity=manifest.get("integrity"),
         correct_concept_points=correct_concept_points,
         incorrect_concept_penalty=incorrect_concept_penalty,
     )
@@ -195,6 +196,7 @@ def score_run(
         question_scores=question_scores,
         agent_name=agent_name, run_id=run_id,
         agent_provenance=manifest.get("agent_provenance"),
+        integrity=manifest.get("integrity"),
         correct_concept_points=correct_concept_points,
         incorrect_concept_penalty=incorrect_concept_penalty,
     )

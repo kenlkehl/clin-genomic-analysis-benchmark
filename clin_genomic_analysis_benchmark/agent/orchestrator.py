@@ -30,6 +30,12 @@ from ..config import RUNS_DIR, TimeoutConfig, settings
 from ..questions import io as q_io
 from ..questions.schema import PublicQuestion
 from ..utils.jsonio import atomic_write_json
+from .isolation import (
+    audit_agent_artifacts,
+    require_supported_adapter,
+    run_isolation_preflight,
+    sandbox_backend_provenance,
+)
 from .runner import StageInvocation, invoke
 
 logger = logging.getLogger(__name__)
@@ -88,6 +94,7 @@ class RunManifest:
     n_questions: int
     n_completed: int
     agent_provenance: dict
+    integrity: dict
     settings: dict
 
 
@@ -457,6 +464,9 @@ def run_eval(
     run_id: Optional[str] = None,
 ) -> Path:
     """Run the harness against an agent. Returns the run directory."""
+    adapter_name = require_supported_adapter(agent_cmd)
+    sandbox = sandbox_backend_provenance()
+    preflight = run_isolation_preflight()
     stages = stages or ["classify", "disambiguate", "analyze"]
     if agent_max_attempts < 1:
         raise click_exception("agent_max_attempts must be >= 1")
@@ -525,6 +535,18 @@ def run_eval(
                 runs.append(fut.result())
 
     ended = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    postflight_findings = audit_agent_artifacts(run_dir / "per_question")
+    postflight = {
+        "passed": not postflight_findings,
+        "forbidden_marker_findings": postflight_findings,
+    }
+    integrity = {
+        "status": "valid" if postflight["passed"] else "quarantined",
+        "adapter": adapter_name,
+        "sandbox": sandbox,
+        "preflight": preflight,
+        "postflight": postflight,
+    }
     manifest = RunManifest(
         agent_cmd=agent_cmd,
         agent_name=agent_name,
@@ -537,6 +559,7 @@ def run_eval(
         n_questions=n_total,
         n_completed=sum(1 for r in runs if r.error is None),
         agent_provenance=_agent_provenance(agent_cmd),
+        integrity=integrity,
         settings={
             "stages": stages,
             "max_parallel": max_parallel,

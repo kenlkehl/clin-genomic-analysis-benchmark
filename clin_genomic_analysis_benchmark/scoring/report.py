@@ -18,12 +18,15 @@ def _pct(num: float, den: float) -> str:
 def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
                 question_scores: list[QuestionScore], agent_name: str, run_id: str,
                 agent_provenance: dict | None = None,
+                integrity: dict | None = None,
                 correct_concept_points: float = 1.0,
                 incorrect_concept_penalty: float = 0.25) -> str:
     lines: list[str] = []
     lines.append("# clin-genomic-analysis-benchmark scorecard\n")
     lines.append(f"- **Agent**: `{agent_name}`")
     lines.append(f"- **Run id**: `{run_id}`")
+    integrity_status = str((integrity or {}).get("status") or "unaudited")
+    lines.append(f"- **Integrity**: `{integrity_status}`")
     if agent_provenance:
         if agent_provenance.get("model"):
             lines.append(f"- **Model**: `{agent_provenance['model']}`")
@@ -40,6 +43,11 @@ def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
                  f"+{correct_concept_points:g} per correct selection, "
                  f"−{incorrect_concept_penalty:g} per incorrect selection, floor 0")
     lines.append(f"- **Questions scored**: {overall.n}")
+    if integrity_status != "valid":
+        lines.append(
+            "- **BENCHMARK RESULT IS NOT CERTIFIED**: filesystem-isolation "
+            f"status is `{integrity_status}`"
+        )
     if overall.overall_score is not None:
         lines.append(f"- **SCORE: {overall.overall_score * 100:.1f}%** "
                      f"— weighted mean of the three subtasks")
@@ -135,12 +143,14 @@ def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
 def to_json(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
             question_scores: list[QuestionScore], agent_name: str, run_id: str,
             agent_provenance: dict | None = None,
+            integrity: dict | None = None,
             correct_concept_points: float = 1.0,
             incorrect_concept_penalty: float = 0.25) -> str:
     return json.dumps({
         "agent_name": agent_name,
         "run_id": run_id,
         "agent_provenance": agent_provenance or {},
+        "integrity": integrity or {"status": "unaudited"},
         "scorer": "deterministic-rules-v2",
         "disambiguation_scoring": {
             "match": "exact_concept_id",

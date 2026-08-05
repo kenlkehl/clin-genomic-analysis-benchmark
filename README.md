@@ -21,11 +21,30 @@ All six cohorts are wired end to end. The reference adapter drives Claude Code o
 
 ### Keeping the answers away from the agent
 
-The agent under evaluation runs with broad filesystem read access, so **no gold sits in this repo**. The gold question bank, the computed gold answers, and the review workbook all live under **`$CLINGEN_GOLD_ROOT`** (default: `../chatbpc/chatbpc_benchmark_gold`).
+The model-controlled CLI runs in a mandatory, fail-closed Linux `bubblewrap`
+mount namespace. It sees only the current cohort at `/data/cohort` (read-only),
+its dictionary under `/data/dictionary` (read-only), a per-question `/work`
+directory (writable), an ephemeral home, and the required software runtime.
+The repository, prior runs, scorecards, normal Claude/Codex histories, and gold
+root are not mounted. Host absolute paths are replaced with these canonical
+aliases before the prompt is built.
 
-The repo's `questions/<cohort>.yaml` is a projection with the answers stripped out — it is a different Pydantic model with no fields for classification, concepts, or gold answers, so leaking through it is a type error rather than an oversight. Evaluation reads the public bank; only the scorer, a trusted harness process, reads the gold bank.
+The gold question bank, computed gold answers, and review workbook additionally
+remain outside the repository under **`$CLINGEN_GOLD_ROOT`** (default:
+`../chatbpc/chatbpc_benchmark_gold`). This separation is defense in depth; the
+filesystem namespace is the confidentiality boundary.
 
-One residual risk, knowingly accepted: an adversarial agent that walks the filesystem by absolute path could still find the gold root. Close it with an OS sandbox, or point `CLINGEN_GOLD_ROOT` somewhere non-adjacent.
+The repo's `questions/<cohort>.yaml` is a projection with the answers stripped
+out—it is a different Pydantic model with no fields for classification,
+concepts, or gold answers. Evaluation reads the public bank; only the trusted
+harness/scorer reads the gold bank.
+
+Every run performs a namespace preflight and scans agent artifacts afterward.
+`manifest.json` and both scorecards record `integrity.status`. Only `valid`
+runs are certified; `quarantined` or legacy `unaudited` runs must not be used
+for model comparisons. Network access remains available because the CLI must
+reach its configured endpoint, but host `/tmp`, Unix sockets, and the host
+filesystem outside the explicit mounts are absent.
 
 ## How scoring works
 
@@ -145,6 +164,7 @@ For an older workbook that has reviewed prose concepts but no canonical-ID colum
 
 ```bash
 uv sync
+command -v bwrap             # required; evaluation fails closed without it
 cp .env.example .env   # Vertex (ANTHROPIC_VERTEX_PROJECT_ID, credentials) + Azure OpenAI
 
 # Make sure the YAML banks match the workbook
@@ -175,8 +195,10 @@ uv run clingen-bench retry-failures \
   --run claude_code/<run_id> \
   --dry-run
 
-# Retry the selected stages (up to 3 attempts each), merge successful results
-# into a new copied run, record repair provenance, and regenerate its scorecard.
+# Retry the selected stages (up to 3 attempts each) in fresh isolated scratch
+# directories, merge successful results into a new run, record repair
+# provenance, and regenerate its scorecard. Gold-bearing scorecards are never
+# copied into the repair tree before retries execute.
 # The source run is never modified. The original model, provider, effort, Vertex
 # project, region, and stage timeouts are restored from its manifest.
 uv run clingen-bench retry-failures \
@@ -215,7 +237,17 @@ Agents are **CLI executables**, called once per (question, stage):
 $ <your_agent> --question-file question.json --output result.json
 ```
 
-The harness is model- and framework-agnostic — it knows nothing about your agent beyond this contract. The reference adapter (`adapters/claude_code/adapter.py`) builds a system prompt from `AGENT_INSTRUCTIONS.md` and shells out to `claude --print --output-format json --model <model> --add-dir <cohort_dir> --allowedTools Read,Glob,Grep,Bash`.
+The harness contract remains model- and framework-agnostic, but a coding-agent
+adapter must put every model-controlled subprocess through
+`agent.isolation.sandboxed_agent_command` and be added to the sandboxed-adapter
+registry. Unregistered adapters fail closed. The Claude Code and both Codex
+adapters are registered; the Antigravity and template adapters are not yet
+certified for benchmark runs.
+
+The reference Claude adapter builds a system prompt from
+`AGENT_INSTRUCTIONS.md`, then launches `claude` inside the outer namespace with
+its normal narrow tool allowlist. The Codex adapters use the same outer
+boundary plus Codex's internal sandbox as defense in depth.
 
 Start from `adapters/template/`.
 

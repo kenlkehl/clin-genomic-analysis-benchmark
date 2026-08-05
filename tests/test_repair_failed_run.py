@@ -132,6 +132,7 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
         "n_questions": 2,
         "n_completed": 2,
         "agent_provenance": {},
+        "integrity": {"status": "valid"},
         "settings": {
             "stages": ["classify", "disambiguate", "analyze"],
             "timeouts": {"classify": 10, "disambiguate": 20, "analyze": 30},
@@ -164,6 +165,8 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
     ]
     (source / "manifest.json").write_text(json.dumps(manifest))
     (source / "runs.json").write_text(json.dumps(original_runs))
+    (source / "scorecard.json").write_text('{"gold":"must not be copied"}')
+    (source / "scorecard.md").write_text("gold-bearing scorecard")
     marker = source / "per_question" / "c" / "q-failed" / "original.log"
     marker.parent.mkdir(parents=True)
     marker.write_text("original artifact")
@@ -187,6 +190,9 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
         lambda cohort: SimpleNamespace(questions=public_questions),
     )
     monkeypatch.setattr(repair, "get_cohort", lambda cohort: SimpleNamespace(name=cohort))
+    monkeypatch.setattr(repair, "require_supported_adapter", lambda command: "test")
+    monkeypatch.setattr(repair, "sandbox_backend_provenance", lambda: {"backend": "test"})
+    monkeypatch.setattr(repair, "run_isolation_preflight", lambda: {"passed": True})
 
     captured_kwargs = {}
 
@@ -237,6 +243,8 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
     assert repaired_runs[0]["disambiguate"]["success"] is True
     assert repaired_runs[1] == original_runs[1]
     assert (repaired / "per_question" / "c" / "q-failed" / "original.log").exists()
+    assert not (repaired / "scorecard.json").exists()
+    assert not (repaired / "scorecard.md").exists()
 
     repaired_manifest = json.loads((repaired / "manifest.json").read_text())
     assert repaired_manifest["run_id"] == "repaired-run"
@@ -246,6 +254,7 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
     assert history["successful_merges"] == 1
     assert history["targets"][0]["attempt_count"] == 2
     assert history["source_hashes"]["runs.json"]
+    assert repaired_manifest["integrity"]["status"] == "valid"
     assert scored == [{"run_path": str(repaired), "scoring_config_path": None}]
 
 
@@ -286,6 +295,9 @@ def test_retry_failed_run_keeps_original_failure_when_retry_exhausts(
         ]),
     )
     monkeypatch.setattr(repair, "get_cohort", lambda cohort: SimpleNamespace(name=cohort))
+    monkeypatch.setattr(repair, "require_supported_adapter", lambda command: "test")
+    monkeypatch.setattr(repair, "sandbox_backend_provenance", lambda: {"backend": "test"})
+    monkeypatch.setattr(repair, "run_isolation_preflight", lambda: {"passed": True})
     monkeypatch.setattr(repair, "score_run", lambda **kwargs: kwargs["run_path"])
     monkeypatch.setattr(
         repair,
@@ -315,3 +327,21 @@ def test_retry_failed_run_keeps_original_failure_when_retry_exhausts(
     assert repaired_runs[0]["disambiguate"] == old_failure
     assert summary.successful_merges == 0
     assert summary.failed_retries == 1
+
+
+def test_plan_refuses_quarantined_source(tmp_path):
+    source = tmp_path / "quarantined"
+    source.mkdir()
+    (source / "manifest.json").write_text(json.dumps({
+        "agent_cmd": "bash adapters/claude_code/run.sh",
+        "cohorts": [],
+        "integrity": {"status": "quarantined"},
+    }))
+    (source / "runs.json").write_text("[]")
+
+    try:
+        repair.plan_failed_run(source)
+    except ValueError as exc:
+        assert "quarantined run" in str(exc)
+    else:
+        raise AssertionError("quarantined run should not be repairable")
