@@ -328,7 +328,10 @@ def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
     scratch_dir = Path(question["scratch_dir"]).resolve()
     cohort_dir = Path(question["cohort_dir"]).resolve()
     scratch_dir.mkdir(parents=True, exist_ok=True)
-    max_attempts = _env_int("CODEX_MAX_ATTEMPTS", 3)
+    # The benchmark harness owns cross-adapter retries. Keep this inner loop at
+    # one by default so three harness attempts do not silently become nine
+    # Codex processes; standalone users can still opt into adapter retries.
+    max_attempts = _env_int("CODEX_MAX_ATTEMPTS", 1)
     retry_sleep = _env_float("CODEX_RETRY_BASE_SECONDS", 15.0)
 
     codex_bin = os.environ.get("CODEX_BIN", "codex")

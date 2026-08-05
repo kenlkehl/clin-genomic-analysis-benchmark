@@ -160,10 +160,20 @@ def compute_gold(cohort: str, max_repair_iters: int, only: str | None,
               help="Restrict to a single question id (across cohorts).")
 @click.option("--stages", default="classify,disambiguate,analyze", show_default=True)
 @click.option("--max-parallel", default=4, type=int, show_default=True)
+@click.option("--agent-max-attempts", default=3, type=click.IntRange(min=1),
+              show_default=True,
+              help="Maximum harness attempts for each failed agent stage.")
+@click.option("--agent-retry-base-seconds", default=5.0,
+              type=click.FloatRange(min=0), show_default=True,
+              help="Initial retry delay; subsequent delays use exponential backoff.")
+@click.option("--retry-failures/--no-retry-failures", default=True, show_default=True,
+              help="After eval, repair score-relevant technical failures in a copied run.")
 @click.option("--run-id", default=None)
 @click.option("--verbose", is_flag=True)
 def eval(agent: str, agent_name: str, cohort: str, question: str | None,
-         stages: str, max_parallel: int, run_id: str | None, verbose: bool) -> None:
+         stages: str, max_parallel: int, agent_max_attempts: int,
+         agent_retry_base_seconds: float, retry_failures: bool,
+         run_id: str | None, verbose: bool) -> None:
     """Evaluate an agent against the benchmark (Phase D)."""
     import logging as _logging
     _logging.basicConfig(level=_logging.INFO if verbose else _logging.WARNING,
@@ -178,9 +188,123 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
         question_id=question,
         stages=stages_list,
         max_parallel=max_parallel,
+        agent_max_attempts=agent_max_attempts,
+        agent_retry_base_seconds=agent_retry_base_seconds,
         run_id=run_id,
     )
     click.echo(f"Eval written to {run_dir}")
+    if not retry_failures:
+        return
+
+    from .agent.repair import plan_failed_run, retry_failed_run
+    from .config import SCORING_CONFIG_DIR
+
+    try:
+        _, repair_targets = plan_failed_run(run_dir)
+    except (FileNotFoundError, ValueError) as exc:
+        raise click.ClickException(
+            f"Eval completed at {run_dir}, but post-run repair planning failed: {exc}"
+        ) from exc
+    if not repair_targets:
+        click.echo("Post-run repair: no score-relevant technical failures.")
+        return
+
+    click.echo(f"Post-run repair: retrying {len(repair_targets)} failed question(s).")
+    cfg_path = SCORING_CONFIG_DIR / "default.yaml"
+    if not cfg_path.exists():
+        cfg_path = None
+    try:
+        summary = retry_failed_run(
+            run_path=run_dir,
+            agent_cmd=agent,
+            max_parallel=max_parallel,
+            agent_max_attempts=agent_max_attempts,
+            agent_retry_base_seconds=agent_retry_base_seconds,
+            scoring_config_path=cfg_path,
+        )
+    except (FileNotFoundError, FileExistsError, ValueError) as exc:
+        raise click.ClickException(
+            f"Eval completed at {run_dir}, but post-run repair failed: {exc}"
+        ) from exc
+    click.echo(
+        f"Post-run repair merged {summary.successful_merges}/{len(summary.targets)} "
+        f"successful retries."
+    )
+    click.echo(f"Final repaired run: {summary.repaired_run_dir}")
+    click.echo(f"Scorecard: {summary.repaired_run_dir / 'scorecard.md'}")
+
+
+@cli.command("retry-failures")
+@click.option("--run", required=True,
+              help="Source run relative under runs/ or an absolute run directory.")
+@click.option("--output-run-id", default=None,
+              help="Directory name for the repaired copy (default: generated).")
+@click.option("--agent", default=None,
+              help="Override the source manifest's agent command.")
+@click.option("--max-parallel", default=4, type=click.IntRange(min=1), show_default=True)
+@click.option("--agent-max-attempts", default=3, type=click.IntRange(min=1),
+              show_default=True,
+              help="Maximum attempts for each selected failed stage.")
+@click.option("--agent-retry-base-seconds", default=5.0,
+              type=click.FloatRange(min=0), show_default=True,
+              help="Initial retry delay; subsequent delays use exponential backoff.")
+@click.option("--config", default=None, type=click.Path(exists=True),
+              help="Scoring config YAML (defaults to scoring_configs/default.yaml).")
+@click.option("--dry-run", is_flag=True,
+              help="List score-relevant failures without executing the agent or writing files.")
+@click.option("--verbose", is_flag=True)
+def retry_failures(run: str, output_run_id: str | None, agent: str | None,
+                   max_parallel: int, agent_max_attempts: int,
+                   agent_retry_base_seconds: float, config: str | None,
+                   dry_run: bool, verbose: bool) -> None:
+    """Retry technical failures in a copied run and regenerate its scorecard."""
+    import logging as _logging
+
+    from .agent.repair import plan_failed_run, retry_failed_run
+    from .config import SCORING_CONFIG_DIR
+
+    _logging.basicConfig(level=_logging.INFO if verbose else _logging.WARNING,
+                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    try:
+        source_dir, targets = plan_failed_run(run)
+    except (FileNotFoundError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Source run: {source_dir}")
+    click.echo(f"Score-relevant technical failures: {len(targets)}")
+    for target in targets:
+        click.echo(
+            f"  - {target.cohort}/{target.question_id}: {target.stage} "
+            f"({target.original_failure_reason})"
+        )
+    if dry_run:
+        return
+    if not targets:
+        click.echo("Nothing to retry; source run left unchanged.")
+        return
+
+    cfg_path = Path(config) if config else (SCORING_CONFIG_DIR / "default.yaml")
+    if not cfg_path.exists():
+        cfg_path = None
+    try:
+        summary = retry_failed_run(
+            run_path=run,
+            output_run_id=output_run_id,
+            agent_cmd=agent,
+            max_parallel=max_parallel,
+            agent_max_attempts=agent_max_attempts,
+            agent_retry_base_seconds=agent_retry_base_seconds,
+            scoring_config_path=cfg_path,
+        )
+    except (FileNotFoundError, FileExistsError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(
+        f"Merged {summary.successful_merges}/{len(summary.targets)} successful retries; "
+        f"{summary.failed_retries} still failed."
+    )
+    click.echo(f"Repaired run: {summary.repaired_run_dir}")
+    click.echo(f"Scorecard: {summary.repaired_run_dir / 'scorecard.md'}")
 
 
 @cli.command()

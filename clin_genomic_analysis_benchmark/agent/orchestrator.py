@@ -26,7 +26,7 @@ from typing import Optional
 
 from ..cohorts import Cohort, resolve_cohorts
 from ..concepts import concept_menu_payload
-from ..config import RUNS_DIR, settings
+from ..config import RUNS_DIR, TimeoutConfig, settings
 from ..questions import io as q_io
 from ..questions.schema import PublicQuestion
 from ..utils.jsonio import atomic_write_json
@@ -359,14 +359,18 @@ def _build_question_payload(*, q: PublicQuestion, cohort: Cohort, stage: str, sc
 
 
 def _run_one_question(*, agent_cmd: str, q: PublicQuestion, cohort: Cohort, run_dir: Path,
-                      stages: list[str], gold_classification: Optional[str] = None) -> QuestionRun:
+                      stages: list[str], agent_max_attempts: int,
+                      agent_retry_base_seconds: float,
+                      gold_classification: Optional[str] = None,
+                      agent_env: Optional[Mapping[str, str]] = None,
+                      timeout_config: Optional[TimeoutConfig] = None) -> QuestionRun:
     from ..cohorts import find_data_dictionary
     qdir = _per_question_dir(run_dir, cohort.name, q.id)
     qdir.mkdir(parents=True, exist_ok=True)
     scratch = qdir / "scratch"
     scratch.mkdir(exist_ok=True)
     dict_path = find_data_dictionary(cohort)
-    timeouts = settings().timeouts
+    timeouts = timeout_config or settings().timeouts
     qrun = QuestionRun(
         question_id=q.id, cohort=cohort.name, category=q.category,
         # runs/ lives in the agent-reachable repo, so keep it gold-free: only
@@ -388,6 +392,9 @@ def _run_one_question(*, agent_cmd: str, q: PublicQuestion, cohort: Cohort, run_
                 result_path=qdir / "classify.json",
                 stderr_log_path=qdir / "classify.agent.log",
                 timeout_s=timeouts.classify,
+                max_attempts=agent_max_attempts,
+                retry_base_seconds=agent_retry_base_seconds,
+                agent_env=agent_env,
             )
             qrun.classify = _serialise(inv)
             if inv.success and isinstance(inv.result, dict):
@@ -408,6 +415,9 @@ def _run_one_question(*, agent_cmd: str, q: PublicQuestion, cohort: Cohort, run_
                 result_path=qdir / "disambiguate.json",
                 stderr_log_path=qdir / "disambiguate.agent.log",
                 timeout_s=timeouts.disambiguate,
+                max_attempts=agent_max_attempts,
+                retry_base_seconds=agent_retry_base_seconds,
+                agent_env=agent_env,
             )
             qrun.disambiguate = _serialise(inv)
         elif classification == "unambiguous" and "analyze" in stages:
@@ -423,6 +433,9 @@ def _run_one_question(*, agent_cmd: str, q: PublicQuestion, cohort: Cohort, run_
                 result_path=qdir / "analyze.json",
                 stderr_log_path=qdir / "analyze.agent.log",
                 timeout_s=timeouts.analyze,
+                max_attempts=agent_max_attempts,
+                retry_base_seconds=agent_retry_base_seconds,
+                agent_env=agent_env,
             )
             qrun.analyze = _serialise(inv)
     except Exception as exc:
@@ -439,10 +452,16 @@ def run_eval(
     question_id: Optional[str] = None,
     stages: Optional[list[str]] = None,
     max_parallel: int = 4,
+    agent_max_attempts: int = 3,
+    agent_retry_base_seconds: float = 5.0,
     run_id: Optional[str] = None,
 ) -> Path:
     """Run the harness against an agent. Returns the run directory."""
     stages = stages or ["classify", "disambiguate", "analyze"]
+    if agent_max_attempts < 1:
+        raise click_exception("agent_max_attempts must be >= 1")
+    if agent_retry_base_seconds < 0:
+        raise click_exception("agent_retry_base_seconds must be >= 0")
     run_id = run_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + uuid.uuid4().hex[:6]
     run_dir = RUNS_DIR / agent_name / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -490,12 +509,16 @@ def run_eval(
         for c, q in work:
             runs.append(_run_one_question(
                 agent_cmd=agent_cmd, q=q, cohort=c, run_dir=run_dir, stages=stages,
+                agent_max_attempts=agent_max_attempts,
+                agent_retry_base_seconds=agent_retry_base_seconds,
                 gold_classification=gold_cls.get((c.name, q.id)),
             ))
     else:
         with ThreadPoolExecutor(max_workers=max_parallel) as pool:
             futures = [pool.submit(_run_one_question, agent_cmd=agent_cmd, q=q, cohort=c,
                                    run_dir=run_dir, stages=stages,
+                                   agent_max_attempts=agent_max_attempts,
+                                   agent_retry_base_seconds=agent_retry_base_seconds,
                                    gold_classification=gold_cls.get((c.name, q.id)))
                        for c, q in work]
             for fut in as_completed(futures):
@@ -518,6 +541,11 @@ def run_eval(
             "stages": stages,
             "max_parallel": max_parallel,
             "timeouts": asdict(settings().timeouts),
+            "retries": {
+                "max_attempts": agent_max_attempts,
+                "base_delay_seconds": agent_retry_base_seconds,
+                "backoff": "exponential",
+            },
         },
     )
     atomic_write_json(run_dir / "manifest.json", asdict(manifest))

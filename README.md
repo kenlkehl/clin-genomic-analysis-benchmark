@@ -152,14 +152,36 @@ cp .env.example .env   # Vertex (ANTHROPIC_VERTEX_PROJECT_ID, credentials) + Azu
 
 # Run an agent over one cohort. Each analyze question spawns an agent that runs
 # Python against the cohort files, so a full run takes real time and real spend.
+# Failed stages are attempted up to 3 times with exponential backoff; override
+# with --agent-max-attempts and --agent-retry-base-seconds.
 uv run clingen-bench eval \
   --agent "bash adapters/claude_code/run.sh" \
   --agent-name claude_code \
   --cohort bladder_1.2 \
   --max-parallel 4
 
+# eval automatically checks for score-relevant technical failures afterward.
+# When any remain after the per-stage attempts, it repairs them in a copied run,
+# rescoring that copy and printing its path as the final artifact. Use
+# --no-retry-failures only when an intentionally raw run is desired.
+
 # Score it locally. Scoring makes no model or network calls.
 uv run clingen-bench score --run claude_code/<new_run_id>
+
+# Salvage a completed run without rerunning successful questions. This first
+# lists only technical failures that can affect scoring; wrong-route downstream
+# failures are intentionally excluded.
+uv run clingen-bench retry-failures \
+  --run claude_code/<run_id> \
+  --dry-run
+
+# Retry the selected stages (up to 3 attempts each), merge successful results
+# into a new copied run, record repair provenance, and regenerate its scorecard.
+# The source run is never modified. The original model, provider, effort, Vertex
+# project, region, and stage timeouts are restored from its manifest.
+uv run clingen-bench retry-failures \
+  --run claude_code/<run_id> \
+  --max-parallel 4
 
 # One question, for a smoke test
 uv run clingen-bench eval --agent "bash adapters/claude_code/run.sh" \
