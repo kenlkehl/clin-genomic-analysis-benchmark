@@ -54,6 +54,12 @@ def score_run(
         raise FileNotFoundError(f"Run dir does not exist: {run_dir}")
 
     manifest, runs_raw = _load_run(run_dir)
+    integrity_status = str((manifest.get("integrity") or {}).get("status") or "unaudited")
+    if integrity_status == "quarantined":
+        raise ValueError(
+            "refusing to score a quarantined run; resolve the integrity finding or use "
+            "the narrowly scoped adjudication command when its policy applies"
+        )
     agent_name = manifest["agent_name"]
     run_id = manifest["run_id"]
 

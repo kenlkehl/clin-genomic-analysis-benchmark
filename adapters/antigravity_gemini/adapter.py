@@ -334,6 +334,7 @@ def _next_audit_stem(audit_dir: Path, stage: str) -> str:
 def _archive_process_artifacts(
     *,
     scratch_dir: Path,
+    model_scratch_dir: Path | None = None,
     stage: str,
     proc: subprocess.CompletedProcess[str],
 ) -> tuple[Path, str]:
@@ -344,7 +345,7 @@ def _archive_process_artifacts(
     (audit_dir / f"{stem}.stdout.txt").write_text(proc.stdout or "")
     (audit_dir / f"{stem}.stderr.txt").write_text(proc.stderr or "")
 
-    cli_log = scratch_dir / f"agy.{stage}.log"
+    cli_log = (model_scratch_dir or scratch_dir) / f"agy.{stage}.log"
     if cli_log.is_symlink():
         raise AgentIsolationError(f"Antigravity CLI log became a symlink: {cli_log}")
     if cli_log.is_file():
@@ -413,6 +414,7 @@ def _agy_call(*, prompt: str, question: dict) -> str:
         )
         audit_dir, stem = _archive_process_artifacts(
             scratch_dir=scratch_dir,
+            model_scratch_dir=getattr(launch, "host_staged_scratch", scratch_dir),
             stage=stage,
             proc=proc,
         )

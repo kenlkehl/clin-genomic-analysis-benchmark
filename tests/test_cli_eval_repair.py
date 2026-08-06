@@ -20,16 +20,21 @@ def test_eval_automatically_repairs_score_relevant_failures(tmp_path, monkeypatc
     monkeypatch.setattr(repair, "plan_failed_run", lambda path: (run_dir, [target]))
     calls = []
 
-    def fake_retry(**kwargs):
+    def fake_retry_loop(**kwargs):
         calls.append(kwargs)
         return SimpleNamespace(
-            repaired_run_dir=repaired_dir,
-            successful_merges=1,
-            failed_retries=0,
-            targets=(target,),
+            final_run_dir=repaired_dir,
+            stop_reason="complete",
+            remaining_targets=(),
+            passes=(SimpleNamespace(
+                repaired_run_dir=repaired_dir,
+                successful_merges=1,
+                failed_retries=0,
+                targets=(target,),
+            ),),
         )
 
-    monkeypatch.setattr(repair, "retry_failed_run", fake_retry)
+    monkeypatch.setattr(repair, "retry_failed_run_until_stable", fake_retry_loop)
 
     result = CliRunner().invoke(cli, [
         "eval",
@@ -40,10 +45,12 @@ def test_eval_automatically_repairs_score_relevant_failures(tmp_path, monkeypatc
 
     assert result.exit_code == 0, result.output
     assert "Post-run repair: retrying 1 failed question(s)." in result.output
+    assert "Post-run repair pass 1 merged 1/1 successful retries." in result.output
     assert f"Final repaired run: {repaired_dir}" in result.output
     assert calls[0]["run_path"] == run_dir
     assert calls[0]["agent_cmd"] == "fake-agent"
     assert calls[0]["max_parallel"] == 2
+    assert calls[0]["max_repair_passes"] == 3
 
 
 def test_eval_can_explicitly_disable_post_run_repair(tmp_path, monkeypatch):

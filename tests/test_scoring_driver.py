@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from clin_genomic_analysis_benchmark.questions.schema import CohortQuestionFile, Question
 from clin_genomic_analysis_benchmark.scoring import driver
+import pytest
 
 
 def _write_run(run_dir, *, classify_result: dict, disambiguate_result: dict | None = None,
@@ -79,6 +80,18 @@ def test_driver_scores_exact_ids_and_false_positive_penalty(tmp_path, monkeypatc
     assert result["incorrect_concept_ids"] == ["MODEL_SPECIFICATION"]
     assert result["missed_concept_ids"] == ["TIME_ORIGIN"]
     assert not list(run_dir.rglob("judge_*"))
+
+
+def test_driver_refuses_quarantined_run(tmp_path):
+    run_dir = tmp_path / "runs" / "agent" / "quarantined"
+    _write_run(
+        run_dir,
+        classify_result={"classification": "ambiguous"},
+        integrity={"status": "quarantined"},
+    )
+
+    with pytest.raises(ValueError, match="refusing to score a quarantined run"):
+        driver.score_run(run_path=str(run_dir))
 
 
 def test_ambiguous_gold_unambiguous_agent_does_not_claim_missing_gold(tmp_path, monkeypatch):

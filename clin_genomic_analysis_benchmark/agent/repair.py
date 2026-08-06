@@ -60,6 +60,17 @@ class RepairSummary:
     failed_retries: int
 
 
+@dataclass(frozen=True)
+class RepairLoopSummary:
+    """Result of bounded repair passes over successively repaired copies."""
+
+    source_run_dir: Path
+    final_run_dir: Path
+    passes: tuple[RepairSummary, ...]
+    remaining_targets: tuple[RepairTarget, ...]
+    stop_reason: str
+
+
 _STAGES = ("classify", "disambiguate", "analyze")
 _CONFIG_ENV_VARS = set(_SAFE_AGENT_ENV_VARS) | {
     # These can override ANTHROPIC_VERTEX_PROJECT_ID in Claude Code.
@@ -279,16 +290,30 @@ def _provenance_mismatches(original: dict, retry: dict) -> dict[str, dict[str, A
     return mismatches
 
 
-def _timeout_config(manifest: dict) -> TimeoutConfig:
+def _timeout_config(
+    manifest: dict,
+    overrides: Mapping[str, int] | None = None,
+) -> TimeoutConfig:
     raw = ((manifest.get("settings") or {}).get("timeouts") or {})
     defaults = settings().timeouts
+    overrides = overrides or {}
+    unknown = sorted(set(overrides) - set(_STAGES))
+    if unknown:
+        raise ValueError(f"unknown timeout override stage(s): {', '.join(unknown)}")
     values: dict[str, int] = {}
     for stage in _STAGES:
         try:
-            value = int(raw.get(stage, getattr(defaults, stage)))
+            inherited = int(raw.get(stage, getattr(defaults, stage)))
         except (TypeError, ValueError):
-            value = getattr(defaults, stage)
-        values[stage] = value if value > 0 else getattr(defaults, stage)
+            inherited = getattr(defaults, stage)
+        value = overrides.get(stage, inherited)
+        try:
+            value = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{stage} timeout override must be an integer") from exc
+        if value <= 0:
+            raise ValueError(f"{stage} timeout must be > 0")
+        values[stage] = value
     return TimeoutConfig(**values)
 
 
@@ -345,6 +370,7 @@ def retry_failed_run(
     max_parallel: int = 4,
     agent_max_attempts: int = 3,
     agent_retry_base_seconds: float = 5.0,
+    timeout_overrides: Mapping[str, int] | None = None,
     scoring_config_path: Optional[Path] = None,
 ) -> RepairSummary:
     """Create, repair, and rescore a copy of ``run_path``.
@@ -400,7 +426,7 @@ def retry_failed_run(
         raise FileExistsError(f"Repaired run destination already exists: {repaired_dir}")
 
     public_questions = _public_questions_for_targets(targets)
-    timeout_config = _timeout_config(manifest)
+    timeout_config = _timeout_config(manifest, timeout_overrides)
     repair_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + uuid.uuid4().hex[:6]
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     source_hashes = {
@@ -513,6 +539,7 @@ def retry_failed_run(
             "backoff": "exponential",
             "max_parallel": max_parallel,
             "timeouts": asdict(timeout_config),
+            "timeout_overrides": dict(timeout_overrides or {}),
         },
         "targets": audit_outcomes,
         "successful_merges": successful_merges,
@@ -556,4 +583,71 @@ def retry_failed_run(
         targets=tuple(targets),
         successful_merges=successful_merges,
         failed_retries=len(targets) - successful_merges,
+    )
+
+
+def retry_failed_run_until_stable(
+    *,
+    run_path: str | Path,
+    output_run_id: str | None = None,
+    agent_cmd: str | None = None,
+    max_parallel: int = 2,
+    agent_max_attempts: int = 3,
+    agent_retry_base_seconds: float = 5.0,
+    timeout_overrides: Mapping[str, int] | None = None,
+    max_repair_passes: int = 3,
+    scoring_config_path: Optional[Path] = None,
+) -> RepairLoopSummary:
+    """Retry successive repaired copies until complete, stalled, or capped."""
+    if max_repair_passes < 1:
+        raise ValueError("max_repair_passes must be >= 1")
+
+    source_dir, manifest, _ = _load_source(run_path)
+    root_output_id = output_run_id or _new_run_id(
+        str(manifest.get("run_id") or source_dir.name)
+    )
+    _validate_output_run_id(root_output_id)
+
+    current_dir = source_dir
+    pass_summaries: list[RepairSummary] = []
+    remaining: list[RepairTarget] = []
+    stop_reason = "pass_limit"
+    for pass_number in range(1, max_repair_passes + 1):
+        _, targets = plan_failed_run(current_dir)
+        if not targets:
+            stop_reason = "complete"
+            remaining = []
+            break
+        pass_output_id = (
+            root_output_id if pass_number == 1
+            else f"{root_output_id}-pass{pass_number}"
+        )
+        summary = retry_failed_run(
+            run_path=current_dir,
+            output_run_id=pass_output_id,
+            agent_cmd=agent_cmd,
+            max_parallel=max_parallel,
+            agent_max_attempts=agent_max_attempts,
+            agent_retry_base_seconds=agent_retry_base_seconds,
+            timeout_overrides=timeout_overrides,
+            scoring_config_path=scoring_config_path,
+        )
+        pass_summaries.append(summary)
+        current_dir = summary.repaired_run_dir
+        _, remaining = plan_failed_run(current_dir)
+        if not remaining:
+            stop_reason = "complete"
+            break
+        if summary.successful_merges == 0:
+            stop_reason = "no_progress"
+            break
+    else:
+        _, remaining = plan_failed_run(current_dir)
+
+    return RepairLoopSummary(
+        source_run_dir=source_dir,
+        final_run_dir=current_dir,
+        passes=tuple(pass_summaries),
+        remaining_targets=tuple(remaining),
+        stop_reason=stop_reason,
     )

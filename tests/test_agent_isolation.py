@@ -39,11 +39,17 @@ payload = {
     "scratch_writable": os.access("/work", os.W_OK),
     "forbidden_visible": os.path.exists(sys.argv[1]),
     "host_home_visible": os.path.exists("/home/klkehl"),
+    "scratch_host_path_in_mountinfo": sys.argv[2].encode() in open(
+        "/proc/self/mountinfo", "rb"
+    ).read(),
 }
 open("/work/proof.json", "w").write(json.dumps(payload))
 """
     with isolation.sandboxed_agent_command(
-        ["/usr/bin/python3", "-c", script, str(forbidden.resolve())],
+        [
+            "/usr/bin/python3", "-c", script,
+            str(forbidden.resolve()), str(scratch.resolve()),
+        ],
         cohort_dir=cohort,
         data_dictionary_path=dictionary,
         scratch_dir=scratch,
@@ -66,6 +72,7 @@ open("/work/proof.json", "w").write(json.dumps(payload))
         "scratch_writable": True,
         "forbidden_visible": False,
         "host_home_visible": False,
+        "scratch_host_path_in_mountinfo": False,
     }
 
 

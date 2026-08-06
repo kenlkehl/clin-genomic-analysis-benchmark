@@ -27,6 +27,13 @@ def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
     lines.append(f"- **Run id**: `{run_id}`")
     integrity_status = str((integrity or {}).get("status") or "unaudited")
     lines.append(f"- **Integrity**: `{integrity_status}`")
+    adjudication = (integrity or {}).get("adjudication") or {}
+    if integrity_status == "adjudicated_for_scoring":
+        lines.append(
+            "- **Integrity exception**: accepted for scoring under `"
+            f"{adjudication.get('policy', 'unspecified')}`; original postflight findings "
+            "remain in the scorecard"
+        )
     if agent_provenance:
         if agent_provenance.get("model"):
             lines.append(f"- **Model**: `{agent_provenance['model']}`")
@@ -43,7 +50,11 @@ def to_markdown(*, overall: CohortAgg, per_cohort: dict[str, CohortAgg],
                  f"+{correct_concept_points:g} per correct selection, "
                  f"−{incorrect_concept_penalty:g} per incorrect selection, floor 0")
     lines.append(f"- **Questions scored**: {overall.n}")
-    if integrity_status != "valid":
+    if integrity_status == "adjudicated_for_scoring":
+        lines.append(
+            "- **ACCEPTED FOR SCORING WITH A DOCUMENTED INTEGRITY EXCEPTION**"
+        )
+    elif integrity_status != "valid":
         lines.append(
             "- **BENCHMARK RESULT IS NOT CERTIFIED**: filesystem-isolation "
             f"status is `{integrity_status}`"

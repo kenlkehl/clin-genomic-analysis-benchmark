@@ -40,9 +40,11 @@ concepts, or gold answers. Evaluation reads the public bank; only the trusted
 harness/scorer reads the gold bank.
 
 Every run performs a namespace preflight and scans agent artifacts afterward.
-`manifest.json` and both scorecards record `integrity.status`. Only `valid`
-runs are certified; `quarantined` or legacy `unaudited` runs must not be used
-for model comparisons. Network access remains available because the CLI must
+`manifest.json` and both scorecards record `integrity.status`. Automated
+postflight-clean runs are `valid`. A run accepted under a narrow, recorded
+exception is `adjudicated_for_scoring`; its original findings and adjudication
+remain embedded in the scorecard. `quarantined` or legacy `unaudited` runs must
+not be used for model comparisons. Network access remains available because the CLI must
 reach its configured endpoint, but host `/tmp`, Unix sockets, and the host
 filesystem outside the explicit mounts are absent.
 
@@ -195,15 +197,20 @@ uv run clingen-bench retry-failures \
   --run claude_code/<run_id> \
   --dry-run
 
-# Retry the selected stages (up to 3 attempts each) in fresh isolated scratch
-# directories, merge successful results into a new run, record repair
-# provenance, and regenerate its scorecard. Gold-bearing scorecards are never
-# copied into the repair tree before retries execute.
+# Retry the selected stages in fresh isolated scratch directories. Repair uses
+# at most 2 concurrent calls by default and continues over successively repaired
+# copies until complete, a pass makes no progress, or --max-repair-passes is
+# reached. Every pass records its hashes, effective timeouts, and provenance.
+# Gold-bearing scorecards are never copied into the repair tree before retries.
 # The source run is never modified. The original model, provider, effort, Vertex
-# project, region, and stage timeouts are restored from its manifest.
+# project, region, and stage timeouts are restored from its manifest unless an
+# explicit repair-only timeout override is supplied.
 uv run clingen-bench retry-failures \
   --run claude_code/<run_id> \
-  --max-parallel 4
+  --max-parallel 2 \
+  --max-repair-passes 3 \
+  --classify-timeout 1200 \
+  --disambiguate-timeout 900
 
 # One question, for a smoke test
 uv run clingen-bench eval --agent "bash adapters/claude_code/run.sh" \

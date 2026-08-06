@@ -168,11 +168,28 @@ def compute_gold(cohort: str, max_repair_iters: int, only: str | None,
               help="Initial retry delay; subsequent delays use exponential backoff.")
 @click.option("--retry-failures/--no-retry-failures", default=True, show_default=True,
               help="After eval, repair score-relevant technical failures in a copied run.")
+@click.option("--repair-max-passes", default=3, type=click.IntRange(min=1),
+              show_default=True,
+              help="Maximum automatic repair passes after the evaluation.")
+@click.option("--repair-max-parallel", default=2, type=click.IntRange(min=1),
+              show_default=True,
+              help="Maximum concurrent calls during automatic repair.")
+@click.option("--repair-classify-timeout", default=None, type=click.IntRange(min=1),
+              help="Override the classification timeout during repair, in seconds.")
+@click.option("--repair-disambiguate-timeout", default=None,
+              type=click.IntRange(min=1),
+              help="Override the disambiguation timeout during repair, in seconds.")
+@click.option("--repair-analyze-timeout", default=None, type=click.IntRange(min=1),
+              help="Override the analysis timeout during repair, in seconds.")
 @click.option("--run-id", default=None)
 @click.option("--verbose", is_flag=True)
 def eval(agent: str, agent_name: str, cohort: str, question: str | None,
          stages: str, max_parallel: int, agent_max_attempts: int,
          agent_retry_base_seconds: float, retry_failures: bool,
+         repair_max_passes: int, repair_max_parallel: int,
+         repair_classify_timeout: int | None,
+         repair_disambiguate_timeout: int | None,
+         repair_analyze_timeout: int | None,
          run_id: str | None, verbose: bool) -> None:
     """Evaluate an agent against the benchmark (Phase D)."""
     import logging as _logging
@@ -200,7 +217,7 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
     if not retry_failures:
         return
 
-    from .agent.repair import plan_failed_run, retry_failed_run
+    from .agent.repair import plan_failed_run, retry_failed_run_until_stable
     from .config import SCORING_CONFIG_DIR
 
     try:
@@ -218,24 +235,40 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
     if not cfg_path.exists():
         cfg_path = None
     try:
-        summary = retry_failed_run(
+        timeout_overrides = {
+            stage: value
+            for stage, value in {
+                "classify": repair_classify_timeout,
+                "disambiguate": repair_disambiguate_timeout,
+                "analyze": repair_analyze_timeout,
+            }.items()
+            if value is not None
+        }
+        loop = retry_failed_run_until_stable(
             run_path=run_dir,
             agent_cmd=agent,
-            max_parallel=max_parallel,
+            max_parallel=repair_max_parallel,
             agent_max_attempts=agent_max_attempts,
             agent_retry_base_seconds=agent_retry_base_seconds,
+            timeout_overrides=timeout_overrides,
+            max_repair_passes=repair_max_passes,
             scoring_config_path=cfg_path,
         )
     except (AgentIsolationError, FileNotFoundError, FileExistsError, ValueError) as exc:
         raise click.ClickException(
             f"Eval completed at {run_dir}, but post-run repair failed: {exc}"
         ) from exc
+    for index, summary in enumerate(loop.passes, start=1):
+        click.echo(
+            f"Post-run repair pass {index} merged "
+            f"{summary.successful_merges}/{len(summary.targets)} successful retries."
+        )
     click.echo(
-        f"Post-run repair merged {summary.successful_merges}/{len(summary.targets)} "
-        f"successful retries."
+        f"Post-run repair stopped: {loop.stop_reason}; "
+        f"{len(loop.remaining_targets)} score-relevant failure(s) remain."
     )
-    click.echo(f"Final repaired run: {summary.repaired_run_dir}")
-    click.echo(f"Scorecard: {summary.repaired_run_dir / 'scorecard.md'}")
+    click.echo(f"Final repaired run: {loop.final_run_dir}")
+    click.echo(f"Scorecard: {loop.final_run_dir / 'scorecard.md'}")
 
 
 @cli.command("retry-failures")
@@ -245,13 +278,22 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
               help="Directory name for the repaired copy (default: generated).")
 @click.option("--agent", default=None,
               help="Override the source manifest's agent command.")
-@click.option("--max-parallel", default=4, type=click.IntRange(min=1), show_default=True)
+@click.option("--max-parallel", default=2, type=click.IntRange(min=1), show_default=True)
 @click.option("--agent-max-attempts", default=3, type=click.IntRange(min=1),
               show_default=True,
               help="Maximum attempts for each selected failed stage.")
 @click.option("--agent-retry-base-seconds", default=5.0,
               type=click.FloatRange(min=0), show_default=True,
               help="Initial retry delay; subsequent delays use exponential backoff.")
+@click.option("--max-repair-passes", default=3, type=click.IntRange(min=1),
+              show_default=True,
+              help="Stop after this many repair passes even if failures remain.")
+@click.option("--classify-timeout", default=None, type=click.IntRange(min=1),
+              help="Override classification timeout during repair, in seconds.")
+@click.option("--disambiguate-timeout", default=None, type=click.IntRange(min=1),
+              help="Override disambiguation timeout during repair, in seconds.")
+@click.option("--analyze-timeout", default=None, type=click.IntRange(min=1),
+              help="Override analysis timeout during repair, in seconds.")
 @click.option("--config", default=None, type=click.Path(exists=True),
               help="Scoring config YAML (defaults to scoring_configs/default.yaml).")
 @click.option("--dry-run", is_flag=True,
@@ -259,13 +301,15 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
 @click.option("--verbose", is_flag=True)
 def retry_failures(run: str, output_run_id: str | None, agent: str | None,
                    max_parallel: int, agent_max_attempts: int,
-                   agent_retry_base_seconds: float, config: str | None,
+                   agent_retry_base_seconds: float, max_repair_passes: int,
+                   classify_timeout: int | None, disambiguate_timeout: int | None,
+                   analyze_timeout: int | None, config: str | None,
                    dry_run: bool, verbose: bool) -> None:
     """Retry technical failures in a copied run and regenerate its scorecard."""
     import logging as _logging
 
     from .agent.isolation import AgentIsolationError
-    from .agent.repair import plan_failed_run, retry_failed_run
+    from .agent.repair import plan_failed_run, retry_failed_run_until_stable
     from .config import SCORING_CONFIG_DIR
 
     _logging.basicConfig(level=_logging.INFO if verbose else _logging.WARNING,
@@ -292,24 +336,41 @@ def retry_failures(run: str, output_run_id: str | None, agent: str | None,
     if not cfg_path.exists():
         cfg_path = None
     try:
-        summary = retry_failed_run(
+        timeout_overrides = {
+            stage: value
+            for stage, value in {
+                "classify": classify_timeout,
+                "disambiguate": disambiguate_timeout,
+                "analyze": analyze_timeout,
+            }.items()
+            if value is not None
+        }
+        loop = retry_failed_run_until_stable(
             run_path=run,
             output_run_id=output_run_id,
             agent_cmd=agent,
             max_parallel=max_parallel,
             agent_max_attempts=agent_max_attempts,
             agent_retry_base_seconds=agent_retry_base_seconds,
+            timeout_overrides=timeout_overrides,
+            max_repair_passes=max_repair_passes,
             scoring_config_path=cfg_path,
         )
     except (AgentIsolationError, FileNotFoundError, FileExistsError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
+    for index, summary in enumerate(loop.passes, start=1):
+        click.echo(
+            f"Pass {index}: merged {summary.successful_merges}/"
+            f"{len(summary.targets)} successful retries; "
+            f"{summary.failed_retries} failed this pass."
+        )
     click.echo(
-        f"Merged {summary.successful_merges}/{len(summary.targets)} successful retries; "
-        f"{summary.failed_retries} still failed."
+        f"Repair stopped: {loop.stop_reason}; "
+        f"{len(loop.remaining_targets)} score-relevant failure(s) remain."
     )
-    click.echo(f"Repaired run: {summary.repaired_run_dir}")
-    click.echo(f"Scorecard: {summary.repaired_run_dir / 'scorecard.md'}")
+    click.echo(f"Repaired run: {loop.final_run_dir}")
+    click.echo(f"Scorecard: {loop.final_run_dir / 'scorecard.md'}")
 
 
 @cli.command()
@@ -330,8 +391,60 @@ def score(run: str, config: str | None, verbose: bool) -> None:
     cfg_path = _P(config) if config else (SCORING_CONFIG_DIR / "default.yaml")
     if not cfg_path.exists():
         cfg_path = None  # use built-in defaults
-    out = score_run(run_path=run, scoring_config_path=cfg_path)
+    try:
+        out = score_run(run_path=run, scoring_config_path=cfg_path)
+    except (FileNotFoundError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
     click.echo(f"Scorecard written to {out / 'scorecard.md'}")
+
+
+@cli.command("adjudicate-current-run-path-leak")
+@click.option("--run", required=True,
+              help="Quarantined run relative under runs/ or an absolute run directory.")
+@click.option("--reviewer", required=True,
+              help="Person or process responsible for the review decision.")
+@click.option("--rationale", required=True,
+              help="Why the limited path disclosure did not expose gold or prior-run content.")
+@click.option("--config", default=None, type=click.Path(exists=True),
+              help="Scoring config YAML (defaults to scoring_configs/default.yaml).")
+@click.option("--score/--no-score", default=True, show_default=True,
+              help="Generate deterministic scorecards after successful adjudication.")
+def adjudicate_current_run_path_leak(run: str, reviewer: str, rationale: str,
+                                    config: str | None, score: bool) -> None:
+    """Accept a schema-v1 current-run procfs path leak under a narrow policy."""
+    from pathlib import Path as _P
+
+    from .agent.integrity import (
+        IntegrityAdjudicationError,
+        adjudicate_current_run_mount_path_leak,
+    )
+    from .config import SCORING_CONFIG_DIR
+    from .scoring.driver import score_run
+
+    try:
+        run_dir, record = adjudicate_current_run_mount_path_leak(
+            run_path=run,
+            reviewer=reviewer,
+            rationale=rationale,
+        )
+    except (FileNotFoundError, IntegrityAdjudicationError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        f"Integrity adjudication recorded for {run_dir} "
+        f"under {record['policy']}."
+    )
+    if not score:
+        return
+    cfg_path = _P(config) if config else (SCORING_CONFIG_DIR / "default.yaml")
+    if not cfg_path.exists():
+        cfg_path = None
+    try:
+        score_run(run_path=str(run_dir), scoring_config_path=cfg_path)
+    except (FileNotFoundError, ValueError) as exc:
+        raise click.ClickException(
+            f"adjudication was recorded, but scoring failed: {exc}"
+        ) from exc
+    click.echo(f"Scorecard written to {run_dir / 'scorecard.md'}")
 
 
 @cli.command("init-adapter")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 from clin_genomic_analysis_benchmark.agent import repair
@@ -249,6 +250,7 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
         max_parallel=1,
         agent_max_attempts=3,
         agent_retry_base_seconds=0,
+        timeout_overrides={"disambiguate": 90},
     )
 
     repaired = source.parent / "repaired-run"
@@ -257,7 +259,9 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
     assert summary.failed_retries == 0
     assert captured_kwargs["stages"] == ["disambiguate"]
     assert captured_kwargs["gold_classification"] == "ambiguous"
-    assert captured_kwargs["timeout_config"].disambiguate == 20
+    assert captured_kwargs["timeout_config"].classify == 10
+    assert captured_kwargs["timeout_config"].disambiguate == 90
+    assert captured_kwargs["timeout_config"].analyze == 30
 
     # Source result and artifacts remain untouched.
     assert json.loads((source / "runs.json").read_text()) == original_runs
@@ -276,6 +280,10 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
     history = repaired_manifest["repair_history"][-1]
     assert history["selection_policy"] == "score_relevant_technical_failures_v1"
     assert history["successful_merges"] == 1
+    assert history["retry_settings"]["timeouts"]["disambiguate"] == 90
+    assert history["retry_settings"]["timeout_overrides"] == {
+        "disambiguate": 90
+    }
     assert history["targets"][0]["attempt_count"] == 2
     assert history["source_hashes"]["runs.json"]
     assert repaired_manifest["integrity"]["status"] == "valid"
@@ -369,3 +377,79 @@ def test_plan_refuses_quarantined_source(tmp_path):
         assert "quarantined run" in str(exc)
     else:
         raise AssertionError("quarantined run should not be repairable")
+
+
+def test_timeout_config_rejects_invalid_overrides():
+    manifest = {"settings": {"timeouts": {
+        "classify": 10,
+        "disambiguate": 20,
+        "analyze": 30,
+    }}}
+
+    configured = repair._timeout_config(
+        manifest,
+        {"classify": 100, "disambiguate": 200},
+    )
+    assert configured.classify == 100
+    assert configured.disambiguate == 200
+    assert configured.analyze == 30
+
+    try:
+        repair._timeout_config(manifest, {"unknown": 5})
+    except ValueError as exc:
+        assert "unknown timeout override" in str(exc)
+    else:
+        raise AssertionError("unknown stage should be rejected")
+
+
+def test_repair_loop_continues_on_progress_until_complete(tmp_path, monkeypatch):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "manifest.json").write_text(json.dumps({"run_id": "source"}))
+    (source / "runs.json").write_text("[]")
+    target_one = repair.RepairTarget("q1", "c", "classify", "timeout")
+    target_two = repair.RepairTarget("q2", "c", "disambiguate", "timeout")
+    pass_one = source.parent / "loop-output"
+    pass_two = source.parent / "loop-output-pass2"
+
+    def fake_plan(path):
+        path = path.resolve()
+        if path == source.resolve():
+            return path, [target_one]
+        if path == pass_one.resolve():
+            return path, [target_two]
+        if path == pass_two.resolve():
+            return path, []
+        raise AssertionError(path)
+
+    calls = []
+
+    def fake_retry(**kwargs):
+        calls.append(kwargs)
+        repaired = pass_one if len(calls) == 1 else pass_two
+        target = target_one if len(calls) == 1 else target_two
+        return repair.RepairSummary(
+            source_run_dir=Path(kwargs["run_path"]).resolve(),
+            repaired_run_dir=repaired.resolve(),
+            targets=(target,),
+            successful_merges=1,
+            failed_retries=0,
+        )
+
+    monkeypatch.setattr(repair, "plan_failed_run", fake_plan)
+    monkeypatch.setattr(repair, "retry_failed_run", fake_retry)
+
+    result = repair.retry_failed_run_until_stable(
+        run_path=source,
+        output_run_id="loop-output",
+        max_repair_passes=3,
+        timeout_overrides={"disambiguate": 900},
+    )
+
+    assert result.stop_reason == "complete"
+    assert result.final_run_dir == pass_two.resolve()
+    assert result.remaining_targets == ()
+    assert len(result.passes) == 2
+    assert calls[0]["output_run_id"] == "loop-output"
+    assert calls[1]["output_run_id"] == "loop-output-pass2"
+    assert calls[1]["timeout_overrides"] == {"disambiguate": 900}

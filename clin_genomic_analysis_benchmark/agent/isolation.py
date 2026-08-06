@@ -34,7 +34,7 @@ from ..config import REPO_ROOT, RUNS_DIR, gold_root
 
 
 BWRAP = Path("/usr/bin/bwrap")
-SANDBOX_SCHEMA_VERSION = "1"
+SANDBOX_SCHEMA_VERSION = "2"
 SANDBOX_COHORT_DIR = Path("/data/cohort")
 SANDBOX_DICTIONARY_DIR = Path("/data/dictionary")
 SANDBOX_SCRATCH_DIR = Path("/work")
@@ -55,6 +55,7 @@ class SandboxedCommand:
     data_dictionary_path: str
     scratch_dir: str
     host_ephemeral_home: Path
+    host_staged_scratch: Path
 
 
 _SUPPORTED_ADAPTER_DIRS = {
@@ -652,6 +653,39 @@ def _validate_host_mounts(
     return cohort, dictionary, scratch
 
 
+def _copy_scratch_tree(*, source: Path, destination: Path) -> None:
+    """Copy a scratch tree without following model-controlled filesystem links.
+
+    The sandbox binds ``destination`` rather than the real run directory. This
+    keeps the host-side run path out of procfs mount metadata while preserving
+    scratch files between stages and harness retries.
+    """
+    destination.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for path in sorted(source.rglob("*")):
+        relative = path.relative_to(source)
+        target = destination / relative
+        try:
+            mode = path.lstat().st_mode
+        except OSError as exc:
+            raise AgentIsolationError(
+                f"could not inspect scratch artifact {relative}: {exc}"
+            ) from exc
+        if stat.S_ISLNK(mode):
+            raise AgentIsolationError(f"scratch artifact is a symlink: {relative}")
+        if stat.S_ISDIR(mode):
+            target.mkdir(mode=0o700, parents=True, exist_ok=True)
+            continue
+        if not stat.S_ISREG(mode):
+            raise AgentIsolationError(f"scratch artifact is not a regular file: {relative}")
+        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        shutil.copy2(path, target)
+
+
+def _sync_staged_scratch(*, staged: Path, host: Path) -> None:
+    """Merge regular files from the neutral staging tree into run scratch."""
+    _copy_scratch_tree(source=staged, destination=host)
+
+
 @contextmanager
 def sandboxed_agent_command(
     command: Sequence[str],
@@ -690,6 +724,8 @@ def sandboxed_agent_command(
         temporary_root = Path(temporary)
         home = temporary_root / "home"
         home.mkdir(mode=0o700)
+        staged_scratch = temporary_root / "scratch"
+        _copy_scratch_tree(source=scratch, destination=staged_scratch)
         _seed_home(home, home_kind, source_env)
         python_wrappers = _prepare_python_wrappers(temporary_root)
         sandbox_env = _sandbox_environment(source_env)
@@ -715,20 +751,27 @@ def sandboxed_agent_command(
             "--ro-bind", str(cohort), str(SANDBOX_COHORT_DIR),
             "--ro-bind", str(dictionary),
             str(SANDBOX_DICTIONARY_DIR / dictionary.name),
-            "--bind", str(scratch), str(SANDBOX_SCRATCH_DIR),
+            # Never bind the real runs/.../scratch directory. Procfs exposes
+            # bind-mount source paths through /proc/*/mountinfo, so use a
+            # disposable neutral path and synchronize it after the process.
+            "--bind", str(staged_scratch), str(SANDBOX_SCRATCH_DIR),
             "--bind", str(home), str(SANDBOX_HOME_DIR),
             "--chdir", str(SANDBOX_SCRATCH_DIR),
         ])
         inner = _map_external_executable(list(command), bwrap)
         bwrap.extend(["--", *inner])
-        yield SandboxedCommand(
-            command=bwrap,
-            environment=sandbox_env,
-            cohort_dir=str(SANDBOX_COHORT_DIR),
-            data_dictionary_path=str(SANDBOX_DICTIONARY_DIR / dictionary.name),
-            scratch_dir=str(SANDBOX_SCRATCH_DIR),
-            host_ephemeral_home=home,
-        )
+        try:
+            yield SandboxedCommand(
+                command=bwrap,
+                environment=sandbox_env,
+                cohort_dir=str(SANDBOX_COHORT_DIR),
+                data_dictionary_path=str(SANDBOX_DICTIONARY_DIR / dictionary.name),
+                scratch_dir=str(SANDBOX_SCRATCH_DIR),
+                host_ephemeral_home=home,
+                host_staged_scratch=staged_scratch,
+            )
+        finally:
+            _sync_staged_scratch(staged=staged_scratch, host=scratch)
 
 
 def export_agent_session_audit(
@@ -832,12 +875,18 @@ def run_isolation_preflight() -> dict[str, Any]:
             str(gold_root().expanduser().resolve()),
             str(RUNS_DIR.resolve()),
             str(canary.resolve()),
+            str(scratch.resolve()),
         ]
         script = (
-            "import os,sys; "
+            "import glob,os,sys; "
             "required=sys.argv[1:4]; forbidden=sys.argv[4:]; "
             "assert all(os.path.exists(p) for p in required), required; "
-            "assert all(not os.path.exists(p) for p in forbidden), forbidden"
+            "assert all(not os.path.exists(p) for p in forbidden), forbidden; "
+            "mount_files=set(glob.glob('/proc/[0-9]*/mountinfo')); "
+            "mount_files.update({'/proc/self/mountinfo','/proc/1/mountinfo'}); "
+            "mount_data=b'\\n'.join(open(p,'rb').read() for p in mount_files if os.path.isfile(p)); "
+            "leaks=[p for p in forbidden if p.encode() in mount_data]; "
+            "assert not leaks, ('host mount sources leaked through procfs', leaks)"
         )
         with sandboxed_agent_command(
             [
@@ -872,6 +921,7 @@ def run_isolation_preflight() -> dict[str, Any]:
             "gold_root_hidden": True,
             "prior_runs_hidden": True,
             "outside_canary_hidden": True,
+            "host_mount_sources_hidden_in_procfs": True,
         },
     }
 
