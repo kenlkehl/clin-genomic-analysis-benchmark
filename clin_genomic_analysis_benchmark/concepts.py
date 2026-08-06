@@ -40,13 +40,10 @@ CONCEPT_MENU: tuple[Concept, ...] = (
     ),
     Concept(
         "CLINICAL_SUBGROUP_DEFINITION",
-        "Clinical subgroup definition",
-        "Which clinical or molecular subgroup, subtype, age cutoff, or population stratum applies.",
-    ),
-    Concept(
-        "VARIABLE_OR_CATEGORY_DEFINITION",
-        "Variable or category definition",
-        "Which source variable, coding system, grouping, or demographic dimension is used.",
+        "Clinical subgroup or category definition",
+        "Which clinical or molecular subgroup, subtype, age cutoff, population "
+        "stratum, source variable, coding system, grouping, or demographic "
+        "dimension applies.",
     ),
     Concept(
         "MISSING_DATA_HANDLING",
@@ -266,8 +263,13 @@ def infer_legacy_concept_ids(raw: str) -> list[str]:
         (r"^anatomic|^histologic|^cancer-subtype scope|^nsclc histologic|^sidedness grouping|^inclusion of breast sarcoma|^whether to count bladder", "ANATOMIC_HISTOLOGIC_SCOPE"),
         (r"^extent-of-disease|^restriction to metastatic disease|^stage stratum|^disease setting / population scope", "DISEASE_EXTENT_SCOPE"),
         (r"^advanced disease definition|^metastatic-cohort definition|^definition of (advanced|metastatic|early stage|locally advanced)|^resectable cancer definition|^mcrpc definition|^definition of mcrpc|^mcrpc$", "DISEASE_STATE_DEFINITION"),
-        (r"^subtype restriction|^subtype grouping|^population stratum|^age cutoff|^age threshold", "CLINICAL_SUBGROUP_DEFINITION"),
-        (r"^category granularity|^race vs ethnicity field choice|^treatment of multi-race coding|^demographic dimension", "VARIABLE_OR_CATEGORY_DEFINITION"),
+        (
+            r"^subtype restriction|^subtype grouping|^population stratum|"
+            r"^age cutoff|^age threshold|^category granularity|"
+            r"^race vs ethnicity field choice|^treatment of multi-race coding|"
+            r"^demographic dimension",
+            "CLINICAL_SUBGROUP_DEFINITION",
+        ),
         (r"^handling of (unknown|missing)|^treatment of unknown|^missing/unknown|^denominator handling for unknown", "MISSING_DATA_HANDLING"),
         (r"^chemotherapy backbone|^definition of ['\"]?(chemotherapy|immunotherapy|targeted therapy|folfox-based regimen|gemcitabine-based)|^specific anti-egfr agent|^comparator chemotherapy regimen definition|^first-line treatment class|^whether the cdk4/6|^exclusion of adt", "TREATMENT_DEFINITION"),
         (r"^comparator", "COMPARATOR_DEFINITION"),
@@ -311,10 +313,14 @@ def infer_legacy_concept_ids(raw: str) -> list[str]:
         add("DISEASE_EXTENT_SCOPE")
     if _has(text, r"advanced disease definition|definition of ['\"]?(?:advanced|metastatic|early stage|locally advanced)|metastatic-cohort definition|mcrpc definition|definition of mcrpc|resectable cancer definition|timing window \(at diagnosis vs ever\)"):
         add("DISEASE_STATE_DEFINITION")
-    if _has(text, r"subtype restriction|subtype grouping|population stratum|age cutoff|age threshold|defining ['\"]?(?:older|young)|hr\+|tnbc vs|clinical subgroup"):
+    if _has(
+        text,
+        r"subtype restriction|subtype grouping|population stratum|age cutoff|"
+        r"age threshold|defining ['\"]?(?:older|young)|hr\+|tnbc vs|"
+        r"clinical subgroup|category granularity|race vs ethnicity field|"
+        r"multi-race coding|demographic dimension|variable choice|field choice",
+    ):
         add("CLINICAL_SUBGROUP_DEFINITION")
-    if _has(text, r"category granularity|race vs ethnicity field|multi-race coding|demographic dimension|variable choice|field choice"):
-        add("VARIABLE_OR_CATEGORY_DEFINITION")
     if _has(text, r"missing|unknown|not applicable") and not _has(text, r"ca_type-missing"):
         add("MISSING_DATA_HANDLING")
 

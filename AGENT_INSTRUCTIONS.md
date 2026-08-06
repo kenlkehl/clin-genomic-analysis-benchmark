@@ -87,8 +87,7 @@ The same menu is included as structured data in every `question.json`.
 | `ANATOMIC_HISTOLOGIC_SCOPE` | eligible cancer sites, `ca_type` values, histologies, or sidedness groups |
 | `DISEASE_EXTENT_SCOPE` | a stage or extent restriction, such as all stages versus Stage IV |
 | `DISEASE_STATE_DEFINITION` | a definition of advanced, metastatic, early, resectable, or mCRPC disease |
-| `CLINICAL_SUBGROUP_DEFINITION` | a clinical/molecular subgroup, subtype, age cutoff, or population stratum |
-| `VARIABLE_OR_CATEGORY_DEFINITION` | a source variable, coding system, grouping, or demographic dimension |
+| `CLINICAL_SUBGROUP_DEFINITION` | a clinical/molecular subgroup, subtype, age cutoff, population stratum, source variable, coding system, grouping, or demographic dimension |
 | `MISSING_DATA_HANDLING` | a rule for unknown, missing, or not-applicable values |
 | `TREATMENT_DEFINITION` | drugs, classes, backbones, combinations, or procedures that count as treatment |
 | `COMPARATOR_DEFINITION` | a reference or control group |
@@ -273,74 +272,185 @@ these grounds alone.
 
 ## What still counts as AMBIGUOUS
 
-A question is AMBIGUOUS when it leaves at least one of these truly
-underspecified, either upfront, or based on the actual cohort data.
+A question is AMBIGUOUS when it leaves at least one of the concepts below
+materially underspecified, either in the question text or in light of the
+actual cohort data, and none of the conventional defaults above resolves it.
+The bullets correspond one-to-one with the IDs in the disambiguation concept
+menu. Select the named ID when its condition applies.
 
-- **Population definition** that isn't resolved by the conventional
-  defaults above (e.g., "advanced cancer" with no anchor to a specific
-  staging variable AND the cohort has both de novo Stage IV and
-  metastatic-recurrent patients in roughly equal numbers, so the choice
-  materially shifts the cohort).
+- **`ANATOMIC_HISTOLOGIC_SCOPE`** — The eligible cancer sites, `ca_type`
+  values, histologies, or sidedness groups are not specified and materially
+  different choices would change the analysis population. This commonly
+  applies to cancer-level questions in heterogeneous cohorts. Patient-level
+  demographic questions remain exempt under the convention above.
 
-- **Anatomic / histologic scope** for a *cancer-level* question against a
-  cohort that contains materially different histologies or anatomic
-  sub-types, when the question does not specify which to include and the
-  choice would shift the analysis sample. (Patient-level demographic
-  questions are exempt — see "Patient-level attributes" above.)
+- **`DISEASE_EXTENT_SCOPE`** — The question does not specify a required stage
+  or extent restriction, such as all stages versus Stage IV, and more than one
+  materially different restriction is clinically plausible. Use this for a
+  direct stage/extent eligibility choice; use `DISEASE_STATE_DEFINITION` when
+  the unresolved issue is how to construct a clinical disease state.
 
-- **Outcome metric** with multiple plausible operationalizations the
-  conventions don't pin down (e.g., "treatment response" without
-  specifying RECIST / imaging / clinical, or "PFS" when multiple distinct
-  PFS variables exist and the time-origin isn't stated). For example, in this dataset, PFS-I means PFS where progression events are defined based on imaging assessment; PFS-M means progression is defined based on oncologist assessment; PFS-I-or-M defines progression as the earlier of imaging or oncologist assessment that progression has occurred; and PFS-I-and-M defines progression as requiring that both imaging and oncologist assessments have ascertained progression.
+- **`DISEASE_STATE_DEFINITION`** — A state such as advanced, metastatic,
+  early, resectable, or mCRPC is used without an operational definition. For
+  example, "metastatic" may mean de novo Stage IV only or may also include
+  recurrent/relapsed metastatic disease.
 
-- **Comparator group** not specified or not derivable (e.g., asking for
-  a hazard ratio, but the population restriction makes the exposure constant within
-  the analysis sample, so no comparator exists).
+- **`CLINICAL_SUBGROUP_DEFINITION`** — A clinical or molecular subgroup,
+  subtype, age group, population stratum, source variable, coding system,
+  category grouping, or demographic dimension lacks a deterministic
+  definition. Examples include an undefined age threshold, an incompletely
+  specified receptor subgroup, race versus ethnicity, alternative category
+  groupings, or how multi-category records should be represented.
 
-- **Drug-class boundaries** not deterministic from the cohort data (e.g.,
-  "platinum-based chemotherapy" when the question hinges on whether
-  intravesical platinum or neoadjuvant-only platinum counts, AND the
-  dataset doesn't contain a standard flag).
+- **`MISSING_DATA_HANDLING`** — The result materially depends on whether
+  unknown, missing, or not-applicable values are excluded, included in the
+  denominator, treated as negative, or reported as a separate category, and
+  the question does not supply a rule.
 
-- **Definition of "chemotherapy"** when used without qualification: it may
-  mean cytotoxic chemotherapy only or any systemic therapy, and whether a
-  cytotoxic-payload antibody-drug conjugate counts is unspecified. (A
-  specific term such as "platinum-based chemotherapy" is not ambiguous on
-  this ground.)
+- **`TREATMENT_DEFINITION`** — The drugs, classes, backbones, combinations, or
+  procedures that count as the treatment are not deterministic under the
+  conventions above. This includes unresolved drug-class boundaries and an
+  unqualified term such as "chemotherapy" that could mean cytotoxic treatment
+  only or systemic therapy more broadly.
 
-- **"First-line" / "second-line" / line-of-therapy** without an analytic
-  anchor. There is no universal convention for "first-line" in oncology —
-  the operational definition is bespoke to the clinical context (first
-  regimen for the index cancer, first regimen after metastatic diagnosis,
-  first systemic therapy, first cytotoxic regimen, first regimen after a
-  specific landmark, etc.) and to the research question. Treat any
-  unqualified line-of-therapy term as ambiguous unless the question pins
-  down the population/setting AND the dataset has a corresponding pre-
-  built flag.
+- **`COMPARATOR_DEFINITION`** — A reference or control group is required but
+  is not specified or derivable. For example, a requested hazard ratio may
+  have several plausible reference groups, or the stated population may make
+  the proposed exposure constant and leave no comparator.
 
-- **Biomarker definition** beyond the conventions above. Receptor-status
-  thresholds in BPC are not conventionally fixed (no canonical IHC cut-
-  points or rules for equivocal cases).
+- **`LINE_OF_THERAPY`** — "First-line," "second-line," or another line lacks
+  an analytic anchor. Plausible anchors include the first regimen for the
+  index cancer, the first regimen after metastatic diagnosis, the first
+  systemic or cytotoxic regimen, or the first regimen after a landmark. An
+  unqualified line is ambiguous unless the population and setting plus a
+  corresponding dataset field make the anchor deterministic.
 
-- **Biomarker-frequency denominator** when a question asks what
-  fraction/proportion of patients or samples have an alteration in gene X
-  but does not say whether the denominator is *all* sequenced patients/
-  samples or only those whose panel **covers gene X**. The two denominators
-  differ whenever some panels omit the gene, so silence on this is a
-  genuine ambiguity. (A plain count of patients/samples with the alteration
-  — no denominator — is not ambiguous on this ground.)
+- **`TREATMENT_SETTING`** — The treatment setting is not fixed, such as
+  adjuvant, neoadjuvant, metastatic, castration-sensitive, castration-resistant,
+  or another clinically distinct context, and the setting changes which
+  treatments or patients qualify.
 
-- **Time origin** not specified when multiple are plausible AND the
-  dataset offers different time-origin variables (e.g., a survival
-  endpoint without saying from diagnosis vs. from regimen start vs. from
-  advanced-disease index).
+- **`REGIMEN_SELECTION`** — The question does not say which qualifying regimen
+  to use when a patient has multiple candidates, or whether monotherapy,
+  combination therapy, or regimens containing additional agents qualify.
+  Select this for the regimen-selection rule, not for the definition of a
+  drug or class itself.
 
-- **Filter cut-off** not specified (e.g., "long-term survivors" without a
-  year threshold).
+- **`CLINICAL_TRIAL_HANDLING`** — Clinical-trial regimen rows have unannotated
+  composition and could materially affect treatment eligibility or assignment,
+  but the question gives no rule. Plausible rules include assuming the drug of
+  interest is absent, excluding trial regimens, or treating trial regimens as a
+  separate group.
 
-- **Delayed cohort entry** . BPC cohorts require that genomic data have been collected on a tumor specimen. This means that any question that may address events or index dates that could precede the genomic specimen must address the delayed cohort entry problem: Time before genomic testing is essentially 'immortal,' since patients who died without testing would not be in the cohort. For time to event analyses indexed before genomic testing, this can be addressed via risk set adjustment / adjustment for left truncation, although this does not eliminate the related challenge of bias due to genomic testing being done at moments of disease progression. To be unambiguous, a question vulnerable to this issue must describe how it will deal with it, even if there is no obvious best approach to dealing with it.
+- **`PROCEDURE_OR_TIMING_DEFINITION`** — A procedure or a treatment relative
+  to a procedure needs an operational timing rule, such as the window defining
+  surgery, adjuvant therapy, or neoadjuvant therapy, and no deterministic
+  window or ordering rule is supplied.
 
-- **Immortal time bias** for an exposure defined by *receipt* of a treatment that can only occur after some time has elapsed (e.g., "received adjuvant/neoadjuvant therapy" vs not, or an "ever received treatment X" comparison anchored at diagnosis). Comparing such groups from a common origin without a landmark gives the treated group guaranteed event-free time before exposure, biasing the result. To be unambiguous, the question must define a landmark (e.g., restrict to patients alive and eligible at a fixed time after diagnosis and classify exposure as of that landmark); the conventional analysis is a landmark analysis.
+- **`GENE_OR_GENE_SET`** — A biomarker refers to a pathway, repair process,
+  signature, or gene family without specifying which genes are members. For
+  example, "DNA damage repair alteration" requires a concrete gene set.
+
+- **`ALTERATION_TYPE`** — The genomic alteration classes that count are not
+  specified, such as SNV/indel mutations, copy-number alterations, fusions, or
+  structural variants. A phrase such as "FGFR3 altered" may require this choice.
+
+- **`VARIANT_INCLUSION_CRITERIA`** — The question requires consequence,
+  pathogenicity, hotspot, or call-confidence filters that are not resolved by
+  the mutation defaults above. Do not select this merely to revisit the
+  conventional non-synonymous definition when that default directly applies.
+
+- **`CNA_THRESHOLD`** — A copy-number state such as gain, amplification, loss,
+  or deletion is requested without a threshold, and multiple materially
+  different thresholds are compatible with the wording.
+
+- **`GERMLINE_SOMATIC_SCOPE`** — The question does not establish whether
+  germline alterations, somatic alterations, or both count, and the applicable
+  data contain more than one plausible source.
+
+- **`PANEL_COVERAGE`** — Eligibility depends on whether an assay could detect
+  the gene or event, but the question does not specify a coverage rule. For a
+  biomarker frequency, this commonly means choosing between all sequenced
+  patients/samples and only those tested on a panel covering the gene. A plain
+  alteration count with no denominator is not ambiguous on this ground alone.
+
+- **`SPECIMEN_SELECTION`** — More than one specimen or sequencing event could
+  be used and the defaults above do not determine which one qualifies, such as
+  the first, latest, pre-treatment, or disease-state-specific specimen.
+
+- **`BIOMARKER_TEST_DEFINITION`** — The assay or result defining a biomarker is
+  unspecified. Examples include whether MSI or MMR status is used, which
+  receptor-status test and threshold applies, or how equivocal results count.
+
+- **`OUTCOME_METRIC`** — The endpoint or endpoint version is not fixed, such as
+  OS, response, TTNT, PFS-I, PFS-M, PFS-I-or-M, or PFS-I-and-M. In BPC, these
+  PFS variants use imaging assessment, oncologist assessment, the earlier of
+  the two, or both assessments, respectively.
+
+- **`RESPONSE_DEFINITION`** — "Response" is requested without saying how it is
+  measured or categorized, such as RECIST/imaging response, clinical response,
+  best response, objective response, or disease-control categories.
+
+- **`TIME_ORIGIN`** — Follow-up could plausibly begin at more than one event
+  and the question does not choose among them, such as diagnosis, advanced-
+  disease onset, regimen start, surgery, or another landmark.
+
+- **`TIME_HORIZON`** — A follow-up horizon, filter cutoff, or summary time
+  point is required but missing. Examples include "long-term survivor" without
+  a year threshold or survival probability without a requested time point.
+
+- **`SUMMARY_MEASURE`** — The question does not specify whether to report a
+  mean, median, count, proportion, survival probability, or another summary,
+  and more than one would reasonably answer the wording.
+
+- **`STATISTICAL_ESTIMAND`** — The target contrast or statistic is unclear,
+  such as subgroup-specific hazard ratios versus a treatment-by-biomarker
+  interaction, a difference versus a ratio, or an overall versus conditional
+  effect.
+
+- **`MODEL_SPECIFICATION`** — The required model, test, covariates, adjustment
+  set, or interaction terms are not fixed and materially different choices
+  remain after applying the defaults. Do not select this solely to question
+  the conventional univariable Cox model when that default directly applies.
+
+- **`CENSORING_RULE`** — Handling of ongoing follow-up, absent events,
+  competing events, or treatment changes is required but not specified, and
+  plausible censoring choices materially change the time-to-event analysis.
+
+- **`DELAYED_ENTRY`** — The outcome origin can precede genomic testing, but
+  the question does not say how patients enter the risk set. BPC inclusion
+  requires a genomically tested tumor, so time before testing is selectively
+  observed. Plausible rules include left truncation at testing, restriction to
+  patients tested before the origin, or an explicit alternative. A vulnerable
+  time-to-event question must state its rule to be unambiguous.
+
+- **`IMMORTAL_TIME_BIAS`** — An exposure is defined by something occurring
+  after follow-up begins, such as ever receiving a treatment, but the question
+  does not specify a landmark, time-varying exposure, pre-origin ascertainment,
+  or another temporal strategy. A treated-versus-untreated comparison from a
+  common earlier origin otherwise grants the treated group guaranteed
+  event-free time before exposure.
+
+- **`ASCERTAINMENT_WINDOW`** — A characteristic or exposure could be measured
+  at diagnosis, before the outcome origin, within a fixed window, or ever
+  during follow-up, and the question does not say which window applies. This
+  identifies *when status is determined*; use `IMMORTAL_TIME_BIAS` as well only
+  when the unresolved timing creates that specific bias.
+
+- **`REPEATED_OBSERVATIONS`** — Patients can contribute multiple regimens,
+  samples, treatments, or measurements, but the question does not specify the
+  analysis unit or how repeated observations are selected or aggregated.
+
+- **`DENOMINATOR_DEFINITION`** — A non-panel-related eligible or tested
+  denominator is not specified, and materially different populations could
+  serve as the denominator. Use `PANEL_COVERAGE` instead when the unresolved
+  denominator is specifically eligibility based on assay coverage.
+
+- **`DATA_AVAILABILITY`** — The requested construct lacks a clearly identified
+  and sufficiently populated variable or measurement, leaving multiple
+  plausible data sources, proxies, or availability requirements. A completely
+  well-specified but unestimable analysis is not ambiguous on this ground; use
+  the structured `unanswerable` result described below instead.
 
 
 ---
