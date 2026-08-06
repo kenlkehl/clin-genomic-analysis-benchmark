@@ -99,6 +99,7 @@ def test_antigravity_passes_model_and_canonical_paths(
     assert command[command.index("--output-format") + 1] == "json"
     schema = json.loads(command[command.index("--json-schema") + 1])
     assert schema["required"] == ["classification"]
+    assert schema["properties"]["classification"]["type"] == "string"
     assert "--disable-slash-commands" in command
     assert "--dangerously-skip-permissions" not in command
     assert captured["env"]["AGY_CLI_DISABLE_AUTO_UPDATE"] == "true"

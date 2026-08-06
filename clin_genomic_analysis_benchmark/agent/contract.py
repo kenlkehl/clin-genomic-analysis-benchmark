@@ -67,7 +67,10 @@ _CLASSIFY_RESULT: dict[str, Any] = {
     "additionalProperties": False,
     "required": ["classification"],
     "properties": {
-        "classification": {"enum": ["ambiguous", "unambiguous"]},
+        "classification": {
+            "type": "string",
+            "enum": ["ambiguous", "unambiguous"],
+        },
         "rationale": {"type": "string"},
     },
 }
@@ -79,7 +82,7 @@ _DISAMBIGUATE_RESULT: dict[str, Any] = {
     "properties": {
         "concept_ids": {
             "type": "array",
-            "items": {"enum": list(CONCEPT_IDS)},
+            "items": {"type": "string", "enum": list(CONCEPT_IDS)},
             "minItems": 1,
             "uniqueItems": True,
         },
@@ -92,6 +95,7 @@ _ANALYZE_RESULT: dict[str, Any] = {
     "required": ["answer_type", "answer"],
     "properties": {
         "answer_type": {
+            "type": "string",
             "enum": [
                 "count", "proportion", "median_with_ci",
                 "hazard_ratio_with_ci", "odds_ratio_with_ci",

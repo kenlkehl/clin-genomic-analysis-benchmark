@@ -29,6 +29,11 @@ That CLI version does not list a model literally named “Gemini 3.5 Flash
 Lite.” Do not assume that `Low` and `Lite` are aliases; use a Lite name only
 after it appears in `agy models` for the installed CLI/account.
 
+On this account, `gemini-3.5-flash` currently accepts only `low` and `medium`
+through `--effort`; `AGY_EFFORT=high` is rejected by the service before a model
+call. Treat `agy`'s runtime availability error as authoritative because effort
+availability can vary independently of the display names in documentation.
+
 ## Configuration
 
 | variable | default | purpose |
