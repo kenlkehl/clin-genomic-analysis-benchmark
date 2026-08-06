@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Google Antigravity CLI + Gemini 3.5 Flash adapter for clin-genomic-analysis-benchmark.
+# Google Antigravity CLI + Gemini adapter for clin-genomic-analysis-benchmark.
 #
 # Contract: invoked by the harness as
 #   run.sh --question-file <abs question.json> --output <abs result.json>
@@ -27,13 +27,18 @@ fi
 ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$ADAPTER_DIR/../.." && pwd)"
 
-# Load repo-root .env if present. Useful for AGY_* overrides.
+# Load repo-root .env if present. Useful for AGY_* settings.
 if [[ -f "$REPO_ROOT/.env" ]]; then
   set -a; . "$REPO_ROOT/.env"; set +a
 fi
 
-# Antigravity's installer typically places agy in ~/.local/bin and also keeps
-# helper binaries under ~/.gemini/antigravity-cli/bin.
+if [[ -z "${AGY_MODEL:-}" ]]; then
+  echo "antigravity adapter: AGY_MODEL is required; choose an exact name from 'agy models'" >&2
+  exit 2
+fi
+
+# Antigravity's installer typically places agy in ~/.local/bin. The model CLI
+# receives a separately constructed, ephemeral home inside the outer sandbox.
 export PATH="$HOME/.local/bin:$HOME/.gemini/antigravity-cli/bin:$PATH"
 
 exec python3 "$ADAPTER_DIR/adapter.py" --question-file "$QFILE" --output "$OUT"

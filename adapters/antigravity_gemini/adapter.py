@@ -1,14 +1,14 @@
 """Google Antigravity CLI adapter for clin-genomic-analysis-benchmark.
 
-This adapter invokes the Antigravity CLI (`agy`) in print mode. The local
-Antigravity settings select Gemini 3.5 Flash, and this wrapper keeps the
-benchmark contract identical to the other adapters:
+This adapter invokes the Antigravity CLI (``agy``) in print mode with an
+explicit ``AGY_MODEL`` and keeps the benchmark contract identical to the other
+adapters:
 
     run.sh --question-file <question.json> --output <result.json>
 
-The adapter is intentionally thin: it builds a stage prompt from
-AGENT_INSTRUCTIONS.md and the harness payload, lets Antigravity use its normal
-CLI tools, extracts the final JSON object, and writes it to result.json.
+The model-controlled process runs inside the benchmark's mandatory bubblewrap
+boundary. It can see only the current cohort, dictionary, scratch directory,
+ephemeral Antigravity home, and software runtime.
 """
 
 from __future__ import annotations
@@ -21,7 +21,18 @@ import subprocess
 import sys
 from pathlib import Path
 
+from clin_genomic_analysis_benchmark.agent.isolation import (
+    SANDBOX_COHORT_DIR,
+    SANDBOX_SCRATCH_DIR,
+    AgentIsolationError,
+    export_agent_session_audit,
+    sandbox_question_view,
+    sandboxed_agent_command,
+)
+from clin_genomic_analysis_benchmark.agent.contract import _RESULT_SCHEMAS
+
 ADAPTER_DIR = Path(__file__).resolve().parent
+_MAX_ERROR_STREAM_CHARS = 4000
 
 DEFAULT_PRINT_TIMEOUTS = {
     "classify": "9m30s",
@@ -30,12 +41,17 @@ DEFAULT_PRINT_TIMEOUTS = {
 }
 
 
+class AntigravityInvocationError(RuntimeError):
+    """Antigravity failed before returning a usable assistant response."""
+
+
 def _load_question(path: Path) -> dict:
     with open(path) as f:
         return json.load(f)
 
 
 def _build_prompt(question: dict) -> str:
+    question = sandbox_question_view(question)
     repo_root = ADAPTER_DIR.parent.parent
     instructions_doc = (repo_root / "AGENT_INSTRUCTIONS.md").read_text()
     stage = question["stage"]
@@ -247,40 +263,168 @@ def _print_timeout(stage: str) -> str:
     )
 
 
+def _agy_model() -> str:
+    model = os.environ.get("AGY_MODEL", "").strip()
+    if not model:
+        raise AntigravityInvocationError(
+            "AGY_MODEL is required; choose an exact name reported by `agy models`"
+        )
+    return model
+
+
+def _agy_mode() -> str:
+    mode = os.environ.get("AGY_MODE", "accept-edits").strip()
+    if mode not in {"accept-edits", "plan"}:
+        raise AntigravityInvocationError(
+            "AGY_MODE must be either 'accept-edits' or 'plan'"
+        )
+    return mode
+
+
+def _agy_effort() -> str | None:
+    effort = os.environ.get("AGY_EFFORT", "").strip().lower()
+    if not effort:
+        return None
+    if effort not in {"low", "medium", "high"}:
+        raise AntigravityInvocationError(
+            "AGY_EFFORT must be 'low', 'medium', or 'high'"
+        )
+    return effort
+
+
+def _extract_cli_result(text: str) -> dict | None:
+    """Unwrap Antigravity JSON mode while retaining a plain-text fallback."""
+    try:
+        envelope = json.loads(text)
+    except json.JSONDecodeError:
+        return _extract_json(text)
+
+    def unwrap(value: object) -> dict | None:
+        if isinstance(value, str):
+            return _extract_json(value)
+        if not isinstance(value, dict):
+            return None
+        if any(key in value for key in ("classification", "concept_ids", "answer_type")):
+            return value
+        for key in (
+            "structured_output",
+            "response",
+            "result",
+            "output",
+            "content",
+            "text",
+            "message",
+        ):
+            extracted = unwrap(value.get(key))
+            if extracted is not None:
+                return extracted
+        return None
+
+    return unwrap(envelope)
+
+
+def _next_audit_stem(audit_dir: Path, stage: str) -> str:
+    stem = f"agy.{stage}"
+    index = 1
+    while (audit_dir / f"{stem}.{index}.stdout.txt").exists():
+        index += 1
+    return f"{stem}.{index}"
+
+
+def _archive_process_artifacts(
+    *,
+    scratch_dir: Path,
+    stage: str,
+    proc: subprocess.CompletedProcess[str],
+) -> tuple[Path, str]:
+    """Move model-visible CLI logs aside and preserve both process streams."""
+    audit_dir = scratch_dir.parent / "adapter_audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    stem = _next_audit_stem(audit_dir, stage)
+    (audit_dir / f"{stem}.stdout.txt").write_text(proc.stdout or "")
+    (audit_dir / f"{stem}.stderr.txt").write_text(proc.stderr or "")
+
+    cli_log = scratch_dir / f"agy.{stage}.log"
+    if cli_log.is_symlink():
+        raise AgentIsolationError(f"Antigravity CLI log became a symlink: {cli_log}")
+    if cli_log.is_file():
+        cli_log.replace(audit_dir / f"{stem}.cli.log")
+    return audit_dir, stem
+
+
+def _failure_details(proc: subprocess.CompletedProcess[str]) -> str:
+    streams = []
+    for label, value in (("stdout", proc.stdout), ("stderr", proc.stderr)):
+        if value:
+            streams.append(
+                f"--- {label} ---\n{value[-_MAX_ERROR_STREAM_CHARS:]}"
+            )
+    return "\n".join(streams) or "<no process output>"
+
+
 def _agy_call(*, prompt: str, question: dict) -> str:
     stage = question["stage"]
     scratch_dir = Path(question["scratch_dir"]).resolve()
     cohort_dir = Path(question["cohort_dir"]).resolve()
     scratch_dir.mkdir(parents=True, exist_ok=True)
-    log_file = Path(os.environ.get("AGY_LOG_FILE", scratch_dir / f"agy.{stage}.log"))
-
     cmd = [
         os.environ.get("AGY_BIN", "agy"),
-        "--log-file", str(log_file),
+        "--log-file", str(SANDBOX_SCRATCH_DIR / f"agy.{stage}.log"),
         "--print-timeout", _print_timeout(stage),
-        "--add-dir", str(cohort_dir),
-        "--add-dir", str(scratch_dir),
+        "--add-dir", str(SANDBOX_COHORT_DIR),
+        "--add-dir", str(SANDBOX_SCRATCH_DIR),
+        "--mode", _agy_mode(),
+        "--model", _agy_model(),
+        "--output-format", "json",
+        "--json-schema", json.dumps(_RESULT_SCHEMAS[stage], separators=(",", ":")),
+        "--disable-slash-commands",
     ]
+    effort = _agy_effort()
+    if effort:
+        cmd.extend(["--effort", effort])
+    agent = os.environ.get("AGY_AGENT", "").strip()
+    if agent:
+        cmd.extend(["--agent", agent])
     if _env_truthy("AGY_USE_SANDBOX", True):
         cmd.append("--sandbox")
-    if _env_truthy("AGY_SKIP_PERMISSIONS", True):
+    if _env_truthy("AGY_SKIP_PERMISSIONS", False):
         cmd.append("--dangerously-skip-permissions")
     cmd.append("--print")
     cmd.append(prompt)
 
-    env = os.environ.copy()
-    env.setdefault("NO_COLOR", "1")
-
-    proc = subprocess.run(
+    source_env = os.environ.copy()
+    source_env.setdefault("NO_COLOR", "1")
+    # A benchmark invocation must not mutate the installed CLI mid-run.
+    source_env["AGY_CLI_DISABLE_AUTO_UPDATE"] = "true"
+    dictionary_path = Path(question["data_dictionary_path"]).resolve()
+    with sandboxed_agent_command(
         cmd,
-        cwd=str(scratch_dir),
-        env=env,
-        capture_output=True,
-        text=True,
-    )
+        cohort_dir=cohort_dir,
+        data_dictionary_path=dictionary_path,
+        scratch_dir=scratch_dir,
+        environment=source_env,
+        home_kind="antigravity",
+    ) as launch:
+        proc = subprocess.run(
+            launch.command,
+            env=launch.environment,
+            capture_output=True,
+            text=True,
+        )
+        audit_dir, stem = _archive_process_artifacts(
+            scratch_dir=scratch_dir,
+            stage=stage,
+            proc=proc,
+        )
+        export_agent_session_audit(
+            launch,
+            destination=audit_dir / f"{stem}.session",
+            home_kind="antigravity",
+        )
     if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout)[-2000:]
-        raise RuntimeError(f"agy exited {proc.returncode}: {tail}")
+        raise AntigravityInvocationError(
+            f"agy exited {proc.returncode}\n{_failure_details(proc)}"
+        )
     return proc.stdout
 
 
@@ -299,7 +443,7 @@ def main() -> int:
         sys.stderr.write(f"adapter: antigravity invocation failed: {e}\n")
         return 3
 
-    obj = _extract_json(text)
+    obj = _extract_cli_result(text)
     if obj is None:
         sys.stderr.write("adapter: could not extract JSON from antigravity output\n")
         sys.stderr.write(text[:2000] + "\n")

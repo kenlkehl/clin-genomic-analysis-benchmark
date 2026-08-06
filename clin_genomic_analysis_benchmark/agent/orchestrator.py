@@ -112,6 +112,18 @@ _SAFE_AGENT_ENV_VARS = (
     "CODEX_REASONING_EFFORT",
     "CODEX_PROFILE",
     "CODEX_SANDBOX_MODE",
+    "AGY_MODEL",
+    "AGY_EFFORT",
+    "AGY_AGENT",
+    "AGY_MODE",
+    "AGY_GCP_PROJECT",
+    "AGY_GCP_LOCATION",
+    "AGY_USE_SANDBOX",
+    "AGY_SKIP_PERMISSIONS",
+    "AGY_PRINT_TIMEOUT",
+    "AGY_PRINT_TIMEOUT_CLASSIFY",
+    "AGY_PRINT_TIMEOUT_DISAMBIGUATE",
+    "AGY_PRINT_TIMEOUT_ANALYZE",
 )
 
 
@@ -262,11 +274,90 @@ def _claude_effort_provenance(
     }
 
 
+def _antigravity_provenance(
+    *, agent_cmd: str, env: Mapping[str, str], read_user_config: bool
+) -> dict | None:
+    """Resolve Antigravity's explicitly pinned model and safe GCP settings."""
+    if "adapters/antigravity_gemini/" not in agent_cmd:
+        return None
+
+    settings: dict = {}
+    if read_user_config:
+        config_value = env.get("CLINGEN_AGY_CONFIG_DIR", "").strip()
+        config_dir = (
+            Path(config_value).expanduser()
+            if config_value
+            else Path.home() / ".gemini/antigravity-cli"
+        )
+        try:
+            candidate = json.loads((config_dir / "settings.json").read_text())
+            settings = candidate if isinstance(candidate, dict) else {}
+        except (OSError, ValueError, TypeError):
+            settings = {}
+
+    model = env.get("AGY_MODEL", "").strip() or None
+    model_effort_match = re.search(
+        r"(?:\((low|medium|high)\)|-(low|medium|high))\s*$",
+        model or "",
+        re.I,
+    )
+    model_effort = next(
+        (group.lower() for group in model_effort_match.groups() if group),
+        None,
+    ) if model_effort_match else None
+    explicit_effort = env.get("AGY_EFFORT", "").strip().lower() or None
+    effort = explicit_effort or model_effort
+    gcp = settings.get("gcp") if isinstance(settings.get("gcp"), dict) else {}
+    project = env.get("AGY_GCP_PROJECT", "").strip() or str(
+        gcp.get("project", "")
+    ).strip()
+    location = env.get("AGY_GCP_LOCATION", "").strip() or str(
+        gcp.get("location", "")
+    ).strip()
+
+    provenance = {
+        "adapter": "antigravity_gemini",
+        "provider": "google_antigravity",
+        "provider_source": "adapter",
+        "model": model,
+        "model_source": "AGY_MODEL" if model else "unresolved",
+        "effort_level": effort,
+        "effort_supported": effort is not None,
+        "effort_source": (
+            "AGY_EFFORT"
+            if explicit_effort
+            else ("AGY_MODEL_variant" if model_effort else "not_exposed")
+        ),
+        "project_id": project or None,
+        "project_id_source": (
+            "AGY_GCP_PROJECT"
+            if env.get("AGY_GCP_PROJECT", "").strip()
+            else ("antigravity_user_settings" if project else "unresolved")
+        ),
+        "region": location or None,
+        "region_source": (
+            "AGY_GCP_LOCATION"
+            if env.get("AGY_GCP_LOCATION", "").strip()
+            else ("antigravity_user_settings" if location else "unresolved")
+        ),
+        "mode": env.get("AGY_MODE", "").strip() or "accept-edits",
+        "mode_source": "AGY_MODE" if env.get("AGY_MODE", "").strip() else "adapter_default",
+        "cli_auto_update": False,
+        "cli_auto_update_source": "adapter_forced",
+    }
+    agent = env.get("AGY_AGENT", "").strip()
+    if agent:
+        provenance["agent_profile"] = agent
+        provenance["agent_profile_source"] = "AGY_AGENT"
+    return provenance
+
+
 def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) -> dict:
     """Capture reproducibility metadata from a strict, non-secret allow-list.
 
-    For supported Claude Code and Codex adapters, also resolve effective model
-    configuration from their explicit environment and non-secret config layers.
+    For supported Claude Code, Codex, and Antigravity adapters, also resolve
+    effective model configuration from explicit environment and non-secret
+    config layers.
     """
     env = os.environ if environ is None else environ
     explicit_env = {
@@ -283,6 +374,17 @@ def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) 
     )
     if codex is not None:
         provenance.update(codex)
+        return provenance
+
+    antigravity = _antigravity_provenance(
+        agent_cmd=agent_cmd,
+        env=env,
+        read_user_config=(
+            environ is None or bool(env.get("CLINGEN_AGY_CONFIG_DIR", "").strip())
+        ),
+    )
+    if antigravity is not None:
+        provenance.update(antigravity)
         return provenance
 
     if "adapters/claude_code/" not in agent_cmd:

@@ -252,6 +252,19 @@ def _restored_agent_environment(original: dict) -> dict[str, str]:
             env["CODEX_MODEL_PROVIDER"] = str(original["provider"])
         if original.get("effort_level"):
             env["CODEX_REASONING_EFFORT"] = str(original["effort_level"])
+    elif adapter == "antigravity_gemini":
+        if original.get("model"):
+            env["AGY_MODEL"] = str(original["model"])
+        if original.get("effort_level"):
+            env["AGY_EFFORT"] = str(original["effort_level"])
+        if original.get("project_id"):
+            env["AGY_GCP_PROJECT"] = str(original["project_id"])
+        if original.get("region"):
+            env["AGY_GCP_LOCATION"] = str(original["region"])
+        if original.get("mode"):
+            env["AGY_MODE"] = str(original["mode"])
+        if original.get("agent_profile"):
+            env["AGY_AGENT"] = str(original["agent_profile"])
     return env
 
 

@@ -17,7 +17,7 @@ All six cohorts are wired end to end. The reference adapter drives Claude Code o
 | Agent-facing bank | `questions/<cohort>.yaml` — `id`, `category`, `text` only. This is everything the agent under test ever sees |
 | Gold bank | `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` — answers, canonical concept IDs, classifications, and audit prose. Read by the scorer, never by the agent |
 | Agent guidance | `AGENT_INSTRUCTIONS.md` — served verbatim to the agent by the reference adapter |
-| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/template/` to write your own |
+| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/antigravity_gemini/` (Gemini through Antigravity CLI), `adapters/template/` to write your own |
 
 ### Keeping the answers away from the agent
 
@@ -220,12 +220,14 @@ configurable effort, so leave the variable unset for that model. Neither setting
 has any role in scoring.
 
 Every run's `manifest.json` includes a non-secret `agent_provenance` block. The
-Claude Code and Codex adapters record the effective model, provider, effort
-level, and the source of each resolved value; Claude Vertex runs also record the
-project and region. Codex values are resolved from explicit `CODEX_*` overrides,
-the selected profile, or the base user config in precedence order. The same
-provenance appears at the top of generated scorecards. API keys and credential
-paths are never included.
+Claude Code, Codex, and Antigravity adapters record the effective model,
+provider, effort level, and the source of each resolved value; cloud-backed runs
+also record the project and region when available. Codex values are resolved
+from explicit `CODEX_*` overrides, the selected profile, or the base user config
+in precedence order. Antigravity requires an explicit `AGY_MODEL` and records
+either `AGY_EFFORT` or the model's High/Medium/Low suffix. The same provenance
+appears at the top of generated scorecards. API keys and credential paths are
+never included.
 
 `generate-questions` and `compute-gold` build a bank and its gold answers with an LLM. They are how the bank started, but it is now curated by hand in the workbook, so day to day you want `sync_yaml_from_review.py` instead.
 
@@ -240,14 +242,14 @@ $ <your_agent> --question-file question.json --output result.json
 The harness contract remains model- and framework-agnostic, but a coding-agent
 adapter must put every model-controlled subprocess through
 `agent.isolation.sandboxed_agent_command` and be added to the sandboxed-adapter
-registry. Unregistered adapters fail closed. The Claude Code and both Codex
-adapters are registered; the Antigravity and template adapters are not yet
+registry. Unregistered adapters fail closed. Claude Code, both Codex adapters,
+and Antigravity are registered; the template adapter is intentionally not
 certified for benchmark runs.
 
 The reference Claude adapter builds a system prompt from
 `AGENT_INSTRUCTIONS.md`, then launches `claude` inside the outer namespace with
-its normal narrow tool allowlist. The Codex adapters use the same outer
-boundary plus Codex's internal sandbox as defense in depth.
+its normal narrow tool allowlist. The Codex and Antigravity adapters use the
+same outer boundary plus their CLIs' internal sandboxes as defense in depth.
 
 Start from `adapters/template/`.
 

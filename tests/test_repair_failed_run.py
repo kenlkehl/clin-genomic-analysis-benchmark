@@ -119,6 +119,30 @@ def test_restored_environment_pins_original_claude_model_effort_and_project(monk
     assert "GOOGLE_CLOUD_PROJECT" not in env
 
 
+def test_restored_environment_pins_original_antigravity_runtime(monkeypatch):
+    monkeypatch.setenv("AGY_MODEL", "current-model")
+    original = {
+        "adapter": "antigravity_gemini",
+        "provider": "google_antigravity",
+        "model": "gemini-3.6-flash-high",
+        "effort_level": "high",
+        "project_id": "original-project",
+        "region": "global",
+        "mode": "accept-edits",
+        "agent_profile": "benchmark-agent",
+        "environment": {},
+    }
+
+    env = repair._restored_agent_environment(original)
+
+    assert env["AGY_MODEL"] == "gemini-3.6-flash-high"
+    assert env["AGY_EFFORT"] == "high"
+    assert env["AGY_GCP_PROJECT"] == "original-project"
+    assert env["AGY_GCP_LOCATION"] == "global"
+    assert env["AGY_MODE"] == "accept-edits"
+    assert env["AGY_AGENT"] == "benchmark-agent"
+
+
 def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
     tmp_path, monkeypatch
 ):

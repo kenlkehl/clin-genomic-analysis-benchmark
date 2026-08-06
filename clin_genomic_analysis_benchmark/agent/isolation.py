@@ -1,10 +1,11 @@
 """Fail-closed filesystem isolation for model-controlled coding-agent CLIs.
 
-The benchmark adapter is trusted orchestration code.  The Codex/Claude process
-it launches is not: it can run shell commands chosen by the model.  This module
-places that process in a bubblewrap mount namespace containing only the current
-cohort, its dictionary, a per-question scratch directory, an ephemeral home,
-and the minimal software runtime needed to do the analysis.
+The benchmark adapter is trusted orchestration code. The Codex, Claude, or
+Antigravity process it launches is not: it can run shell commands chosen by the
+model. This module places that process in a bubblewrap mount namespace
+containing only the current cohort, its dictionary, a per-question scratch
+directory, an ephemeral home, and the minimal software runtime needed to do the
+analysis.
 
 This is a confidentiality boundary.  The CLIs' own ``--sandbox`` and
 ``--add-dir`` flags remain useful mutation controls, but are not used as a
@@ -57,6 +58,7 @@ class SandboxedCommand:
 
 
 _SUPPORTED_ADAPTER_DIRS = {
+    "antigravity_gemini",
     "claude_code",
     "codex_gpt",
     "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl",
@@ -153,6 +155,7 @@ _PASSTHROUGH_ENV = {
     "NO_COLOR",
     "DISABLE_TELEMETRY",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+    "AGY_CLI_DISABLE_AUTO_UPDATE",
 }
 
 
@@ -169,7 +172,8 @@ def _sandbox_environment(source: Mapping[str, str]) -> dict[str, str]:
         "CODEX_HOME": str(SANDBOX_HOME_DIR / ".codex"),
         "CLAUDE_CONFIG_DIR": str(SANDBOX_HOME_DIR / ".claude"),
         "PYTHONNOUSERSITE": "1",
-        "PATH": "/opt/benchmark-python-wrappers:/opt/benchmark-venv/bin:"
+        "PATH": "/home/agent/.gemini/antigravity-cli/bin:"
+                "/opt/benchmark-python-wrappers:/opt/benchmark-venv/bin:"
                 "/home/linuxbrew/.linuxbrew/bin:"
                 "/usr/local/bin:/usr/bin:/bin",
     })
@@ -319,6 +323,206 @@ def _seed_claude_home(home: Path, source_env: Mapping[str, str]) -> None:
         shutil.copy2(source_credential, copied)
 
 
+def _seed_google_adc(home: Path, source_env: Mapping[str, str]) -> None:
+    """Copy ADC into a disposable home without exposing its host path."""
+    credential_value = source_env.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    source_credential = (
+        Path(credential_value).expanduser()
+        if credential_value
+        else Path.home() / ".config/gcloud/application_default_credentials.json"
+    )
+    if source_credential.is_file():
+        copied = home / ".config/gcloud/application_default_credentials.json"
+        copied.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_credential, copied)
+
+
+def _read_json_object(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, ValueError, TypeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _seed_antigravity_home(home: Path, source_env: Mapping[str, str]) -> None:
+    """Seed only Antigravity runtime settings, never persistent agent state.
+
+    Antigravity normally keeps trusted workspace paths, conversations, implicit
+    context, memories, and logs under ``~/.gemini/antigravity-cli``.  Copying
+    that tree would reintroduce the exact cross-run data channel the outer
+    namespace is intended to close, so this builds a fresh configuration from
+    a small allow-list instead.
+    """
+    source_value = source_env.get("CLINGEN_AGY_CONFIG_DIR", "").strip()
+    source = (
+        Path(source_value).expanduser()
+        if source_value
+        else Path.home() / ".gemini/antigravity-cli"
+    )
+    destination = home / ".gemini/antigravity-cli"
+    destination.mkdir(parents=True, exist_ok=True)
+
+    original = _read_json_object(source / "settings.json")
+    original_gcp = original.get("gcp") if isinstance(original.get("gcp"), dict) else {}
+    project = source_env.get("AGY_GCP_PROJECT", "").strip() or str(
+        original_gcp.get("project", "")
+    ).strip()
+    location = source_env.get("AGY_GCP_LOCATION", "").strip() or str(
+        original_gcp.get("location", "")
+    ).strip()
+    model = source_env.get("AGY_MODEL", "").strip() or str(
+        original.get("model", "")
+    ).strip()
+
+    settings: dict[str, Any] = {
+        "allowNonWorkspaceAccess": False,
+        "artifactReviewPolicy": "always-proceed",
+        "enableTerminalSandbox": True,
+        "enableTelemetry": False,
+        "toolPermission": "proceed-in-sandbox",
+        "permissions": {
+            "allow": ["command(*)"],
+            "ask": [],
+            "deny": [
+                "unsandboxed(*)",
+                "read_file(/home/agent/.gemini)",
+                "read_file(/home/agent/.config/gcloud)",
+                "read_url(*)",
+                "execute_url(*)",
+                "mcp(*)",
+            ],
+        },
+        "trustedWorkspaces": [str(SANDBOX_SCRATCH_DIR)],
+    }
+    if model:
+        settings["model"] = model
+    gcp = {key: value for key, value in (("project", project), ("location", location)) if value}
+    if gcp:
+        settings["gcp"] = gcp
+    (destination / "settings.json").write_text(json.dumps(settings, indent=2) + "\n")
+
+    onboarding_source = _read_json_object(source / "cache/onboarding.json")
+    onboarding = {
+        key: bool(onboarding_source[key])
+        for key in (
+            "consumerOnboardingComplete",
+            "enterpriseOnboardingComplete",
+            "onboardingComplete",
+        )
+        if isinstance(onboarding_source.get(key), bool)
+    }
+    if onboarding:
+        cache = destination / "cache"
+        cache.mkdir()
+        (cache / "onboarding.json").write_text(json.dumps(onboarding, indent=2) + "\n")
+    try:
+        default_project_id = (source / "cache/default_project_id.txt").read_text().strip()
+    except OSError:
+        default_project_id = ""
+    if re.fullmatch(r"[A-Za-z0-9_-]{1,128}", default_project_id):
+        cache = destination / "cache"
+        cache.mkdir(exist_ok=True)
+        (cache / "default_project_id.txt").write_text(default_project_id + "\n")
+
+    # OAuth profiles can be bound to Antigravity's installation identifier.
+    # This UUID is not conversation/context state and contains no host path.
+    try:
+        installation_id = (source / "installation_id").read_text().strip()
+    except OSError:
+        installation_id = ""
+    if re.fullmatch(r"[0-9a-fA-F-]{36}", installation_id):
+        (destination / "installation_id").write_text(installation_id + "\n")
+    try:
+        jetski_state = (source / "jetski_state.pbtxt").read_text()
+    except OSError:
+        jetski_state = ""
+    uuid_match = re.search(
+        r'^installation_uuid:\s*"([0-9a-fA-F-]{36})"\s*$',
+        jetski_state,
+        re.MULTILINE,
+    )
+    if uuid_match:
+        (destination / "jetski_state.pbtxt").write_text(
+            f'installation_uuid: "{uuid_match.group(1)}"\n'
+        )
+
+    # Some Antigravity integrations invoke this helper by name.  The installed
+    # helper embeds the host user's absolute path, so generate a canonical shim.
+    helper_dir = destination / "bin"
+    helper_dir.mkdir()
+    helper = helper_dir / "agentapi"
+    helper.write_text('#!/bin/sh\nexec /opt/agent-cli/agy agentapi "$@"\n')
+    helper.chmod(0o755)
+    _seed_google_adc(home, source_env)
+
+    # Antigravity's own keyring client is not portable across mount/user
+    # namespaces, but it has a supported file fallback. Trusted setup reads one
+    # exact keyring item and writes only that OAuth profile into the disposable
+    # home. The desktop session bus and unrelated keyring items stay outside.
+    oauth_profile = _lookup_antigravity_keyring_secret(source_env)
+    if oauth_profile:
+        try:
+            parsed_profile = json.loads(oauth_profile)
+            token = parsed_profile.get("token")
+            valid_profile = (
+                isinstance(parsed_profile.get("auth_method"), str)
+                and isinstance(token, dict)
+                and any(
+                    isinstance(token.get(key), str) and token[key]
+                    for key in ("access_token", "refresh_token")
+                )
+            )
+        except (UnicodeDecodeError, ValueError, TypeError):
+            valid_profile = False
+        if valid_profile:
+            token_file = destination / "antigravity-oauth-token"
+            token_file.write_bytes(oauth_profile)
+            token_file.chmod(0o600)
+
+
+_ANTIGRAVITY_KEYRING_LOOKUP = r"""
+import gi
+import sys
+
+gi.require_version("Secret", "1")
+from gi.repository import Secret
+
+schema = Secret.Schema.new(
+    "org.freedesktop.Secret.Generic",
+    Secret.SchemaFlags.NONE,
+    {
+        "service": Secret.SchemaAttributeType.STRING,
+        "username": Secret.SchemaAttributeType.STRING,
+    },
+)
+password = Secret.password_lookup_sync(
+    schema, {"service": "gemini", "username": "antigravity"}, None
+)
+if password:
+    sys.stdout.buffer.write(password.encode())
+"""
+
+
+def _lookup_antigravity_keyring_secret(
+    source_env: Mapping[str, str],
+) -> bytes | None:
+    """Read only Antigravity's OAuth profile from the host Secret Service."""
+    if not source_env.get("DBUS_SESSION_BUS_ADDRESS", "").strip():
+        return None
+    proc = subprocess.run(
+        [
+            "/usr/bin/python3",
+            "-c",
+            _ANTIGRAVITY_KEYRING_LOOKUP,
+        ],
+        env=dict(source_env),
+        capture_output=True,
+        timeout=10,
+    )
+    return proc.stdout if proc.returncode == 0 and proc.stdout else None
+
+
 def _seed_home(home: Path, kind: str, source_env: Mapping[str, str]) -> None:
     for relative in (".cache", ".config", ".local/state"):
         (home / relative).mkdir(parents=True, exist_ok=True)
@@ -326,6 +530,8 @@ def _seed_home(home: Path, kind: str, source_env: Mapping[str, str]) -> None:
         _seed_codex_home(home, source_env)
     elif kind == "claude":
         _seed_claude_home(home, source_env)
+    elif kind == "antigravity":
+        _seed_antigravity_home(home, source_env)
 
 
 def _add_ro_bind(command: list[str], source: Path, destination: str | Path) -> None:
@@ -537,6 +743,16 @@ def export_agent_session_audit(
     ignored to prevent a model-created link from escaping the ephemeral home.
     """
     candidates = {
+        "antigravity": (
+            Path(".gemini/antigravity-cli/annotations"),
+            Path(".gemini/antigravity-cli/brain"),
+            Path(".gemini/antigravity-cli/cache"),
+            Path(".gemini/antigravity-cli/conversations"),
+            Path(".gemini/antigravity-cli/crashes"),
+            Path(".gemini/antigravity-cli/implicit"),
+            Path(".gemini/antigravity-cli/knowledge"),
+            Path(".gemini/antigravity-cli/log"),
+        ),
         "claude": (Path(".claude/projects"), Path(".claude/debug")),
         "codex": (Path(".codex/sessions"), Path(".codex/log")),
         "codex_qwen": (Path(".codex/sessions"), Path(".codex/log")),

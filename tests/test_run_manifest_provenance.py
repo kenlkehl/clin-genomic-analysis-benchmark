@@ -142,6 +142,43 @@ def test_codex_provenance_resolves_profile_over_base_config(tmp_path):
     assert "CODEX_HOME" not in provenance["environment"]
 
 
+def test_antigravity_provenance_records_pinned_variant_without_secrets(tmp_path):
+    (tmp_path / "settings.json").write_text(json.dumps({
+        "gcp": {"project": "settings-project", "location": "us"},
+        "trustedWorkspaces": ["/secret/gold"],
+    }))
+    provenance = _agent_provenance(
+        "bash adapters/antigravity_gemini/run.sh",
+        environ={
+            "CLINGEN_AGY_CONFIG_DIR": str(tmp_path),
+            "AGY_MODEL": "gemini-3.6-flash-high",
+            "AGY_EFFORT": "medium",
+            "AGY_MODE": "accept-edits",
+            "GOOGLE_APPLICATION_CREDENTIALS": "/secret/credential.json",
+        },
+    )
+
+    assert provenance["adapter"] == "antigravity_gemini"
+    assert provenance["provider"] == "google_antigravity"
+    assert provenance["model"] == "gemini-3.6-flash-high"
+    assert provenance["model_source"] == "AGY_MODEL"
+    assert provenance["effort_level"] == "medium"
+    assert provenance["effort_supported"] is True
+    assert provenance["effort_source"] == "AGY_EFFORT"
+    assert provenance["project_id"] == "settings-project"
+    assert provenance["region"] == "us"
+    assert provenance["mode"] == "accept-edits"
+    assert provenance["cli_auto_update"] is False
+    assert provenance["environment"] == {
+        "AGY_MODEL": "gemini-3.6-flash-high",
+        "AGY_EFFORT": "medium",
+        "AGY_MODE": "accept-edits",
+    }
+    serialized = json.dumps(provenance)
+    assert "credential.json" not in serialized
+    assert "/secret/gold" not in serialized
+
+
 def test_non_claude_adapter_only_gets_allowlisted_environment():
     provenance = _agent_provenance(
         "bash adapters/custom/run.sh",

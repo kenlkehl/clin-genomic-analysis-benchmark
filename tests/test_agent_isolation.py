@@ -135,6 +135,107 @@ def test_codex_home_excludes_projects_and_session_history(tmp_path):
         assert not (sandbox_home / ".codex/history.jsonl").exists()
 
 
+def test_antigravity_home_excludes_persistent_agent_state(tmp_path):
+    cohort, dictionary, scratch = _mounts(tmp_path)
+    source = tmp_path / "host-antigravity"
+    (source / "cache").mkdir(parents=True)
+    (source / "conversations").mkdir()
+    (source / "brain").mkdir()
+    (source / "settings.json").write_text(json.dumps({
+        "model": "old model",
+        "gcp": {"project": "settings-project", "location": "us"},
+        "trustedWorkspaces": ["/host/path/with/answers"],
+        "permissions": {"allow": ["Shell(*)"]},
+        "allowNonWorkspaceAccess": True,
+    }))
+    (source / "cache/onboarding.json").write_text(json.dumps({
+        "enterpriseOnboardingComplete": True,
+        "unrelated": "do not copy",
+    }))
+    (source / "history.jsonl").write_text("prior session")
+    (source / "conversations/prior.db").write_text("prior conversation")
+    (source / "brain/gold.txt").write_text("prior memory")
+
+    with isolation.sandboxed_agent_command(
+        ["/usr/bin/true"],
+        cohort_dir=cohort,
+        data_dictionary_path=dictionary,
+        scratch_dir=scratch,
+        environment={
+            "CLINGEN_AGY_CONFIG_DIR": str(source),
+            "AGY_MODEL": "gemini-3.6-flash-high",
+            "AGY_GCP_PROJECT": "explicit-project",
+            "AGY_GCP_LOCATION": "global",
+        },
+        home_kind="antigravity",
+    ) as launch:
+        config_root = launch.host_ephemeral_home / ".gemini/antigravity-cli"
+        settings = json.loads((config_root / "settings.json").read_text())
+        assert settings == {
+            "allowNonWorkspaceAccess": False,
+            "artifactReviewPolicy": "always-proceed",
+            "enableTerminalSandbox": True,
+            "enableTelemetry": False,
+            "toolPermission": "proceed-in-sandbox",
+            "permissions": {
+                "allow": ["command(*)"],
+                "ask": [],
+                "deny": [
+                    "unsandboxed(*)",
+                    "read_file(/home/agent/.gemini)",
+                    "read_file(/home/agent/.config/gcloud)",
+                    "read_url(*)",
+                    "execute_url(*)",
+                    "mcp(*)",
+                ],
+            },
+            "trustedWorkspaces": ["/work"],
+            "model": "gemini-3.6-flash-high",
+            "gcp": {"project": "explicit-project", "location": "global"},
+        }
+        onboarding = json.loads((config_root / "cache/onboarding.json").read_text())
+        assert onboarding == {"enterpriseOnboardingComplete": True}
+        assert not (config_root / "history.jsonl").exists()
+        assert not (config_root / "conversations").exists()
+        assert not (config_root / "brain").exists()
+        assert "/host/path/with/answers" not in json.dumps(settings)
+
+
+def test_antigravity_gets_only_its_oauth_file_fallback(tmp_path, monkeypatch):
+    cohort, dictionary, scratch = _mounts(tmp_path)
+    profile = json.dumps({
+        "auth_method": "oauth",
+        "token": {
+            "access_token": "test-access",
+            "refresh_token": "test-refresh",
+        },
+    }).encode()
+    monkeypatch.setattr(
+        isolation,
+        "_lookup_antigravity_keyring_secret",
+        lambda source_env: profile,
+    )
+
+    with isolation.sandboxed_agent_command(
+        ["/usr/bin/true"],
+        cohort_dir=cohort,
+        data_dictionary_path=dictionary,
+        scratch_dir=scratch,
+        environment={
+            "AGY_MODEL": "gemini-3.6-flash-high",
+            "DBUS_SESSION_BUS_ADDRESS": "unix:path=/host/session/bus",
+        },
+        home_kind="antigravity",
+    ) as launch:
+        token_file = (
+            launch.host_ephemeral_home
+            / ".gemini/antigravity-cli/antigravity-oauth-token"
+        )
+        assert token_file.read_bytes() == profile
+        assert token_file.stat().st_mode & 0o777 == 0o600
+        assert "DBUS_SESSION_BUS_ADDRESS" not in launch.environment
+
+
 def test_preflight_and_forbidden_marker_audit(tmp_path):
     assert isolation.run_isolation_preflight()["passed"] is True
     clean = tmp_path / "clean"
@@ -161,3 +262,8 @@ def test_unregistered_adapter_fails_closed():
         isolation.require_supported_adapter(
             "evil-agent --label adapters/claude_code/run.sh"
         )
+
+
+def test_antigravity_adapter_is_registered():
+    command = "bash adapters/antigravity_gemini/run.sh"
+    assert isolation.require_supported_adapter(command) == "antigravity_gemini"

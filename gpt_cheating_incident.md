@@ -6,7 +6,7 @@
 **Severity:** High for benchmark validity  
 
 **Remediation update (2026-08-05):** The repository now has a mandatory,
-fail-closed `bubblewrap` boundary for the Claude Code and Codex adapters,
+fail-closed `bubblewrap` boundary for the Claude Code, Codex, and Antigravity adapters,
 gold-free retry staging, isolation preflight/postflight checks, preserved
 agent-session audit logs outside model-visible scratch, and integrity status in
 manifests/scorecards. The incident remains open until clean replacement runs
@@ -404,7 +404,7 @@ This incident can be closed when all of the following are true:
 1. The exact adapter subprocess cannot read the gold root or any prior
    scorecard, demonstrated by an automated test.
 2. Repair retries operate in a fresh, gold-free staging tree.
-3. Forbidden-path canary tests pass for both Codex and Claude adapters.
+3. Forbidden-path canary tests pass for every registered coding-agent adapter.
 4. Manifests and scorecards report integrity status and sandbox provenance.
 5. Full reruns complete without forbidden-access findings.
 6. Cross-model comparisons are regenerated only from the clean reruns.
