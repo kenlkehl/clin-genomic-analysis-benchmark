@@ -174,14 +174,13 @@ def test_antigravity_home_excludes_persistent_agent_state(tmp_path):
         assert settings == {
             "allowNonWorkspaceAccess": False,
             "artifactReviewPolicy": "always-proceed",
-            "enableTerminalSandbox": True,
+            "enableTerminalSandbox": False,
             "enableTelemetry": False,
-            "toolPermission": "proceed-in-sandbox",
+            "toolPermission": "always-proceed",
             "permissions": {
                 "allow": ["command(*)"],
                 "ask": [],
                 "deny": [
-                    "unsandboxed(*)",
                     "read_file(/home/agent/.gemini)",
                     "read_file(/home/agent/.config/gcloud)",
                     "read_url(*)",

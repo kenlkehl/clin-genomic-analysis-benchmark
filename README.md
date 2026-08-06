@@ -248,8 +248,9 @@ certified for benchmark runs.
 
 The reference Claude adapter builds a system prompt from
 `AGENT_INSTRUCTIONS.md`, then launches `claude` inside the outer namespace with
-its normal narrow tool allowlist. The Codex and Antigravity adapters use the
-same outer boundary plus their CLIs' internal sandboxes as defense in depth.
+its normal narrow tool allowlist. Codex also uses its CLI's internal sandbox as
+defense in depth. Antigravity relies on the outer boundary because its Linux
+`nsjail` cannot execute correctly when nested inside bubblewrap.
 
 Start from `adapters/template/`.
 

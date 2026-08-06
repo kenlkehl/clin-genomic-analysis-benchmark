@@ -46,7 +46,7 @@ availability can vary independently of the display names in documentation.
 | `AGY_MODE` | `accept-edits` | `accept-edits` or `plan` |
 | `AGY_BIN` | `agy` | Antigravity CLI executable used by trusted adapter code |
 | `AGY_CLI_DISABLE_AUTO_UPDATE` | forced to `true` | prevents the CLI binary changing during a benchmark run |
-| `AGY_USE_SANDBOX` | `1` | enable Antigravity's internal sandbox as defense in depth |
+| `AGY_USE_SANDBOX` | `0` | experimental nested Antigravity sandbox; leave disabled for benchmark runs |
 | `AGY_SKIP_PERMISSIONS` | `0` | emergency diagnostic override; avoid in benchmark runs because it bypasses Antigravity permission checks |
 | `AGY_PRINT_TIMEOUT_CLASSIFY` | `9m30s` | Antigravity print timeout for classify |
 | `AGY_PRINT_TIMEOUT_DISAMBIGUATE` | `4m30s` | Antigravity print timeout for disambiguate |
@@ -101,7 +101,9 @@ are absent. Antigravity stdout, stderr, CLI logs, and generated session state ar
 preserved under each question's `adapter_audit/` directory after the process
 exits; they are outside the mount used by later stages.
 
-The disposable settings use Antigravity's `proceed-in-sandbox` policy. Normal
-sandboxed analysis commands are allowed, while unsandboxed commands, web/MCP
-tools, and reads of the disposable credential directories are explicitly
-denied. Do not enable `AGY_SKIP_PERMISSIONS` for scored runs.
+The disposable settings allow normal analysis commands while web/MCP tools and
+direct file-tool reads of the disposable credential directories are denied.
+The mandatory outer bubblewrap namespace is the authoritative containment
+boundary. Antigravity CLI 1.1.10's Linux `nsjail` cannot start its shell when
+nested inside that namespace, so `AGY_USE_SANDBOX` defaults off. Do not enable
+`AGY_SKIP_PERMISSIONS` for scored runs.

@@ -378,14 +378,16 @@ def _seed_antigravity_home(home: Path, source_env: Mapping[str, str]) -> None:
     settings: dict[str, Any] = {
         "allowNonWorkspaceAccess": False,
         "artifactReviewPolicy": "always-proceed",
-        "enableTerminalSandbox": True,
+        # Antigravity 1.1.10's Linux nsjail cannot start /usr/bin/bash when
+        # nested inside the mandatory outer bubblewrap namespace. The outer
+        # namespace is the benchmark's authoritative containment boundary.
+        "enableTerminalSandbox": False,
         "enableTelemetry": False,
-        "toolPermission": "proceed-in-sandbox",
+        "toolPermission": "always-proceed",
         "permissions": {
             "allow": ["command(*)"],
             "ask": [],
             "deny": [
-                "unsandboxed(*)",
                 "read_file(/home/agent/.gemini)",
                 "read_file(/home/agent/.config/gcloud)",
                 "read_url(*)",

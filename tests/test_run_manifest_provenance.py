@@ -169,6 +169,8 @@ def test_antigravity_provenance_records_pinned_variant_without_secrets(tmp_path)
     assert provenance["region"] == "us"
     assert provenance["mode"] == "accept-edits"
     assert provenance["cli_auto_update"] is False
+    assert provenance["inner_sandbox"] is False
+    assert provenance["inner_sandbox_source"] == "adapter_default"
     assert provenance["environment"] == {
         "AGY_MODEL": "gemini-3.6-flash-high",
         "AGY_EFFORT": "medium",

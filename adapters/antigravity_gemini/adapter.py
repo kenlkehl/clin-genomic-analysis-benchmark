@@ -385,7 +385,7 @@ def _agy_call(*, prompt: str, question: dict) -> str:
     agent = os.environ.get("AGY_AGENT", "").strip()
     if agent:
         cmd.extend(["--agent", agent])
-    if _env_truthy("AGY_USE_SANDBOX", True):
+    if _env_truthy("AGY_USE_SANDBOX", False):
         cmd.append("--sandbox")
     if _env_truthy("AGY_SKIP_PERMISSIONS", False):
         cmd.append("--dangerously-skip-permissions")

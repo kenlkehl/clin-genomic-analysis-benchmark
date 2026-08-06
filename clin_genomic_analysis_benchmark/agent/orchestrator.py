@@ -307,6 +307,12 @@ def _antigravity_provenance(
     ) if model_effort_match else None
     explicit_effort = env.get("AGY_EFFORT", "").strip().lower() or None
     effort = explicit_effort or model_effort
+    sandbox_value = env.get("AGY_USE_SANDBOX", "").strip().lower()
+    inner_sandbox = (
+        sandbox_value not in {"0", "false", "no", "off", ""}
+        if sandbox_value
+        else False
+    )
     gcp = settings.get("gcp") if isinstance(settings.get("gcp"), dict) else {}
     project = env.get("AGY_GCP_PROJECT", "").strip() or str(
         gcp.get("project", "")
@@ -344,6 +350,10 @@ def _antigravity_provenance(
         "mode_source": "AGY_MODE" if env.get("AGY_MODE", "").strip() else "adapter_default",
         "cli_auto_update": False,
         "cli_auto_update_source": "adapter_forced",
+        "inner_sandbox": inner_sandbox,
+        "inner_sandbox_source": (
+            "AGY_USE_SANDBOX" if sandbox_value else "adapter_default"
+        ),
     }
     agent = env.get("AGY_AGENT", "").strip()
     if agent:
