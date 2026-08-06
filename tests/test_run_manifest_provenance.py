@@ -142,6 +142,32 @@ def test_codex_provenance_resolves_profile_over_base_config(tmp_path):
     assert "CODEX_HOME" not in provenance["environment"]
 
 
+def test_codex_vertex_gemma_provenance_is_fixed_and_records_project():
+    provenance = _agent_provenance(
+        "bash adapters/codex_vertex_gemma4_26b/run.sh",
+        environ={
+            "VERTEX_GEMMA_PROJECT_ID": "benchmark-project",
+            "VERTEX_GEMMA_LOCATION": "global",
+            # This user Codex setting must not misdescribe the fixed adapter.
+            "CODEX_REASONING_EFFORT": "xhigh",
+        },
+    )
+
+    assert provenance["adapter"] == "codex_vertex_gemma4_26b"
+    assert provenance["provider"] == "google_vertex_agent_platform"
+    assert provenance["model"] == "google/gemma-4-26b-a4b-it-maas"
+    assert provenance["effort_level"] is None
+    assert provenance["effort_supported"] is False
+    assert provenance["project_id"] == "benchmark-project"
+    assert provenance["region"] == "global"
+    assert provenance["api_translation"] == "openai_responses_to_chat_completions"
+    assert provenance["context_window_tokens"] == 262_144
+    assert provenance["environment"] == {
+        "VERTEX_GEMMA_PROJECT_ID": "benchmark-project",
+        "VERTEX_GEMMA_LOCATION": "global",
+    }
+
+
 def test_antigravity_provenance_records_pinned_variant_without_secrets(tmp_path):
     (tmp_path / "settings.json").write_text(json.dumps({
         "gcp": {"project": "settings-project", "location": "us"},

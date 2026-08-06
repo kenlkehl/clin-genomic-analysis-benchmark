@@ -17,7 +17,7 @@ All six cohorts are wired end to end. The reference adapter drives Claude Code o
 | Agent-facing bank | `questions/<cohort>.yaml` — `id`, `category`, `text` only. This is everything the agent under test ever sees |
 | Gold bank | `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` — answers, canonical concept IDs, classifications, and audit prose. Read by the scorer, never by the agent |
 | Agent guidance | `AGENT_INSTRUCTIONS.md` — served verbatim to the agent by the reference adapter |
-| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/antigravity_gemini/` (Gemini through Antigravity CLI), `adapters/template/` to write your own |
+| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_vertex_gemma4_26b/` (Codex with Gemma 4 26B on Vertex Agent Platform), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/antigravity_gemini/` (Gemini through Antigravity CLI), `adapters/template/` to write your own |
 
 ### Keeping the answers away from the agent
 
@@ -249,7 +249,7 @@ $ <your_agent> --question-file question.json --output result.json
 The harness contract remains model- and framework-agnostic, but a coding-agent
 adapter must put every model-controlled subprocess through
 `agent.isolation.sandboxed_agent_command` and be added to the sandboxed-adapter
-registry. Unregistered adapters fail closed. Claude Code, both Codex adapters,
+registry. Unregistered adapters fail closed. Claude Code, all Codex adapters,
 and Antigravity are registered; the template adapter is intentionally not
 certified for benchmark runs.
 

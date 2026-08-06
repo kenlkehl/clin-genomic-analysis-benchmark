@@ -62,6 +62,7 @@ _SUPPORTED_ADAPTER_DIRS = {
     "antigravity_gemini",
     "claude_code",
     "codex_gpt",
+    "codex_vertex_gemma4_26b",
     "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl",
 }
 
@@ -136,6 +137,9 @@ _PASSTHROUGH_ENV = {
     "VLLM_TOKEN",
     "UNSLOTH_STUDIO_AUTH_TOKEN",
     "API_TOKEN",
+    # Ephemeral bearer token for the trusted localhost Vertex protocol bridge.
+    # This is not a Google credential and is generated per Codex invocation.
+    "VERTEX_GEMMA_BRIDGE_KEY",
     # Anthropic and Google Vertex.
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_AUTH_TOKEN",
@@ -301,6 +305,25 @@ def _seed_codex_home(home: Path, source_env: Mapping[str, str]) -> None:
     auth = source_home / "auth.json"
     if auth.is_file():
         shutil.copy2(auth, codex_home / "auth.json")
+
+
+def _seed_codex_vertex_home(home: Path, source_env: Mapping[str, str]) -> None:
+    """Create a clean Codex home for a provider authenticated by its bridge.
+
+    The Vertex bridge supplies its own ephemeral ``env_key`` configuration on
+    the command line. It neither needs nor receives the user's Codex/OpenAI
+    auth file or unrelated persistent Codex configuration.
+    """
+    codex_home = home / ".codex"
+    codex_home.mkdir(parents=True, exist_ok=True)
+    model = source_env.get("CODEX_MODEL", "google/gemma-4-26b-a4b-it-maas")
+    provider = source_env.get(
+        "CODEX_MODEL_PROVIDER", "google_vertex_agent_platform"
+    )
+    (codex_home / "config.toml").write_text(
+        f"model = {_toml_value(model)}\n"
+        f"model_provider = {_toml_value(provider)}\n"
+    )
 
 
 def _seed_claude_home(home: Path, source_env: Mapping[str, str]) -> None:
@@ -531,6 +554,8 @@ def _seed_home(home: Path, kind: str, source_env: Mapping[str, str]) -> None:
         (home / relative).mkdir(parents=True, exist_ok=True)
     if kind in {"codex", "codex_qwen"}:
         _seed_codex_home(home, source_env)
+    elif kind == "codex_vertex":
+        _seed_codex_vertex_home(home, source_env)
     elif kind == "claude":
         _seed_claude_home(home, source_env)
     elif kind == "antigravity":
@@ -801,6 +826,7 @@ def export_agent_session_audit(
         "claude": (Path(".claude/projects"), Path(".claude/debug")),
         "codex": (Path(".codex/sessions"), Path(".codex/log")),
         "codex_qwen": (Path(".codex/sessions"), Path(".codex/log")),
+        "codex_vertex": (Path(".codex/sessions"), Path(".codex/log")),
     }.get(home_kind, ())
     copied: list[Path] = []
     total = 0

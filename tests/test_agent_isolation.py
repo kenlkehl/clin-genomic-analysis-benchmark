@@ -142,6 +142,37 @@ def test_codex_home_excludes_projects_and_session_history(tmp_path):
         assert not (sandbox_home / ".codex/history.jsonl").exists()
 
 
+def test_codex_vertex_home_excludes_user_config_and_auth(tmp_path):
+    cohort, dictionary, scratch = _mounts(tmp_path)
+    source_home = tmp_path / "host-codex"
+    source_home.mkdir()
+    (source_home / "config.toml").write_text(
+        'model = "private-model"\n'
+        '[projects."/host/path/with/answers"]\n'
+        'trust_level = "trusted"\n'
+    )
+    (source_home / "auth.json").write_text('{"tokens":"must-not-copy"}')
+
+    with isolation.sandboxed_agent_command(
+        ["/usr/bin/true"],
+        cohort_dir=cohort,
+        data_dictionary_path=dictionary,
+        scratch_dir=scratch,
+        environment={
+            "CODEX_HOME": str(source_home),
+            "CODEX_MODEL": "google/gemma-4-26b-a4b-it-maas",
+            "CODEX_MODEL_PROVIDER": "google_vertex_agent_platform",
+        },
+        home_kind="codex_vertex",
+    ) as launch:
+        config = (launch.host_ephemeral_home / ".codex/config.toml").read_text()
+        assert "google/gemma-4-26b-a4b-it-maas" in config
+        assert "google_vertex_agent_platform" in config
+        assert "private-model" not in config
+        assert "/host/path/with/answers" not in config
+        assert not (launch.host_ephemeral_home / ".codex/auth.json").exists()
+
+
 def test_antigravity_home_excludes_persistent_agent_state(tmp_path):
     cohort, dictionary, scratch = _mounts(tmp_path)
     source = tmp_path / "host-antigravity"

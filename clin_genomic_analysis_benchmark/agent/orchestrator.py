@@ -112,6 +112,15 @@ _SAFE_AGENT_ENV_VARS = (
     "CODEX_REASONING_EFFORT",
     "CODEX_PROFILE",
     "CODEX_SANDBOX_MODE",
+    "VERTEX_GEMMA_PROJECT_ID",
+    "VERTEX_GEMMA_LOCATION",
+    "VERTEX_GEMMA_MODEL",
+    "VERTEX_GEMMA_REQUEST_TIMEOUT_SECONDS",
+    "VERTEX_GEMMA_MAX_RETRIES",
+    "VERTEX_GEMMA_RETRY_BASE_SECONDS",
+    "VERTEX_GEMMA_MAX_RETRY_SLEEP_SECONDS",
+    "VERTEX_GEMMA_MAX_OUTPUT_TOKENS",
+    "VERTEX_GEMMA_MAX_REQUESTS",
     "AGY_MODEL",
     "AGY_EFFORT",
     "AGY_AGENT",
@@ -226,6 +235,38 @@ def _codex_provenance(
             "CODEX_PROFILE" if explicit_profile_name else "codex_user_config"
         )
     return provenance
+
+
+def _vertex_gemma_provenance(
+    *, agent_cmd: str, env: Mapping[str, str]
+) -> dict | None:
+    """Resolve the fixed Codex/Vertex Gemma adapter without user Codex config."""
+    if "adapters/codex_vertex_gemma4_26b/" not in agent_cmd:
+        return None
+    model = env.get("VERTEX_GEMMA_MODEL", "").strip()
+    project = env.get("VERTEX_GEMMA_PROJECT_ID", "").strip()
+    location = env.get("VERTEX_GEMMA_LOCATION", "").strip()
+    return {
+        "adapter": "codex_vertex_gemma4_26b",
+        "provider": "google_vertex_agent_platform",
+        "provider_source": "adapter",
+        "model": model or "google/gemma-4-26b-a4b-it-maas",
+        "model_source": "VERTEX_GEMMA_MODEL" if model else "adapter_default",
+        "effort_level": None,
+        "effort_supported": False,
+        "effort_source": "unsupported_by_model",
+        "project_id": project or None,
+        "project_id_source": (
+            "VERTEX_GEMMA_PROJECT_ID" if project else "unresolved_required_setting"
+        ),
+        "region": location or "global",
+        "region_source": (
+            "VERTEX_GEMMA_LOCATION" if location else "adapter_default"
+        ),
+        "api_translation": "openai_responses_to_chat_completions",
+        "authentication_boundary": "trusted_local_bridge",
+        "context_window_tokens": 262_144,
+    }
 
 
 def _claude_effort_provenance(
@@ -376,6 +417,16 @@ def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) 
         if env.get(name, "").strip()
     }
     provenance: dict = {"environment": explicit_env}
+
+    vertex_gemma = _vertex_gemma_provenance(agent_cmd=agent_cmd, env=env)
+    if vertex_gemma is not None:
+        provenance["environment"] = {
+            name: value
+            for name, value in explicit_env.items()
+            if name.startswith("VERTEX_GEMMA_")
+        }
+        provenance.update(vertex_gemma)
+        return provenance
 
     codex = _codex_provenance(
         agent_cmd=agent_cmd,

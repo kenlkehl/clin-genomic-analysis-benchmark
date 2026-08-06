@@ -101,6 +101,7 @@ def test_aggregate_runs_includes_only_active_two_level_scorecards(
     }
     assert rows[1]["overall_score_pct"] == "62.5"
     assert rows[1]["disambiguate_score_pct"] == ""
+    assert b"\r\n" not in output_path.read_bytes()
 
 
 def test_aggregate_runs_rejects_malformed_scorecard(tmp_path: Path) -> None:

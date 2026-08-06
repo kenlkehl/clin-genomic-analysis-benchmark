@@ -214,11 +214,30 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
     except AgentIsolationError as exc:
         raise click.ClickException(f"agent isolation failed: {exc}") from exc
     click.echo(f"Eval written to {run_dir}")
+    from .config import SCORING_CONFIG_DIR
+    from .scoring.driver import score_run
+
+    cfg_path = SCORING_CONFIG_DIR / "default.yaml"
+    if not cfg_path.exists():
+        cfg_path = None
+
+    def score_completed_run(path: Path) -> None:
+        try:
+            scored_dir = score_run(
+                run_path=str(path),
+                scoring_config_path=cfg_path,
+            )
+        except (FileNotFoundError, ValueError) as exc:
+            raise click.ClickException(
+                f"Eval completed at {path}, but automatic scoring failed: {exc}"
+            ) from exc
+        click.echo(f"Scorecard: {scored_dir / 'scorecard.md'}")
+
     if not retry_failures:
+        score_completed_run(run_dir)
         return
 
     from .agent.repair import plan_failed_run, retry_failed_run_until_stable
-    from .config import SCORING_CONFIG_DIR
 
     try:
         _, repair_targets = plan_failed_run(run_dir)
@@ -228,12 +247,10 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
         ) from exc
     if not repair_targets:
         click.echo("Post-run repair: no score-relevant technical failures.")
+        score_completed_run(run_dir)
         return
 
     click.echo(f"Post-run repair: retrying {len(repair_targets)} failed question(s).")
-    cfg_path = SCORING_CONFIG_DIR / "default.yaml"
-    if not cfg_path.exists():
-        cfg_path = None
     try:
         timeout_overrides = {
             stage: value

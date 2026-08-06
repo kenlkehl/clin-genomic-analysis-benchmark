@@ -53,11 +53,47 @@ def test_eval_automatically_repairs_score_relevant_failures(tmp_path, monkeypatc
     assert calls[0]["max_repair_passes"] == 3
 
 
+def test_eval_automatically_scores_clean_run(tmp_path, monkeypatch):
+    from clin_genomic_analysis_benchmark.agent import orchestrator, repair
+    from clin_genomic_analysis_benchmark.scoring import driver
+
+    run_dir = tmp_path / "runs" / "agent" / "clean-run"
+    monkeypatch.setattr(orchestrator, "run_eval", lambda **kwargs: run_dir)
+    monkeypatch.setattr(repair, "plan_failed_run", lambda path: (run_dir, []))
+    calls = []
+
+    def fake_score_run(**kwargs):
+        calls.append(kwargs)
+        return run_dir
+
+    monkeypatch.setattr(driver, "score_run", fake_score_run)
+
+    result = CliRunner().invoke(cli, [
+        "eval",
+        "--agent", "fake-agent",
+        "--agent-name", "agent",
+    ])
+
+    assert result.exit_code == 0, result.output
+    assert "Post-run repair: no score-relevant technical failures." in result.output
+    assert f"Scorecard: {run_dir / 'scorecard.md'}" in result.output
+    assert len(calls) == 1
+    assert calls[0]["run_path"] == str(run_dir)
+    assert calls[0]["scoring_config_path"].name == "default.yaml"
+
+
 def test_eval_can_explicitly_disable_post_run_repair(tmp_path, monkeypatch):
     from clin_genomic_analysis_benchmark.agent import orchestrator, repair
+    from clin_genomic_analysis_benchmark.scoring import driver
 
     run_dir = tmp_path / "raw-run"
     monkeypatch.setattr(orchestrator, "run_eval", lambda **kwargs: run_dir)
+    score_calls = []
+    monkeypatch.setattr(
+        driver,
+        "score_run",
+        lambda **kwargs: score_calls.append(kwargs) or run_dir,
+    )
 
     def unexpected_plan(path):
         raise AssertionError("repair planning should be disabled")
@@ -74,3 +110,5 @@ def test_eval_can_explicitly_disable_post_run_repair(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert f"Eval written to {run_dir}" in result.output
     assert "Post-run repair" not in result.output
+    assert f"Scorecard: {run_dir / 'scorecard.md'}" in result.output
+    assert score_calls[0]["run_path"] == str(run_dir)

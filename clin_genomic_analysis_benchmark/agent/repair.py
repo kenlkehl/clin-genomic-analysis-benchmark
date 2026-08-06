@@ -256,6 +256,13 @@ def _restored_agent_environment(original: dict) -> dict[str, str]:
             env["CLAUDE_CODE_USE_VERTEX"] = "0"
         if original.get("effort_supported") and original.get("effort_level"):
             env["CLINGEN_CLAUDE_EFFORT"] = str(original["effort_level"])
+    elif adapter == "codex_vertex_gemma4_26b":
+        if original.get("model"):
+            env["VERTEX_GEMMA_MODEL"] = str(original["model"])
+        if original.get("project_id"):
+            env["VERTEX_GEMMA_PROJECT_ID"] = str(original["project_id"])
+        if original.get("region"):
+            env["VERTEX_GEMMA_LOCATION"] = str(original["region"])
     elif str(adapter or "").startswith("codex_"):
         if original.get("model"):
             env["CODEX_MODEL"] = str(original["model"])

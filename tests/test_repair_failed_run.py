@@ -453,3 +453,20 @@ def test_repair_loop_continues_on_progress_until_complete(tmp_path, monkeypatch)
     assert calls[0]["output_run_id"] == "loop-output"
     assert calls[1]["output_run_id"] == "loop-output-pass2"
     assert calls[1]["timeout_overrides"] == {"disambiguate": 900}
+
+
+def test_repair_restores_vertex_gemma_settings(monkeypatch):
+    monkeypatch.setattr(repair.os, "environ", {})
+    restored = repair._restored_agent_environment({
+        "adapter": "codex_vertex_gemma4_26b",
+        "provider": "google_vertex_agent_platform",
+        "model": "google/gemma-4-26b-a4b-it-maas",
+        "project_id": "benchmark-project",
+        "region": "global",
+        "effort_level": None,
+    })
+
+    assert restored["VERTEX_GEMMA_MODEL"] == "google/gemma-4-26b-a4b-it-maas"
+    assert restored["VERTEX_GEMMA_PROJECT_ID"] == "benchmark-project"
+    assert restored["VERTEX_GEMMA_LOCATION"] == "global"
+    assert "CODEX_REASONING_EFFORT" not in restored
