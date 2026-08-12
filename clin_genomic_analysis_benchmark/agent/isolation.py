@@ -65,6 +65,7 @@ _SUPPORTED_ADAPTER_DIRS = {
     "codex_vllm_gemma4_31b",
     "codex_vertex_gemma4_26b",
     "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl",
+    "codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl",
     "opencode_vllm_gemma4_31b",
 }
 

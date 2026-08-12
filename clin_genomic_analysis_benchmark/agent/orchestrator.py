@@ -162,6 +162,11 @@ _ADAPTER_TIMEOUTS = {
         disambiguate=3_600,
         analyze=7_200,
     ),
+    "codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl": TimeoutConfig(
+        classify=3_600,
+        disambiguate=3_600,
+        analyze=7_200,
+    ),
 }
 
 
@@ -396,13 +401,31 @@ def _unsloth_qwen_provenance(
     *, agent_cmd: str, env: Mapping[str, str]
 ) -> dict | None:
     """Resolve the pinned Qwen/Unsloth adapter without user Codex config."""
-    adapter = "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl"
-    if f"adapters/{adapter}/" not in agent_cmd:
+    adapters = {
+        "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl": {
+            "model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+            "provider": "local_unsloth_qwen3_6_35b_a3b",
+        },
+        "codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl": {
+            "model": "unsloth/Qwen3.6-27B-MTP-GGUF",
+            "provider": "local_unsloth_qwen3_6_27b",
+        },
+    }
+    selected = next(
+        (
+            (adapter, config)
+            for adapter, config in adapters.items()
+            if f"adapters/{adapter}/" in agent_cmd
+        ),
+        None,
+    )
+    if selected is None:
         return None
+    adapter, adapter_config = selected
     model = (
         env.get("UNSLOTH_MODEL", "").strip()
         or env.get("CODEX_MODEL", "").strip()
-        or "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
+        or adapter_config["model"]
     )
     base_url = (
         env.get("UNSLOTH_STUDIO_BASE_URL", "").strip()
@@ -412,7 +435,7 @@ def _unsloth_qwen_provenance(
         base_url += "/v1"
     return {
         "adapter": adapter,
-        "provider": "local_unsloth_qwen3_6_35b_a3b",
+        "provider": adapter_config["provider"],
         "provider_source": "adapter",
         "model": model,
         "model_source": (

@@ -46,6 +46,7 @@ from clin_genomic_analysis_benchmark.agent.contract import validate_result  # no
 
 
 PROVIDER_NAME = "local_unsloth_qwen3_6_35b_a3b"
+PROVIDER_DISPLAY_NAME = "Local Unsloth Studio (Qwen 3.6 35B-A3B)"
 DEFAULT_MODEL = "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
 DEFAULT_BASE_URL = "http://127.0.0.1:8888/v1"
 MODEL_CONTEXT_WINDOW = 262_144
@@ -408,9 +409,7 @@ def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
         )
         with UnslothResponsesBridge(config, audit_path=audit_path) as bridge:
             attempt_cmd = [*cmd]
-            attempt_cmd += _provider_override(
-                "name", "Local Unsloth Studio (Qwen 3.6 35B-A3B)"
-            )
+            attempt_cmd += _provider_override("name", PROVIDER_DISPLAY_NAME)
             attempt_cmd += _provider_override("base_url", bridge.base_url)
             attempt_cmd += _provider_override("env_key", BRIDGE_TOKEN_ENV)
             attempt_cmd += _provider_override("wire_api", "responses")
