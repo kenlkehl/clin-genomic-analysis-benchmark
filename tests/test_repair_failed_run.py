@@ -428,8 +428,29 @@ def test_repair_loop_continues_on_progress_until_complete(tmp_path, monkeypatch)
         calls.append(kwargs)
         repaired = pass_one if len(calls) == 1 else pass_two
         target = target_one if len(calls) == 1 else target_two
+        source_for_pass = Path(kwargs["run_path"]).resolve()
+        source_manifest = json.loads(
+            (source_for_pass / "manifest.json").read_text()
+        )
+        history = list(source_manifest.get("repair_history") or [])
+        history.append({
+            "source_run": str(source_for_pass),
+            "source_hashes": {
+                "manifest.json": repair._file_sha256(
+                    source_for_pass / "manifest.json"
+                ),
+                "runs.json": repair._file_sha256(source_for_pass / "runs.json"),
+            },
+        })
+        repaired.mkdir()
+        (repaired / "manifest.json").write_text(json.dumps({
+            "run_id": repaired.name,
+            "derived_from_run": str(source_for_pass),
+            "repair_history": history,
+        }))
+        (repaired / "runs.json").write_text("[]")
         return repair.RepairSummary(
-            source_run_dir=Path(kwargs["run_path"]).resolve(),
+            source_run_dir=source_for_pass,
             repaired_run_dir=repaired.resolve(),
             targets=(target,),
             successful_merges=1,
@@ -438,6 +459,12 @@ def test_repair_loop_continues_on_progress_until_complete(tmp_path, monkeypatch)
 
     monkeypatch.setattr(repair, "plan_failed_run", fake_plan)
     monkeypatch.setattr(repair, "retry_failed_run", fake_retry)
+    scored = []
+    monkeypatch.setattr(
+        repair,
+        "score_run",
+        lambda **kwargs: scored.append(kwargs) or kwargs["run_path"],
+    )
 
     result = repair.retry_failed_run_until_stable(
         run_path=source,
@@ -447,12 +474,104 @@ def test_repair_loop_continues_on_progress_until_complete(tmp_path, monkeypatch)
     )
 
     assert result.stop_reason == "complete"
+    archive = tmp_path / "pre_repair"
+    archived_source = archive / source.name
+    archived_pass_one = archive / pass_one.name
+    assert result.source_run_dir == archived_source
     assert result.final_run_dir == pass_two.resolve()
     assert result.remaining_targets == ()
     assert len(result.passes) == 2
+    assert result.passes[0].source_run_dir == archived_source
+    assert result.passes[0].repaired_run_dir == archived_pass_one
+    assert result.passes[1].source_run_dir == archived_pass_one
+    assert result.passes[1].repaired_run_dir == pass_two.resolve()
+    assert archived_source.is_dir()
+    assert archived_pass_one.is_dir()
+    assert not source.exists()
+    assert not pass_one.exists()
     assert calls[0]["output_run_id"] == "loop-output"
     assert calls[1]["output_run_id"] == "loop-output-pass2"
     assert calls[1]["timeout_overrides"] == {"disambiguate": 900}
+    assert scored == [{
+        "run_path": str(pass_two.resolve()),
+        "scoring_config_path": None,
+    }]
+
+    final_manifest = json.loads((pass_two / "manifest.json").read_text())
+    assert final_manifest["derived_from_run"] == str(archived_pass_one)
+    assert [entry["source_run"] for entry in final_manifest["repair_history"]] == [
+        str(archived_source),
+        str(archived_pass_one),
+    ]
+    assert final_manifest["repair_history"][-1]["source_hashes"][
+        "manifest.json"
+    ] == repair._file_sha256(archived_pass_one / "manifest.json")
+
+
+def test_archive_pre_final_runs_includes_legacy_top_level_ancestors(tmp_path):
+    agent_dir = tmp_path / "agent"
+    raw = agent_dir / "raw"
+    pass_one = agent_dir / "pass-one"
+    source = agent_dir / "pass-two"
+    final = agent_dir / "pass-three"
+
+    def write_run(path, parent=None):
+        path.mkdir(parents=True)
+        history = []
+        if parent is not None:
+            parent_manifest = json.loads((parent / "manifest.json").read_text())
+            history = list(parent_manifest.get("repair_history") or [])
+            history.append({
+                "source_run": str(parent),
+                "source_hashes": {
+                    "manifest.json": repair._file_sha256(parent / "manifest.json"),
+                    "runs.json": repair._file_sha256(parent / "runs.json"),
+                },
+            })
+        (path / "manifest.json").write_text(json.dumps({
+            "run_id": path.name,
+            "derived_from_run": str(parent) if parent is not None else None,
+            "repair_history": history,
+        }))
+        (path / "runs.json").write_text("[]")
+
+    write_run(raw)
+    write_run(pass_one, raw)
+    write_run(source, pass_one)
+    write_run(final, source)
+    summary = repair.RepairSummary(source, final, (), 1, 0)
+
+    archived_source, summaries, final_dir = repair._archive_pre_final_runs(
+        source,
+        [summary],
+    )
+
+    archive = agent_dir / "pre_repair"
+    assert archived_source == archive / source.name
+    assert summaries[0].source_run_dir == archive / source.name
+    assert summaries[0].repaired_run_dir == final
+    assert final_dir == final
+    assert final.is_dir()
+    assert sorted(path.name for path in archive.iterdir()) == [
+        "pass-one",
+        "pass-two",
+        "raw",
+    ]
+    assert sorted(path.name for path in agent_dir.iterdir()) == [
+        "pass-three",
+        "pre_repair",
+    ]
+
+    final_manifest = json.loads((final / "manifest.json").read_text())
+    assert final_manifest["derived_from_run"] == str(archive / source.name)
+    assert [record["source_run"] for record in final_manifest["repair_history"]] == [
+        str(archive / raw.name),
+        str(archive / pass_one.name),
+        str(archive / source.name),
+    ]
+    assert final_manifest["repair_history"][-1]["source_hashes"][
+        "manifest.json"
+    ] == repair._file_sha256(archive / source.name / "manifest.json")
 
 
 def test_repair_restores_vertex_gemma_settings(monkeypatch):

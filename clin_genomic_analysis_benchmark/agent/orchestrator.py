@@ -112,6 +112,24 @@ _SAFE_AGENT_ENV_VARS = (
     "CODEX_REASONING_EFFORT",
     "CODEX_PROFILE",
     "CODEX_SANDBOX_MODE",
+    "VLLM_BASE_URL",
+    "VLLM_MODEL",
+    "VLLM_REQUEST_TIMEOUT_SECONDS",
+    "VLLM_MAX_RETRIES",
+    "VLLM_RETRY_BASE_SECONDS",
+    "VLLM_MAX_RETRY_SLEEP_SECONDS",
+    "VLLM_MAX_REQUESTS",
+    "OPENCODE_AGENT",
+    "OPENCODE_MAX_OUTPUT_TOKENS",
+    "OPENCODE_MAX_ATTEMPTS",
+    "OPENCODE_RETRY_BASE_SECONDS",
+    "UNSLOTH_STUDIO_BASE_URL",
+    "UNSLOTH_MODEL",
+    "UNSLOTH_REQUEST_TIMEOUT_SECONDS",
+    "UNSLOTH_MAX_RETRIES",
+    "UNSLOTH_RETRY_BASE_SECONDS",
+    "UNSLOTH_MAX_RETRY_SLEEP_SECONDS",
+    "UNSLOTH_MAX_REQUESTS",
     "VERTEX_GEMMA_PROJECT_ID",
     "VERTEX_GEMMA_LOCATION",
     "VERTEX_GEMMA_MODEL",
@@ -134,6 +152,22 @@ _SAFE_AGENT_ENV_VARS = (
     "AGY_PRINT_TIMEOUT_DISAMBIGUATE",
     "AGY_PRINT_TIMEOUT_ANALYZE",
 )
+
+
+_ADAPTER_TIMEOUTS = {
+    # This local model can spend several minutes on one generation and may make
+    # multiple tool-calling turns before returning the stage contract.
+    "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl": TimeoutConfig(
+        classify=3_600,
+        disambiguate=3_600,
+        analyze=7_200,
+    ),
+}
+
+
+def _timeout_config_for_adapter(adapter_name: str) -> TimeoutConfig:
+    """Return per-stage defaults, with narrow overrides for slow adapters."""
+    return _ADAPTER_TIMEOUTS.get(adapter_name, settings().timeouts)
 
 
 def _read_codex_config(path: Path) -> dict:
@@ -264,6 +298,141 @@ def _vertex_gemma_provenance(
             "VERTEX_GEMMA_LOCATION" if location else "adapter_default"
         ),
         "api_translation": "openai_responses_to_chat_completions",
+        "authentication_boundary": "trusted_local_bridge",
+        "context_window_tokens": 262_144,
+    }
+
+
+def _vllm_gemma_provenance(
+    *, agent_cmd: str, env: Mapping[str, str]
+) -> dict | None:
+    """Resolve the pinned local-vLLM Gemma adapter without user Codex config."""
+    if "adapters/codex_vllm_gemma4_31b/" not in agent_cmd:
+        return None
+    model = (
+        env.get("VLLM_MODEL", "").strip()
+        or env.get("CODEX_MODEL", "").strip()
+        or "gemma4-31b"
+    )
+    base_url = (
+        env.get("VLLM_BASE_URL", "").strip()
+        or "http://camus.dfci.harvard.edu:8002/v1"
+    ).rstrip("/")
+    if not base_url.endswith("/v1"):
+        base_url += "/v1"
+    return {
+        "adapter": "codex_vllm_gemma4_31b",
+        "provider": "local_vllm_gemma4_31b",
+        "provider_source": "adapter",
+        "model": model,
+        "model_source": (
+            "VLLM_MODEL"
+            if env.get("VLLM_MODEL", "").strip()
+            else "CODEX_MODEL"
+            if env.get("CODEX_MODEL", "").strip()
+            else "adapter_default"
+        ),
+        "effort_level": None,
+        "effort_supported": False,
+        "effort_source": "adapter_unset",
+        "base_url": base_url,
+        "base_url_source": (
+            "VLLM_BASE_URL"
+            if env.get("VLLM_BASE_URL", "").strip()
+            else "adapter_default"
+        ),
+        "wire_api": "responses",
+        "tool_call_compatibility": "trusted_local_gemma4_parser_bridge",
+        "authentication_boundary": "trusted_local_bridge",
+        "context_window_tokens": 262_144,
+    }
+
+
+def _opencode_vllm_gemma_provenance(
+    *, agent_cmd: str, env: Mapping[str, str]
+) -> dict | None:
+    """Resolve the pinned OpenCode/local-vLLM Gemma adapter."""
+    adapter = "opencode_vllm_gemma4_31b"
+    if f"adapters/{adapter}/" not in agent_cmd:
+        return None
+    model = env.get("VLLM_MODEL", "").strip() or "gemma4-31b"
+    base_url = (
+        env.get("VLLM_BASE_URL", "").strip()
+        or "http://camus.dfci.harvard.edu:8002/v1"
+    ).rstrip("/")
+    if not base_url.endswith("/v1"):
+        base_url += "/v1"
+    agent = env.get("OPENCODE_AGENT", "").strip()
+    output_tokens = env.get("OPENCODE_MAX_OUTPUT_TOKENS", "").strip()
+    return {
+        "adapter": adapter,
+        "client": "opencode",
+        "provider": "local_vllm_gemma4_31b",
+        "provider_source": "adapter",
+        "model": model,
+        "model_source": (
+            "VLLM_MODEL" if env.get("VLLM_MODEL", "").strip() else "adapter_default"
+        ),
+        "effort_level": None,
+        "effort_supported": False,
+        "effort_source": "unsupported_by_model",
+        "base_url": base_url,
+        "base_url_source": (
+            "VLLM_BASE_URL"
+            if env.get("VLLM_BASE_URL", "").strip()
+            else "adapter_default"
+        ),
+        "wire_api": "responses",
+        "tool_call_compatibility": "trusted_local_gemma4_parser_bridge",
+        "authentication_boundary": "trusted_local_bridge",
+        "context_window_tokens": 262_144,
+        "max_output_tokens": int(output_tokens) if output_tokens else 32_768,
+        "agent_profile": agent or "build",
+        "agent_profile_source": "OPENCODE_AGENT" if agent else "adapter_default",
+    }
+
+
+def _unsloth_qwen_provenance(
+    *, agent_cmd: str, env: Mapping[str, str]
+) -> dict | None:
+    """Resolve the pinned Qwen/Unsloth adapter without user Codex config."""
+    adapter = "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl"
+    if f"adapters/{adapter}/" not in agent_cmd:
+        return None
+    model = (
+        env.get("UNSLOTH_MODEL", "").strip()
+        or env.get("CODEX_MODEL", "").strip()
+        or "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
+    )
+    base_url = (
+        env.get("UNSLOTH_STUDIO_BASE_URL", "").strip()
+        or "http://127.0.0.1:8888/v1"
+    ).rstrip("/")
+    if not base_url.endswith("/v1"):
+        base_url += "/v1"
+    return {
+        "adapter": adapter,
+        "provider": "local_unsloth_qwen3_6_35b_a3b",
+        "provider_source": "adapter",
+        "model": model,
+        "model_source": (
+            "UNSLOTH_MODEL"
+            if env.get("UNSLOTH_MODEL", "").strip()
+            else "CODEX_MODEL"
+            if env.get("CODEX_MODEL", "").strip()
+            else "adapter_default"
+        ),
+        "effort_level": None,
+        "effort_supported": False,
+        "effort_source": "adapter_unset",
+        "base_url": base_url,
+        "base_url_source": (
+            "UNSLOTH_STUDIO_BASE_URL"
+            if env.get("UNSLOTH_STUDIO_BASE_URL", "").strip()
+            else "adapter_default"
+        ),
+        "wire_api": "responses",
+        "tool_call_compatibility": "unsloth_studio_native_responses",
         "authentication_boundary": "trusted_local_bridge",
         "context_window_tokens": 262_144,
     }
@@ -406,7 +575,7 @@ def _antigravity_provenance(
 def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) -> dict:
     """Capture reproducibility metadata from a strict, non-secret allow-list.
 
-    For supported Claude Code, Codex, and Antigravity adapters, also resolve
+    For supported Claude Code, Codex, OpenCode, and Antigravity adapters, resolve
     effective model configuration from explicit environment and non-secret
     config layers.
     """
@@ -417,6 +586,38 @@ def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) 
         if env.get(name, "").strip()
     }
     provenance: dict = {"environment": explicit_env}
+
+    opencode_vllm = _opencode_vllm_gemma_provenance(
+        agent_cmd=agent_cmd, env=env
+    )
+    if opencode_vllm is not None:
+        provenance["environment"] = {
+            name: value
+            for name, value in explicit_env.items()
+            if name.startswith("VLLM_") or name.startswith("OPENCODE_")
+        }
+        provenance.update(opencode_vllm)
+        return provenance
+
+    vllm_gemma = _vllm_gemma_provenance(agent_cmd=agent_cmd, env=env)
+    if vllm_gemma is not None:
+        provenance["environment"] = {
+            name: value
+            for name, value in explicit_env.items()
+            if name.startswith("VLLM_") or name == "CODEX_MODEL"
+        }
+        provenance.update(vllm_gemma)
+        return provenance
+
+    unsloth_qwen = _unsloth_qwen_provenance(agent_cmd=agent_cmd, env=env)
+    if unsloth_qwen is not None:
+        provenance["environment"] = {
+            name: value
+            for name, value in explicit_env.items()
+            if name.startswith("UNSLOTH_") or name == "CODEX_MODEL"
+        }
+        provenance.update(unsloth_qwen)
+        return provenance
 
     vertex_gemma = _vertex_gemma_provenance(agent_cmd=agent_cmd, env=env)
     if vertex_gemma is not None:
@@ -628,6 +829,7 @@ def run_eval(
 ) -> Path:
     """Run the harness against an agent. Returns the run directory."""
     adapter_name = require_supported_adapter(agent_cmd)
+    timeout_config = _timeout_config_for_adapter(adapter_name)
     sandbox = sandbox_backend_provenance()
     preflight = run_isolation_preflight()
     stages = stages or ["classify", "disambiguate", "analyze"]
@@ -685,6 +887,7 @@ def run_eval(
                 agent_max_attempts=agent_max_attempts,
                 agent_retry_base_seconds=agent_retry_base_seconds,
                 gold_classification=gold_cls.get((c.name, q.id)),
+                timeout_config=timeout_config,
             ))
     else:
         with ThreadPoolExecutor(max_workers=max_parallel) as pool:
@@ -692,7 +895,8 @@ def run_eval(
                                    run_dir=run_dir, stages=stages,
                                    agent_max_attempts=agent_max_attempts,
                                    agent_retry_base_seconds=agent_retry_base_seconds,
-                                   gold_classification=gold_cls.get((c.name, q.id)))
+                                   gold_classification=gold_cls.get((c.name, q.id)),
+                                   timeout_config=timeout_config)
                        for c, q in work]
             for fut in as_completed(futures):
                 runs.append(fut.result())
@@ -726,7 +930,7 @@ def run_eval(
         settings={
             "stages": stages,
             "max_parallel": max_parallel,
-            "timeouts": asdict(settings().timeouts),
+            "timeouts": asdict(timeout_config),
             "retries": {
                 "max_attempts": agent_max_attempts,
                 "base_delay_seconds": agent_retry_base_seconds,

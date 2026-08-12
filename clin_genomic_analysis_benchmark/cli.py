@@ -168,9 +168,12 @@ def compute_gold(cohort: str, max_repair_iters: int, only: str | None,
               help="Initial retry delay; subsequent delays use exponential backoff.")
 @click.option("--retry-failures/--no-retry-failures", default=True, show_default=True,
               help="After eval, repair score-relevant technical failures in a copied run.")
-@click.option("--repair-max-passes", default=3, type=click.IntRange(min=1),
+@click.option("--repair-max-passes", default=10, type=click.IntRange(min=1),
               show_default=True,
               help="Maximum automatic repair passes after the evaluation.")
+@click.option("--repair-agent-max-attempts", default=10,
+              type=click.IntRange(min=1), show_default=True,
+              help="Maximum attempts per failed stage in each automatic repair pass.")
 @click.option("--repair-max-parallel", default=2, type=click.IntRange(min=1),
               show_default=True,
               help="Maximum concurrent calls during automatic repair.")
@@ -186,7 +189,8 @@ def compute_gold(cohort: str, max_repair_iters: int, only: str | None,
 def eval(agent: str, agent_name: str, cohort: str, question: str | None,
          stages: str, max_parallel: int, agent_max_attempts: int,
          agent_retry_base_seconds: float, retry_failures: bool,
-         repair_max_passes: int, repair_max_parallel: int,
+         repair_max_passes: int, repair_agent_max_attempts: int,
+         repair_max_parallel: int,
          repair_classify_timeout: int | None,
          repair_disambiguate_timeout: int | None,
          repair_analyze_timeout: int | None,
@@ -265,7 +269,7 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
             run_path=run_dir,
             agent_cmd=agent,
             max_parallel=repair_max_parallel,
-            agent_max_attempts=agent_max_attempts,
+            agent_max_attempts=repair_agent_max_attempts,
             agent_retry_base_seconds=agent_retry_base_seconds,
             timeout_overrides=timeout_overrides,
             max_repair_passes=repair_max_passes,
@@ -296,13 +300,13 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
 @click.option("--agent", default=None,
               help="Override the source manifest's agent command.")
 @click.option("--max-parallel", default=2, type=click.IntRange(min=1), show_default=True)
-@click.option("--agent-max-attempts", default=3, type=click.IntRange(min=1),
+@click.option("--agent-max-attempts", default=10, type=click.IntRange(min=1),
               show_default=True,
-              help="Maximum attempts for each selected failed stage.")
+              help="Maximum attempts per selected failed stage in each repair pass.")
 @click.option("--agent-retry-base-seconds", default=5.0,
               type=click.FloatRange(min=0), show_default=True,
               help="Initial retry delay; subsequent delays use exponential backoff.")
-@click.option("--max-repair-passes", default=3, type=click.IntRange(min=1),
+@click.option("--max-repair-passes", default=10, type=click.IntRange(min=1),
               show_default=True,
               help="Stop after this many repair passes even if failures remain.")
 @click.option("--classify-timeout", default=None, type=click.IntRange(min=1),

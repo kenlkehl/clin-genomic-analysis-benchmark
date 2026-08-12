@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# Codex + Qwen 3.6 35B-A3B on local Unsloth Studio.
-#
-# Contract: invoked by the harness as
-#   run.sh --question-file <abs question.json> --output <abs result.json>
+# OpenCode adapter for Gemma 4 31B on the Camus vLLM server.
 
 set -euo pipefail
 
@@ -10,9 +7,13 @@ QFILE=""
 OUT=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    -h|--help)
+      echo "usage: run.sh --question-file PATH --output PATH"
+      exit 0
+      ;;
     --question-file) QFILE="$2"; shift 2 ;;
     --output)        OUT="$2";    shift 2 ;;
-    *) echo "codex adapter: unknown arg $1" >&2; exit 2 ;;
+    *) echo "opencode_vllm_gemma4_31b adapter: unknown arg $1" >&2; exit 2 ;;
   esac
 done
 if [[ -z "$QFILE" || -z "$OUT" ]]; then
@@ -21,9 +22,9 @@ if [[ -z "$QFILE" || -z "$OUT" ]]; then
 fi
 
 ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Ensure the codex CLI is reachable (Homebrew/Linuxbrew install path).
-if ! command -v codex >/dev/null 2>&1; then
-  export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+
+if ! command -v opencode >/dev/null 2>&1; then
+  export PATH="/home/linuxbrew/.linuxbrew/bin:$HOME/.local/bin:$PATH"
 fi
 
 exec python3 "$ADAPTER_DIR/adapter.py" --question-file "$QFILE" --output "$OUT"

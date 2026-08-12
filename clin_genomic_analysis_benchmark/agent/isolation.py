@@ -62,8 +62,10 @@ _SUPPORTED_ADAPTER_DIRS = {
     "antigravity_gemini",
     "claude_code",
     "codex_gpt",
+    "codex_vllm_gemma4_31b",
     "codex_vertex_gemma4_26b",
     "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl",
+    "opencode_vllm_gemma4_31b",
 }
 
 
@@ -140,6 +142,13 @@ _PASSTHROUGH_ENV = {
     # Ephemeral bearer token for the trusted localhost Vertex protocol bridge.
     # This is not a Google credential and is generated per Codex invocation.
     "VERTEX_GEMMA_BRIDGE_KEY",
+    # Equivalent ephemeral token for the local-vLLM Gemma compatibility bridge.
+    "VLLM_GEMMA_BRIDGE_KEY",
+    # OpenCode receives only this ephemeral local-bridge key and inline config.
+    "OPENCODE_VLLM_BRIDGE_KEY",
+    "OPENCODE_CONFIG_CONTENT",
+    # Ephemeral token for the trusted localhost Unsloth credential bridge.
+    "UNSLOTH_STUDIO_BRIDGE_KEY",
     # Anthropic and Google Vertex.
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_AUTH_TOKEN",
@@ -307,12 +316,12 @@ def _seed_codex_home(home: Path, source_env: Mapping[str, str]) -> None:
         shutil.copy2(auth, codex_home / "auth.json")
 
 
-def _seed_codex_vertex_home(home: Path, source_env: Mapping[str, str]) -> None:
-    """Create a clean Codex home for a provider authenticated by its bridge.
+def _seed_minimal_codex_home(home: Path, source_env: Mapping[str, str]) -> None:
+    """Create a clean Codex home for an explicitly configured provider.
 
-    The Vertex bridge supplies its own ephemeral ``env_key`` configuration on
-    the command line. It neither needs nor receives the user's Codex/OpenAI
-    auth file or unrelated persistent Codex configuration.
+    The adapter supplies provider configuration on the command line. It neither
+    needs nor receives the user's Codex/OpenAI auth file or unrelated persistent
+    Codex configuration.
     """
     codex_home = home / ".codex"
     codex_home.mkdir(parents=True, exist_ok=True)
@@ -552,10 +561,10 @@ def _lookup_antigravity_keyring_secret(
 def _seed_home(home: Path, kind: str, source_env: Mapping[str, str]) -> None:
     for relative in (".cache", ".config", ".local/state"):
         (home / relative).mkdir(parents=True, exist_ok=True)
-    if kind in {"codex", "codex_qwen"}:
+    if kind == "codex":
         _seed_codex_home(home, source_env)
-    elif kind == "codex_vertex":
-        _seed_codex_vertex_home(home, source_env)
+    elif kind in {"codex_qwen", "codex_vertex", "codex_vllm"}:
+        _seed_minimal_codex_home(home, source_env)
     elif kind == "claude":
         _seed_claude_home(home, source_env)
     elif kind == "antigravity":
@@ -826,6 +835,7 @@ def export_agent_session_audit(
         "claude": (Path(".claude/projects"), Path(".claude/debug")),
         "codex": (Path(".codex/sessions"), Path(".codex/log")),
         "codex_qwen": (Path(".codex/sessions"), Path(".codex/log")),
+        "codex_vllm": (Path(".codex/sessions"), Path(".codex/log")),
         "codex_vertex": (Path(".codex/sessions"), Path(".codex/log")),
     }.get(home_kind, ())
     copied: list[Path] = []

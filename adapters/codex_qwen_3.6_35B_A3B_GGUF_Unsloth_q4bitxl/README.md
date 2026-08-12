@@ -1,100 +1,106 @@
-# Adapter: `codex_qwen3.6-35B-A3B`
+# Codex + Qwen 3.6 35B-A3B on Unsloth Studio
 
-Agent/harness combo = **OpenAI Codex CLI** as the agent harness, driving a local
-**Unsloth Studio** server that serves an open-source model
-(`unsloth/Qwen3.6-35B-A3B-MTP-GGUF`) on `http://127.0.0.1:8888/v1`. It mirrors
-the interactive `codex --profile unsloth_api` workflow.
+This adapter runs the benchmark with the Codex CLI while sending model requests
+to `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` through a local Unsloth Studio server at
+`http://127.0.0.1:8888/v1`.
 
-## How it works
+It does not depend on a user Codex profile. Every invocation pins the model,
+provider, Responses API, context window, and server URL on the command line and
+runs Codex with `--ignore-user-config --ephemeral` inside the benchmark's
+mandatory bubblewrap isolation.
 
-For each `(question, stage)` the harness calls:
+## Authentication boundary
 
+Unsloth Studio requires authentication. Create an API key in Studio and export
+it before launching the benchmark:
+
+```bash
+export UNSLOTH_STUDIO_AUTH_TOKEN='<studio-api-key>'
 ```
-run.sh --question-file <question.json> --output <result.json>
+
+The real key stays in the trusted adapter process. Codex talks to a
+localhost-only bridge using a random per-invocation key, so shell commands run
+by the model cannot read the Studio credential. `API_TOKEN` remains supported
+as a backwards-compatible fallback, but `UNSLOTH_STUDIO_AUTH_TOKEN` is clearer.
+
+Confirm the endpoint and key before a run:
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $UNSLOTH_STUDIO_AUTH_TOKEN" \
+  http://127.0.0.1:8888/v1/models
 ```
-
-`adapter.py` then:
-
-1. Builds the prompt = repo-root **`AGENT_INSTRUCTIONS.md`** (the single source
-   of truth for conventions + answer schemas, same doc the Claude adapter serves
-   as a system prompt) followed by the stage-specific question payload.
-2. Runs `codex exec --profile unsloth_api` non-interactively, feeding the
-   prompt on stdin, with the per-question **scratch dir as the working root**
-   (`-C`).
-3. Reads Codex's final message from `--output-last-message` and extracts the
-   contract JSON (tolerant parser: fenced → brace-balanced → truncation repair).
-4. Writes `result.json`.
-
-### Sandbox per stage
-
-| Stage | `--sandbox` | Why |
-|---|---|---|
-| classify, disambiguate | `read-only` | only inspects the data dictionary / file headers |
-| analyze | `workspace-write` | runs Python, writes intermediates to scratch; reads the cohort read-only |
-
-Under `workspace-write`, the agent can **read** anywhere but only **write**
-inside the scratch (working) dir — so the read-only cohort data is protected.
-If your platform's sandbox blocks reads of the cohort dir, set
-`CODEX_SANDBOX_MODE=danger-full-access`.
-
-## Prerequisites
-
-1. **Codex CLI** on PATH (developed against `codex-cli 0.142.5`).
-2. A **`unsloth_api` Codex profile**. This adapter also passes provider
-   overrides, but it is designed to match:
-   - `[model_providers.unsloth_api]` in `~/.codex/config.toml`
-     (`base_url = http://127.0.0.1:8888/v1`, `wire_api = "responses"`,
-     `env_key = "UNSLOTH_STUDIO_AUTH_TOKEN"`, `requires_openai_auth = false`)
-   - `~/.codex/unsloth_api.config.toml` setting
-     `model_provider = "unsloth_api"` and
-     `model = "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"`
-3. The **Unsloth Studio server running** and serving that model at the profile's
-   `base_url`. Sanity check: `curl http://127.0.0.1:8888/v1/models`.
-4. `UNSLOTH_STUDIO_AUTH_TOKEN` exported (or in repo-root `.env`) if your server
-   requires auth. If only `API_TOKEN` is set, the adapter copies it to
-   `UNSLOTH_STUDIO_AUTH_TOKEN` before invoking Codex.
-
-## Configuration (env vars, all optional)
-
-| Var | Default | Purpose |
-|---|---|---|
-| `UNSLOTH_STUDIO_AUTH_TOKEN` | `API_TOKEN` or `EMPTY` | auth token for the Unsloth Studio endpoint |
-| `API_TOKEN` | `EMPTY` | fallback auth token copied to `UNSLOTH_STUDIO_AUTH_TOKEN` |
-| `CODEX_PROFILE` | `unsloth_api` | Codex profile to layer |
-| `CODEX_MODEL_PROVIDER` | `unsloth_api` | Codex model provider key |
-| `UNSLOTH_STUDIO_BASE_URL` | `http://127.0.0.1:8888/v1` | Unsloth Studio OpenAI-compatible base URL |
-| `CODEX_PROVIDER_ENV_KEY` | `UNSLOTH_STUDIO_AUTH_TOKEN` | env var Codex uses for provider auth |
-| `CODEX_MODEL` | `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` | override the served model name |
-| `CODEX_SANDBOX_MODE` | `workspace-write` | sandbox for the analyze stage |
-| `CODEX_BIN` | `codex` | path to the codex binary |
-
-`run.sh` sources repo-root `.env` before invoking (the harness does not).
 
 ## Run it
 
+One question:
+
 ```bash
-# smoke test one question
 uv run clingen-bench eval \
   --agent "bash adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/run.sh" \
-  --agent-name codex_qwen3.6-35B-A3B \
+  --agent-name codex_qwen3.6_35b_a3b_unsloth \
   --question bladder_1.2-Q6f9dd68e
-
-# a full cohort
-.venv/bin/clingen-bench eval \
-  --agent "bash adapters/codex_qwen3.6_35B_A3B_GGUF/run.sh" \
-  --agent-name codex_qwen3.6-35B-A3B \
-  --cohort all \
-  --max-parallel 4
-
-# then score
-uv run clingen-bench score --run codex_qwen3.6-35B-A3B/<run_id>
 ```
 
-Per-question artifacts (including `<stage>.agent.log` with Codex's stdout/stderr
-and `.codex_last_message.<stage>.txt` in the scratch dir) land under
-`runs/codex_qwen3.6-35B-A3B/<run_id>/per_question/<cohort>/<qid>/`.
+A full cohort:
 
-> **Privacy note:** unlike the cloud adapters, this keeps cohort data entirely
-> local (Codex ↔ your Unsloth Studio server on localhost) — no external endpoint
-> sees the data. The analyze sandbox also disables the agent shell's network
-> access.
+```bash
+uv run clingen-bench eval \
+  --agent "bash adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/run.sh" \
+  --agent-name codex_qwen3.6_35b_a3b_unsloth \
+  --cohort bladder_1.2 \
+  --max-parallel 1
+```
+
+Start with `--max-parallel 1`; a single loaded local model generally handles
+one long agent request more predictably than several concurrent requests.
+
+## Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `UNSLOTH_STUDIO_AUTH_TOKEN` | required | Studio API key; never passed into the Codex sandbox |
+| `API_TOKEN` | unset | backwards-compatible token fallback |
+| `UNSLOTH_STUDIO_BASE_URL` | `http://127.0.0.1:8888/v1` | Studio OpenAI-compatible API root |
+| `UNSLOTH_MODEL` | `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` | exact served model ID |
+| `CODEX_MODEL` | unset | secondary model override if `UNSLOTH_MODEL` is unset |
+| `CODEX_BIN` | `codex` | Codex executable |
+| `CODEX_SANDBOX_MODE` | `workspace-write` | analyze-stage Codex sandbox |
+| `CODEX_EPHEMERAL` | `1` | disable persistent Codex session state |
+| `CODEX_MAX_ATTEMPTS` | `1` | whole-Codex-process attempts inside one harness attempt |
+| `CODEX_RETRY_BASE_SECONDS` | `15` | delay multiplier between Codex-process attempts |
+| `UNSLOTH_REQUEST_TIMEOUT_SECONDS` | `1200` | timeout for one Studio Responses request |
+| `UNSLOTH_MAX_RETRIES` | `3` | retryable upstream attempts per Responses request |
+| `UNSLOTH_READ_ONLY_MAX_RETRIES` | `1` | upstream attempts for classify/disambiguate before process/finalizer recovery |
+| `UNSLOTH_RETRY_BASE_SECONDS` | `2` | exponential upstream retry base |
+| `UNSLOTH_MAX_RETRY_SLEEP_SECONDS` | `30` | upstream retry sleep cap |
+| `UNSLOTH_MAX_REQUESTS` | `256` | request cap per Codex invocation |
+| `UNSLOTH_READ_ONLY_MAX_REQUESTS` | `8` | enforced request cap for classify/disambiguate before finalization fallback |
+| `UNSLOTH_READ_ONLY_MAX_OUTPUT_TOKENS` | `8192` | per-generation output cap for classify/disambiguate; analyze is uncapped |
+
+The bridge requests a non-streaming response from Studio, then replays it to
+Codex as Responses SSE. This permits safe retries before any partial stream has
+been exposed and preserves Studio's native structured tool calls.
+
+Classify and disambiguate invocations also pass an explicit final-response JSON
+schema to Codex and include a bounded-inspection guard. This prevents a slow
+local model from ending on planning prose or growing the context indefinitely
+by repeatedly dumping cohort metadata. Analyze remains unrestricted because it
+may legitimately require a longer multi-step computation.
+
+If Codex still ends a classify or disambiguate stage without contract JSON, the
+trusted adapter makes a bounded no-tools finalization request to the same Qwen
+model using only the public question, stage instructions, and concept menu. It
+disables hidden reasoning for this contract-only request so the model cannot
+spend its entire output budget before emitting JSON. It does not use gold data,
+and its audit records contain only timing/status and output-size metadata—not
+prompts, responses, cohort values, or credentials.
+
+Because this local model can take several minutes for one generation and can
+make multiple tool-calling turns, the benchmark harness gives this adapter
+longer per-stage defaults: 3600 seconds for classify, 3600 for disambiguate,
+and 7200 for analyze. Other adapters retain the benchmark-wide defaults.
+
+Adapter logs and bridge metadata are written under the question's
+`adapter_audit/` directory. Request bodies, cohort values, and credentials are
+not recorded in the bridge audit.

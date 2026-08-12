@@ -77,6 +77,15 @@ def test_aggregate_runs_includes_only_active_two_level_scorecards(
         disambiguate=1.0,
         analyze=1.0,
     )
+    _write_scorecard(
+        runs_dir / "agent-a" / "pre_repair" / "raw-run" / "scorecard.json",
+        agent="agent-a",
+        run_id="raw-run",
+        overall=1.0,
+        classify=1.0,
+        disambiguate=1.0,
+        analyze=1.0,
+    )
 
     output_path = tmp_path / "scores.csv"
     assert aggregate_runs(runs_dir, output_path) == 2

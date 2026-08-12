@@ -1,409 +1,540 @@
-"""Codex + Unsloth Studio adapter for clin-genomic-analysis-benchmark.
-
-Agent/harness combo: the OpenAI **Codex CLI** driving a local **Unsloth Studio**
-server that serves `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` on port 8888. This mirrors
-the user's interactive `codex --profile unsloth_api` setup, but also passes
-provider overrides so the adapter is explicit about base_url, wire_api, auth env
-key, and model.
-
-For each stage this adapter:
-  - reads the question.json passed by the harness,
-  - builds a prompt = repo-root AGENT_INSTRUCTIONS.md + the stage payload,
-  - runs `codex exec --profile unsloth_api` non-interactively with the scratch
-    dir as the working root and a stage-appropriate sandbox,
-  - reads Codex's final message (via `--output-last-message`),
-  - pulls a JSON object out of it (tolerates Markdown fences / truncation),
-  - writes a contract-compliant result.json.
-
-Environment (all optional; sensible defaults):
-  - UNSLOTH_STUDIO_AUTH_TOKEN
-                          auth token for the endpoint
-  - API_TOKEN             fallback auth token, copied to UNSLOTH_STUDIO_AUTH_TOKEN
-                          when the latter is unset (default "EMPTY")
-  - CODEX_PROFILE         Codex profile to use (default "unsloth_api")
-  - CODEX_MODEL           override the model
-                          (default "unsloth/Qwen3.6-35B-A3B-MTP-GGUF")
-  - UNSLOTH_STUDIO_BASE_URL
-                          endpoint base URL (default "http://127.0.0.1:8888/v1")
-  - CODEX_BIN             path to the codex binary (default "codex" on PATH)
-  - CODEX_SANDBOX_MODE    sandbox for the analyze stage (default "workspace-write";
-                          set "danger-full-access" if the model can't read the
-                          cohort under workspace-write on your platform)
-
-This adapter is intentionally thin — the harness is what ensures correctness.
-"""
+"""Codex CLI adapter for Qwen 3.6 35B-A3B on local Unsloth Studio."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import os
-import re
 import subprocess
 import sys
+import time
+from dataclasses import replace
 from pathlib import Path
+from typing import Any, Mapping
+from urllib.parse import urlsplit
 
-from clin_genomic_analysis_benchmark.agent.isolation import (
+ADAPTER_DIR = Path(__file__).resolve().parent
+REPO_ROOT = ADAPTER_DIR.parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+if str(ADAPTER_DIR) not in sys.path:
+    sys.path.insert(0, str(ADAPTER_DIR))
+
+from adapters.codex_gpt.adapter import (  # noqa: E402
+    _build_prompt,
+    _env_float,
+    _env_int,
+    _env_truthy,
+    _extract_json,
+    _is_retryable_codex_failure,
+    _load_question,
+    _sandbox_for,
+)
+from unsloth_bridge import (  # noqa: E402
+    BridgeConfig,
+    DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    UnslothResponsesBridge,
+    UnslothResponsesClient,
+)
+from clin_genomic_analysis_benchmark.agent.isolation import (  # noqa: E402
     SANDBOX_COHORT_DIR,
     SANDBOX_SCRATCH_DIR,
     export_agent_session_audit,
-    sandbox_question_view,
     sandboxed_agent_command,
 )
-
-ADAPTER_DIR = Path(__file__).resolve().parent
-DEFAULT_CODEX_PROFILE = "unsloth_api"
-DEFAULT_CODEX_PROVIDER = "unsloth_api"
-DEFAULT_CODEX_MODEL = "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
-DEFAULT_UNSLOTH_BASE_URL = "http://127.0.0.1:8888/v1"
-UNSLOTH_TOKEN_ENV = "UNSLOTH_STUDIO_AUTH_TOKEN"
+from clin_genomic_analysis_benchmark.agent.contract import validate_result  # noqa: E402
 
 
-def _load_question(path: Path) -> dict:
-    with open(path) as f:
-        return json.load(f)
+PROVIDER_NAME = "local_unsloth_qwen3_6_35b_a3b"
+DEFAULT_MODEL = "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
+DEFAULT_BASE_URL = "http://127.0.0.1:8888/v1"
+MODEL_CONTEXT_WINDOW = 262_144
+TOKEN_ENV = "UNSLOTH_STUDIO_AUTH_TOKEN"
+FALLBACK_TOKEN_ENV = "API_TOKEN"
+BRIDGE_TOKEN_ENV = "UNSLOTH_STUDIO_BRIDGE_KEY"
 
 
-def _build_prompt(question: dict) -> str:
-    """Prompt = the canonical AGENT_INSTRUCTIONS.md followed by the stage payload.
-
-    Codex `exec` has no `--append-system-prompt`; we prepend the instructions to
-    the user prompt so the model gets the same guidance the Claude adapter serves
-    as a system prompt. Single source of truth: repo-root AGENT_INSTRUCTIONS.md.
-    """
-    question = sandbox_question_view(question)
-    repo_root = ADAPTER_DIR.parent.parent
-    instructions_doc = (repo_root / "AGENT_INSTRUCTIONS.md").read_text()
+def _build_unsloth_prompt(question: dict) -> str:
+    prompt = _build_prompt(question)
     stage = question["stage"]
-    payload = (
-        f"# Question\n"
-        f"- ID: {question['question_id']}\n"
-        f"- Cohort: {question['cohort']}\n"
-        f"- Category: {question['category']}\n"
-        f"- Stage: {stage}\n\n"
-        f"## Cohort directory (READ-ONLY)\n"
-        f"`{question['cohort_dir']}`\n\n"
-        f"## Data dictionary\n"
-        f"`{question['data_dictionary_path']}`\n\n"
-        f"## Question text\n"
-        f"> {question['question_text']}\n\n"
-        f"## Harness instructions\n"
-        f"{question['instructions']}\n\n"
-        f"Your current working directory is your scratch directory (writable): "
-        f"`{question['scratch_dir']}`. Write any intermediate files there. The "
-        f"cohort directory is READ-ONLY — read from it, never write to it. Use the "
-        f"shell to run Python (pandas/numpy/scipy/statsmodels/lifelines) for analysis.\n\n"
-        f"Output ONLY the final JSON object as your very last message, with no "
-        f"surrounding prose and no Markdown fences."
+    if stage not in {"classify", "disambiguate"}:
+        return prompt
+    shell_limit = 4 if stage == "classify" else 2
+    return (
+        f"{prompt}\n\n"
+        "## Local-model completion guard\n"
+        f"Complete this {stage} stage in at most 8 assistant turns and "
+        f"{shell_limit} shell commands. Do not enumerate full tables, print full "
+        "column lists, or dump large files. Inspect only the smallest evidence "
+        "needed for the decision. Never end a turn by merely announcing another "
+        "inspection or saying what you will do next: either execute the necessary "
+        "tool now or return the required JSON. If further inspection would only "
+        "refine confidence, stop and return your best contract-compliant answer "
+        "from the evidence already available.\n"
     )
-    return f"{instructions_doc}\n\n---\n\n{payload}\n"
 
 
-# ---------------------------------------------------------------------------
-# JSON extraction (copied verbatim from adapters/claude_code/adapter.py — a
-# battle-tested tolerant parser: whole-text → fenced → brace-balanced → repair).
-# ---------------------------------------------------------------------------
-
-_FENCE_RE = re.compile(r"```(?:json)?\s*\n(.*?)\n```", re.DOTALL)
-_FIRST_OBJ_RE = re.compile(r"(\{[\s\S]*\})", re.DOTALL)
-
-
-def _balanced_object(candidate: str) -> str | None:
-    """Walk `candidate` (must start with '{'), respecting string literals,
-    and return the substring up to and including the matching closing brace.
-    Returns None if no balanced object found.
-    """
-    depth = 0
-    in_string = False
-    escape = False
-    for i, ch in enumerate(candidate):
-        if escape:
-            escape = False
-            continue
-        if in_string:
-            if ch == "\\":
-                escape = True
-            elif ch == '"':
-                in_string = False
-            continue
-        if ch == '"':
-            in_string = True
-        elif ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return candidate[: i + 1]
+def _stage_output_schema(question: dict) -> dict | None:
+    stage = question["stage"]
+    if stage == "classify":
+        return {
+            "type": "object",
+            "properties": {
+                "classification": {
+                    "type": "string",
+                    "enum": ["ambiguous", "unambiguous"],
+                },
+                "rationale": {"type": "string", "minLength": 1},
+            },
+            "required": ["classification", "rationale"],
+            "additionalProperties": False,
+        }
+    if stage == "disambiguate":
+        concept_ids = [
+            entry["id"]
+            for entry in question.get("disambiguation_concept_menu") or []
+            if isinstance(entry, dict)
+            and isinstance(entry.get("id"), str)
+            and entry["id"]
+        ]
+        item_schema: dict = {"type": "string"}
+        if concept_ids:
+            item_schema["enum"] = concept_ids
+        return {
+            "type": "object",
+            "properties": {
+                "concept_ids": {
+                    "type": "array",
+                    "items": item_schema,
+                    "minItems": 1,
+                    "uniqueItems": True,
+                },
+            },
+            "required": ["concept_ids"],
+            "additionalProperties": False,
+        }
     return None
 
 
-def _repair_truncated_json(candidate: str) -> str | None:
-    """Best-effort: candidate starts with '{' but is truncated.
-    Close any open string, then close any open arrays/objects in LIFO order.
-    Strips a dangling trailing comma / partial key=value fragment if present.
-    Returns the repaired string, or None if not repairable.
-    """
-    in_string = False
-    escape = False
-    stack: list[str] = []  # stack of '{' or '['
-    last_complete_value_end = -1  # index after the last comma or container open
-    for i, ch in enumerate(candidate):
-        if escape:
-            escape = False
+def _response_output_text(response: Mapping[str, Any]) -> str:
+    direct = response.get("output_text")
+    if isinstance(direct, str) and direct.strip():
+        return direct.strip()
+    parts: list[str] = []
+    for item in response.get("output") or []:
+        if not isinstance(item, Mapping):
             continue
-        if in_string:
-            if ch == "\\":
-                escape = True
-            elif ch == '"':
-                in_string = False
+        if item.get("type") == "output_text" and isinstance(item.get("text"), str):
+            parts.append(item["text"])
             continue
-        if ch == '"':
-            in_string = True
-        elif ch == "{":
-            stack.append("{")
-            last_complete_value_end = i + 1
-        elif ch == "[":
-            stack.append("[")
-            last_complete_value_end = i + 1
-        elif ch == "}":
-            if stack and stack[-1] == "{":
-                stack.pop()
-                last_complete_value_end = i + 1
-        elif ch == "]":
-            if stack and stack[-1] == "[":
-                stack.pop()
-                last_complete_value_end = i + 1
-        elif ch == "," and not in_string:
-            last_complete_value_end = i + 1
-
-    if not stack:
-        return None  # already balanced — caller should have parsed it
-
-    # Build the repaired string: close any open string and then unwind the stack.
-    tail = ""
-    if in_string:
-        tail += '"'
-    for opener in reversed(stack):
-        tail += "}" if opener == "{" else "]"
-    repaired = candidate + tail
-    try:
-        json.loads(repaired)
-        return repaired
-    except json.JSONDecodeError:
-        pass
-
-    # Trim back to the last completed key:value boundary (last comma or open brace)
-    # then close. This drops the partial trailing field that broke the parse.
-    if last_complete_value_end <= 0:
-        return None
-    head = candidate[:last_complete_value_end].rstrip()
-    if head.endswith(","):
-        head = head[:-1].rstrip()
-    tail = ""
-    depth_obj = 0
-    depth_arr = 0
-    in_string = False
-    escape = False
-    for ch in head:
-        if escape:
-            escape = False
+        if item.get("type") != "message":
             continue
-        if in_string:
-            if ch == "\\":
-                escape = True
-            elif ch == '"':
-                in_string = False
-            continue
-        if ch == '"':
-            in_string = True
-        elif ch == "{":
-            depth_obj += 1
-        elif ch == "}":
-            depth_obj -= 1
-        elif ch == "[":
-            depth_arr += 1
-        elif ch == "]":
-            depth_arr -= 1
-    if in_string:
-        return None
-    tail = "]" * max(depth_arr, 0) + "}" * max(depth_obj, 0)
-    repaired = head + tail
-    try:
-        json.loads(repaired)
-        return repaired
-    except json.JSONDecodeError:
-        return None
+        for content in item.get("content") or []:
+            if not isinstance(content, Mapping):
+                continue
+            if content.get("type") != "output_text":
+                continue
+            text = content.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+    return "\n".join(part for part in parts if part).strip()
 
 
-def _extract_json(text: str) -> dict | None:
-    text = text.strip()
-    try:
-        v = json.loads(text)
-        if isinstance(v, dict):
-            return v
-    except json.JSONDecodeError:
-        pass
-    m = _FENCE_RE.search(text)
-    if m:
-        try:
-            v = json.loads(m.group(1))
-            if isinstance(v, dict):
-                return v
-        except json.JSONDecodeError:
-            pass
-    m2 = _FIRST_OBJ_RE.search(text)
-    if m2:
-        candidate = m2.group(1)
-        balanced = _balanced_object(candidate)
-        if balanced is not None:
-            try:
-                v = json.loads(balanced)
-                if isinstance(v, dict):
-                    return v
-            except json.JSONDecodeError:
-                pass
-        repaired = _repair_truncated_json(candidate)
-        if repaired is not None:
-            try:
-                v = json.loads(repaired)
-                if isinstance(v, dict):
-                    return v
-            except json.JSONDecodeError:
-                pass
-    start = text.find("{")
-    if start >= 0:
-        candidate = text[start:]
-        repaired = _repair_truncated_json(candidate)
-        if repaired is not None:
-            try:
-                v = json.loads(repaired)
-                if isinstance(v, dict):
-                    return v
-            except json.JSONDecodeError:
-                pass
-    return None
+def _contract_fallback_prompt(question: dict, previous_text: str = "") -> str:
+    menu = "\n".join(
+        f"- {entry['id']}: {entry.get('label', '')} — {entry.get('description', '')}"
+        for entry in question.get("disambiguation_concept_menu") or []
+        if isinstance(entry, dict) and isinstance(entry.get("id"), str)
+    )
+    prior = ""
+    if previous_text:
+        prior = (
+            "\nYour previous answer was not a valid contract object. Do not repeat it:\n"
+            f"{previous_text[:1000]}\n"
+        )
+    return (
+        "You are the contract-finalization step for a cancer-data benchmark. "
+        "You have no tools and must decide from the public question, stage "
+        "instructions, and concept menu below. Never announce a plan or request "
+        "more data. Apply conventional defaults; mark ambiguity only for a material "
+        "choice represented by the menu.\n\n"
+        f"Stage: {question['stage']}\n"
+        f"Question: {question['question_text']}\n"
+        f"Stage instructions: {question['instructions']}\n\n"
+        f"Concept menu:\n{menu}\n"
+        f"{prior}\n"
+        "Return only the required JSON object, with no Markdown or prose."
+    )
 
 
-# ---------------------------------------------------------------------------
-# Codex invocation
-# ---------------------------------------------------------------------------
+def _direct_contract_result(question: dict) -> dict:
+    """Recover a malformed read-only-stage final with the same local model."""
+    schema = _stage_output_schema(question)
+    if schema is None:
+        raise RuntimeError("contract fallback is only available for read-only stages")
+    config = _bridge_config()
+    stage = question["stage"]
+    audit_path = (
+        Path(question["scratch_dir"]).resolve().parent
+        / "adapter_audit"
+        / f"unsloth_contract_fallback.{stage}.jsonl"
+    )
 
-def _sandbox_for(stage: str) -> str:
-    """analyze needs to run code + write scratch; the read-only stages just
-    inspect the data dictionary / file headers."""
-    if stage == "analyze":
-        return os.environ.get("CODEX_SANDBOX_MODE", "workspace-write")
-    return "read-only"
+    def audit(record: dict[str, Any]) -> None:
+        audit_path.parent.mkdir(parents=True, exist_ok=True)
+        with audit_path.open("a") as handle:
+            handle.write(json.dumps({"timestamp": time.time(), **record}) + "\n")
+
+    client = UnslothResponsesClient(config, audit)
+    previous_text = ""
+    for semantic_attempt in range(1, 3):
+        response = client.complete({
+            "model": config.model,
+            "input": [{
+                "type": "message",
+                "role": "user",
+                "content": [{
+                    "type": "input_text",
+                    "text": _contract_fallback_prompt(question, previous_text),
+                }],
+            }],
+            "tools": [],
+            "max_output_tokens": 4_096,
+            "reasoning": {"effort": "none"},
+            "chat_template_kwargs": {"enable_thinking": False},
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": f"{stage}_result",
+                    "schema": schema,
+                    "strict": True,
+                }
+            },
+            "stream": False,
+        })
+        previous_text = _response_output_text(response)
+        result = _extract_json(previous_text)
+        schema_errors = validate_result(result, stage) if result is not None else []
+        valid_result = result is not None and not schema_errors
+        audit({
+            "event": "contract_fallback_result",
+            "semantic_attempt": semantic_attempt,
+            "output_item_count": len(response.get("output") or []),
+            "output_character_count": len(previous_text),
+            "valid_contract_json": valid_result,
+            "schema_error_count": len(schema_errors),
+        })
+        if valid_result:
+            return result
+    raise RuntimeError("same-model contract fallback did not return valid JSON")
 
 
-def _codex_call(*, prompt: str, cohort_dir: str, data_dictionary_path: str,
-                scratch_dir: str, sandbox_mode: str,
-                last_message_file: Path) -> str:
-    profile = os.environ.get("CODEX_PROFILE", DEFAULT_CODEX_PROFILE)
-    provider = os.environ.get("CODEX_MODEL_PROVIDER", DEFAULT_CODEX_PROVIDER)
-    base_url = os.environ.get("UNSLOTH_STUDIO_BASE_URL", DEFAULT_UNSLOTH_BASE_URL)
-    provider_env_key = os.environ.get("CODEX_PROVIDER_ENV_KEY", UNSLOTH_TOKEN_ENV)
+def _model() -> str:
+    model = (
+        os.environ.get("UNSLOTH_MODEL", "").strip()
+        or os.environ.get("CODEX_MODEL", "").strip()
+        or DEFAULT_MODEL
+    )
+    if any(character.isspace() for character in model):
+        raise RuntimeError("UNSLOTH_MODEL must be a single model identifier")
+    return model
+
+
+def _base_url() -> str:
+    """Return a validated Studio API root, adding ``/v1`` if absent."""
+    raw = os.environ.get("UNSLOTH_STUDIO_BASE_URL", DEFAULT_BASE_URL).strip()
+    raw = raw.rstrip("/")
+    parsed = urlsplit(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise RuntimeError(
+            "UNSLOTH_STUDIO_BASE_URL must be an absolute HTTP(S) URL"
+        )
+    if parsed.username or parsed.password:
+        raise RuntimeError(
+            f"put Studio credentials in {TOKEN_ENV}, not UNSLOTH_STUDIO_BASE_URL"
+        )
+    if parsed.query or parsed.fragment:
+        raise RuntimeError(
+            "UNSLOTH_STUDIO_BASE_URL must not contain a query or fragment"
+        )
+    if not parsed.path.rstrip("/").endswith("/v1"):
+        raw += "/v1"
+    return raw
+
+
+def _studio_token() -> str:
+    token = (
+        os.environ.get(TOKEN_ENV, "").strip()
+        or os.environ.get(FALLBACK_TOKEN_ENV, "").strip()
+    )
+    if not token:
+        raise RuntimeError(
+            f"Unsloth Studio requires authentication; export {TOKEN_ENV} "
+            "with a Studio API key"
+        )
+    return token
+
+
+def _provider_override(key: str, value: str) -> list[str]:
+    return ["-c", f"model_providers.{PROVIDER_NAME}.{key}={json.dumps(value)}"]
+
+
+def _bridge_config() -> BridgeConfig:
+    return BridgeConfig(
+        base_url=_base_url(),
+        model=_model(),
+        api_key=_studio_token(),
+        request_timeout_seconds=_env_float(
+            "UNSLOTH_REQUEST_TIMEOUT_SECONDS",
+            DEFAULT_REQUEST_TIMEOUT_SECONDS,
+            minimum=1.0,
+        ),
+        max_retries=_env_int("UNSLOTH_MAX_RETRIES", 3),
+        retry_base_seconds=_env_float(
+            "UNSLOTH_RETRY_BASE_SECONDS", 2.0, minimum=0.0
+        ),
+        max_retry_sleep_seconds=_env_float(
+            "UNSLOTH_MAX_RETRY_SLEEP_SECONDS", 30.0, minimum=0.0
+        ),
+        max_requests=_env_int("UNSLOTH_MAX_REQUESTS", 256),
+    )
+
+
+def _save_attempt_logs(
+    *,
+    scratch_dir: Path,
+    stage: str,
+    attempt: int,
+    proc: subprocess.CompletedProcess[str],
+) -> None:
+    if not _env_truthy("CODEX_SAVE_ATTEMPT_LOGS", True):
+        return
+    audit_dir = scratch_dir.parent / "adapter_audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    (audit_dir / f"codex_unsloth_attempt.{stage}.{attempt}.stdout.txt").write_text(
+        proc.stdout or ""
+    )
+    (audit_dir / f"codex_unsloth_attempt.{stage}.{attempt}.stderr.txt").write_text(
+        proc.stderr or ""
+    )
+
+
+def _is_retryable_unsloth_failure(stderr: str) -> bool:
+    low = stderr.lower()
+    return _is_retryable_codex_failure(stderr) or any(
+        term in low
+        for term in (
+            "connection refused",
+            "connection timed out",
+            "error sending request",
+            "502 bad gateway",
+            "504 gateway timeout",
+        )
+    )
+
+
+def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
+    stage = question["stage"]
+    scratch_dir = Path(question["scratch_dir"]).resolve()
+    cohort_dir = Path(question["cohort_dir"]).resolve()
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    max_attempts = _env_int("CODEX_MAX_ATTEMPTS", 1)
+    retry_sleep = _env_float("CODEX_RETRY_BASE_SECONDS", 15.0)
+    config = _bridge_config()
+    if stage in {"classify", "disambiguate"}:
+        config = replace(
+            config,
+            max_retries=min(
+                config.max_retries,
+                _env_int("UNSLOTH_READ_ONLY_MAX_RETRIES", 1),
+            ),
+            max_requests=min(
+                config.max_requests,
+                _env_int("UNSLOTH_READ_ONLY_MAX_REQUESTS", 8),
+            ),
+            max_output_tokens=_env_int(
+                "UNSLOTH_READ_ONLY_MAX_OUTPUT_TOKENS", 8_192
+            ),
+        )
+    output_schema = _stage_output_schema(question)
+    output_schema_path: Path | None = None
+    if output_schema is not None:
+        output_schema_path = scratch_dir / f".codex_output_schema.{stage}.json"
+        output_schema_path.write_text(json.dumps(output_schema, indent=2))
+
     codex_bin = os.environ.get("CODEX_BIN", "codex")
     cmd = [
-        codex_bin, "exec",
-        "--profile", profile,
-        "-C", str(SANDBOX_SCRATCH_DIR),  # bwrap-backed writable scratch dir
-        "--add-dir", str(SANDBOX_COHORT_DIR),
-        "--skip-git-repo-check",         # scratch dir is not a git repo
-        "--sandbox", sandbox_mode,
-        "-c", 'approval_policy="never"',  # fully non-interactive, no reviewer
-        "-c", f"oss_provider={json.dumps(provider)}",
-        "-c", f"model_provider={json.dumps(provider)}",
-        "-c", f"model_providers.{provider}.name={json.dumps('Unsloth Studio')}",
-        "-c", f"model_providers.{provider}.base_url={json.dumps(base_url)}",
-        "-c", f"model_providers.{provider}.env_key={json.dumps(provider_env_key)}",
-        "-c", f"model_providers.{provider}.wire_api={json.dumps('responses')}",
-        "-c", f"model_providers.{provider}.requires_openai_auth=false",
-        "--color", "never",
-        "-o", str(SANDBOX_SCRATCH_DIR / last_message_file.name),
+        codex_bin,
+        "exec",
+        "-C",
+        str(SANDBOX_SCRATCH_DIR),
+        "--add-dir",
+        str(SANDBOX_COHORT_DIR),
+        "--skip-git-repo-check",
+        "--ignore-user-config",
+        "--sandbox",
+        _sandbox_for(stage),
+        "-c",
+        'approval_policy="never"',
+        "--color",
+        "never",
+        "-o",
+        str(SANDBOX_SCRATCH_DIR / last_message_file.name),
     ]
-    model = os.environ.get("CODEX_MODEL", DEFAULT_CODEX_MODEL)
-    if model:
-        cmd += ["-m", model]
-    cmd += ["-"]                          # read the prompt from stdin
+    if output_schema_path is not None:
+        cmd += [
+            "--output-schema",
+            str(SANDBOX_SCRATCH_DIR / output_schema_path.name),
+        ]
+    if _env_truthy("CODEX_EPHEMERAL", True):
+        cmd.append("--ephemeral")
+    cmd += [
+        "-c",
+        f"model_provider={json.dumps(PROVIDER_NAME)}",
+        "--model",
+        config.model,
+        "-c",
+        f"model_context_window={MODEL_CONTEXT_WINDOW}",
+    ]
 
-    env = os.environ.copy()
-    token = env.get(UNSLOTH_TOKEN_ENV) or env.get("API_TOKEN") or "EMPTY"
-    env[UNSLOTH_TOKEN_ENV] = token
-    env.setdefault("API_TOKEN", token)
-    # Seed the disposable Codex home with this selected profile/provider. These
-    # configuration variables are consumed by the trusted sandbox builder and
-    # are not passed through to the model-controlled process environment.
-    env["CODEX_PROFILE"] = profile
-    env["CODEX_MODEL_PROVIDER"] = provider
-    env["CODEX_MODEL"] = model
+    last_error = ""
+    for attempt in range(1, max_attempts + 1):
+        if last_message_file.exists():
+            last_message_file.unlink()
+        audit_path = (
+            scratch_dir.parent
+            / "adapter_audit"
+            / f"unsloth_bridge.{stage}.{attempt}.jsonl"
+        )
+        with UnslothResponsesBridge(config, audit_path=audit_path) as bridge:
+            attempt_cmd = [*cmd]
+            attempt_cmd += _provider_override(
+                "name", "Local Unsloth Studio (Qwen 3.6 35B-A3B)"
+            )
+            attempt_cmd += _provider_override("base_url", bridge.base_url)
+            attempt_cmd += _provider_override("env_key", BRIDGE_TOKEN_ENV)
+            attempt_cmd += _provider_override("wire_api", "responses")
+            attempt_cmd += [
+                "-c",
+                f"model_providers.{PROVIDER_NAME}.requires_openai_auth=false",
+                "-c",
+                f"model_providers.{PROVIDER_NAME}.request_max_retries=0",
+                "-c",
+                f"model_providers.{PROVIDER_NAME}.stream_max_retries=0",
+                "-",
+            ]
+            env = os.environ.copy()
+            env["CODEX_MODEL"] = config.model
+            env["CODEX_MODEL_PROVIDER"] = PROVIDER_NAME
+            env[BRIDGE_TOKEN_ENV] = bridge.bearer_token
+            # The Studio credential remains in this trusted adapter process and
+            # never reaches Codex or model-launched shell commands.
+            env.pop(TOKEN_ENV, None)
+            env.pop(FALLBACK_TOKEN_ENV, None)
+            # Qwen thinking mode is managed by Studio, not Codex's proprietary
+            # reasoning-effort request field.
+            env.pop("CODEX_REASONING_EFFORT", None)
 
-    with sandboxed_agent_command(
-        cmd,
-        cohort_dir=cohort_dir,
-        data_dictionary_path=data_dictionary_path,
-        scratch_dir=scratch_dir,
-        environment=env,
-        home_kind="codex_qwen",
-    ) as launch:
-        proc = subprocess.run(
-            launch.command,
-            input=prompt,
-            env=launch.environment,
-            capture_output=True,
-            text=True,
-        )
-        export_agent_session_audit(
-            launch,
-            destination=Path(scratch_dir).resolve().parent / "agent_session_audit",
-            home_kind="codex_qwen",
-        )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"codex exited {proc.returncode}: {proc.stderr[-1500:]}"
-        )
+            with sandboxed_agent_command(
+                attempt_cmd,
+                cohort_dir=cohort_dir,
+                data_dictionary_path=question["data_dictionary_path"],
+                scratch_dir=scratch_dir,
+                environment=env,
+                home_kind="codex_qwen",
+            ) as launch:
+                proc = subprocess.run(
+                    launch.command,
+                    input=prompt,
+                    env=launch.environment,
+                    capture_output=True,
+                    text=True,
+                )
+                export_agent_session_audit(
+                    launch,
+                    destination=(
+                        scratch_dir.parent
+                        / "agent_session_audit"
+                        / f"codex_unsloth_attempt_{stage}_{attempt}"
+                    ),
+                    home_kind="codex_qwen",
+                )
 
-    # Prefer the explicit last-message file; fall back to stdout if empty.
-    text = ""
-    if last_message_file.exists():
-        text = last_message_file.read_text().strip()
-    if not text:
-        text = proc.stdout
-    return text
+        _save_attempt_logs(
+            scratch_dir=scratch_dir,
+            stage=stage,
+            attempt=attempt,
+            proc=proc,
+        )
+        if proc.returncode == 0:
+            text = (
+                last_message_file.read_text().strip()
+                if last_message_file.exists()
+                else ""
+            )
+            return text or proc.stdout
+
+        stderr = proc.stderr or ""
+        last_error = f"codex exited {proc.returncode}: {stderr[-8000:]}"
+        if attempt >= max_attempts or not _is_retryable_unsloth_failure(stderr):
+            break
+        sleep_for = retry_sleep * attempt
+        sys.stderr.write(
+            f"adapter: Codex attempt {attempt}/{max_attempts} failed retryably; "
+            f"retrying in {sleep_for:.1f}s\n"
+        )
+        time.sleep(sleep_for)
+    raise RuntimeError(last_error)
 
 
 def main() -> int:
-    p = argparse.ArgumentParser()
-    p.add_argument("--question-file", required=True, type=Path)
-    p.add_argument("--output", required=True, type=Path)
-    args = p.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--question-file", required=True, type=Path)
+    parser.add_argument("--output", required=True, type=Path)
+    args = parser.parse_args()
 
     question = _load_question(args.question_file)
     stage = question["stage"]
-    scratch_dir = question["scratch_dir"]
-    Path(scratch_dir).mkdir(parents=True, exist_ok=True)
-    last_message_file = Path(scratch_dir) / f".codex_last_message.{stage}.txt"
-
-    prompt = _build_prompt(question)
-    text = _codex_call(
-        prompt=prompt,
-        cohort_dir=question["cohort_dir"],
-        data_dictionary_path=question["data_dictionary_path"],
-        scratch_dir=scratch_dir,
-        sandbox_mode=_sandbox_for(stage),
-        last_message_file=last_message_file,
-    )
+    scratch_dir = Path(question["scratch_dir"])
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    last_message_file = scratch_dir / f".codex_last_message.{stage}.txt"
+    text = ""
+    try:
+        text = _codex_call(
+            prompt=_build_unsloth_prompt(question),
+            question=question,
+            last_message_file=last_message_file,
+        )
+    except Exception as exc:
+        sys.stderr.write(f"adapter: Codex/Unsloth invocation failed: {exc}\n")
+        if stage not in {"classify", "disambiguate"}:
+            return 3
 
     obj = _extract_json(text)
+    contract_errors = (
+        validate_result(obj, stage)
+        if obj is not None and stage in {"classify", "disambiguate"}
+        else []
+    )
+    if stage in {"classify", "disambiguate"} and (
+        obj is None or contract_errors
+    ):
+        sys.stderr.write(
+            "adapter: Codex final was not valid contract JSON; trying same-model "
+            "no-tools finalizer\n"
+        )
+        try:
+            obj = _direct_contract_result(question)
+        except Exception as exc:
+            sys.stderr.write(f"adapter: contract finalizer failed: {exc}\n")
     if obj is None:
-        sys.stderr.write("adapter: could not extract JSON from codex output\n")
+        sys.stderr.write("adapter: could not extract JSON from Codex output\n")
         sys.stderr.write(text[:2000] + "\n")
         return 3
-
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(obj, indent=2))
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

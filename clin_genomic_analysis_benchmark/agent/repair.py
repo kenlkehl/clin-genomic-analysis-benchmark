@@ -1,8 +1,10 @@
-"""Retry score-relevant technical failures without mutating the source run.
+"""Retry score-relevant technical failures from an immutable source snapshot.
 
 The repair workflow copies a completed run, executes only failed stages that
 could change its deterministic score, merges successful retries, records an
-audit trail in the copied manifest, and regenerates the scorecard.
+audit trail in the copied manifest, and regenerates the scorecard. After the
+repair loop, pre-final snapshots are archived under ``pre_repair`` and their
+lineage references and hashes are made location-consistent.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ import shutil
 import uuid
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -72,6 +74,7 @@ class RepairLoopSummary:
 
 
 _STAGES = ("classify", "disambiguate", "analyze")
+_PRE_REPAIR_DIRNAME = "pre_repair"
 _CONFIG_ENV_VARS = set(_SAFE_AGENT_ENV_VARS) | {
     # These can override ANTHROPIC_VERTEX_PROJECT_ID in Claude Code.
     "GOOGLE_CLOUD_PROJECT",
@@ -350,6 +353,183 @@ def _validate_output_run_id(output_run_id: str) -> None:
         raise ValueError("--output-run-id must be a single directory name")
 
 
+def _run_collection_dir(run_dir: Path) -> Path:
+    """Return the agent directory that contains active, top-level runs."""
+    if run_dir.parent.name == _PRE_REPAIR_DIRNAME:
+        return run_dir.parent.parent
+    return run_dir.parent
+
+
+def _updated_run_reference(value: Any, moves: Mapping[str, str]) -> Any:
+    if isinstance(value, str):
+        return moves.get(value, value)
+    return value
+
+
+def _rewrite_relocated_lineage(
+    run_dirs: list[Path],
+    reference_moves: Mapping[str, str],
+) -> None:
+    """Update moved-run references while preserving the lineage hash chain."""
+    run_by_reference: dict[str, Path] = {}
+    for run_dir in run_dirs:
+        run_by_reference[str(run_dir)] = run_dir
+        run_by_reference[_run_reference(run_dir)] = run_dir
+
+    # Process oldest to newest. If an archived intermediate manifest changes,
+    # its child can record the new manifest hash during the same pass.
+    for run_dir in run_dirs:
+        manifest_path = run_dir / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        changed = False
+
+        derived = manifest.get("derived_from_run")
+        updated_derived = _updated_run_reference(derived, reference_moves)
+        if updated_derived != derived:
+            manifest["derived_from_run"] = updated_derived
+            changed = True
+
+        for record in manifest.get("repair_history") or []:
+            if not isinstance(record, dict):
+                continue
+            source = record.get("source_run")
+            updated_source = _updated_run_reference(source, reference_moves)
+            if updated_source != source:
+                record["source_run"] = updated_source
+                changed = True
+
+            source_dir = run_by_reference.get(str(updated_source))
+            if source_dir is None:
+                continue
+            source_hashes = {
+                filename: _file_sha256(source_dir / filename)
+                for filename in ("manifest.json", "runs.json")
+            }
+            if record.get("source_hashes") != source_hashes:
+                record["source_hashes"] = source_hashes
+                changed = True
+
+        if changed:
+            atomic_write_json(manifest_path, manifest)
+
+
+def _existing_repair_ancestors(source_dir: Path, collection_dir: Path) -> list[Path]:
+    """Return existing same-agent ancestors recorded by a legacy repair run."""
+    manifest = json.loads((source_dir / "manifest.json").read_text())
+    archive_dir = collection_dir / _PRE_REPAIR_DIRNAME
+    allowed_parents = {collection_dir, archive_dir}
+    ancestors: list[Path] = []
+    seen = {source_dir}
+    for record in manifest.get("repair_history") or []:
+        if not isinstance(record, dict):
+            continue
+        reference = record.get("source_run")
+        if not isinstance(reference, str) or not reference:
+            continue
+        candidate = Path(reference)
+        if not candidate.is_absolute():
+            candidate = RUNS_DIR / candidate
+        candidate = candidate.resolve()
+        if candidate in seen or not candidate.is_dir():
+            continue
+        if candidate.parent not in allowed_parents:
+            raise ValueError(
+                "repair ancestor must be a sibling under the active or "
+                f"pre-repair directory: {candidate}"
+            )
+        if not all((candidate / name).is_file() for name in ("manifest.json", "runs.json")):
+            raise FileNotFoundError(f"Repair ancestor has incomplete metadata: {candidate}")
+        ancestors.append(candidate)
+        seen.add(candidate)
+    return ancestors
+
+
+def _archive_pre_final_runs(
+    source_dir: Path,
+    pass_summaries: list[RepairSummary],
+) -> tuple[Path, tuple[RepairSummary, ...], Path]:
+    """Archive a repair chain, leaving only its final run at top level.
+
+    The original run and every intermediate repair pass move under the agent's
+    ``pre_repair`` directory. The final repaired run remains (or is promoted)
+    at the agent directory's top level. Returned summaries contain the actual
+    post-move paths.
+    """
+    if not pass_summaries:
+        resolved = source_dir.resolve()
+        return resolved, (), resolved
+
+    source_dir = source_dir.resolve()
+    collection_dir = _run_collection_dir(source_dir).resolve()
+    chain = _existing_repair_ancestors(source_dir, collection_dir)
+    chain.append(source_dir)
+    chain.extend(summary.repaired_run_dir.resolve() for summary in pass_summaries)
+    if len(set(chain)) != len(chain):
+        raise ValueError("repair chain contains duplicate run directories")
+    if any(not run_dir.is_dir() for run_dir in chain):
+        missing = next(run_dir for run_dir in chain if not run_dir.is_dir())
+        raise FileNotFoundError(f"Repair-chain run directory is missing: {missing}")
+
+    archive_dir = collection_dir / _PRE_REPAIR_DIRNAME
+    if archive_dir.is_symlink():
+        raise ValueError(f"pre-repair archive must not be a symlink: {archive_dir}")
+    if archive_dir.exists() and not archive_dir.is_dir():
+        raise ValueError(f"pre-repair archive is not a directory: {archive_dir}")
+
+    allowed_parents = {collection_dir, archive_dir}
+    for run_dir in chain:
+        if run_dir.parent not in allowed_parents:
+            raise ValueError(
+                "repair-chain directories must be siblings under the active or "
+                f"pre-repair directory: {run_dir}"
+            )
+
+    destinations = [archive_dir / run_dir.name for run_dir in chain[:-1]]
+    destinations.append(collection_dir / chain[-1].name)
+    if len(set(destinations)) != len(destinations):
+        raise ValueError("repair-chain archive destinations collide")
+    for old, new in zip(chain, destinations):
+        if old != new and new.exists():
+            raise FileExistsError(f"Repair archive destination already exists: {new}")
+
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    completed_moves: list[tuple[Path, Path]] = []
+    try:
+        for old, new in zip(chain, destinations):
+            if old == new:
+                continue
+            old.rename(new)
+            completed_moves.append((old, new))
+    except Exception:
+        for old, new in reversed(completed_moves):
+            if new.exists() and not old.exists():
+                new.rename(old)
+        raise
+
+    reference_moves: dict[str, str] = {}
+    for old, new in zip(chain, destinations):
+        if old == new:
+            continue
+        reference_moves[str(old)] = str(new)
+        reference_moves[_run_reference(old)] = _run_reference(new)
+    _rewrite_relocated_lineage(destinations, reference_moves)
+
+    relocated = dict(zip(chain, destinations))
+    updated_summaries = tuple(
+        replace(
+            summary,
+            source_run_dir=relocated.get(
+                summary.source_run_dir.resolve(), summary.source_run_dir.resolve()
+            ),
+            repaired_run_dir=relocated.get(
+                summary.repaired_run_dir.resolve(), summary.repaired_run_dir.resolve()
+            ),
+        )
+        for summary in pass_summaries
+    )
+    return relocated[source_dir], updated_summaries, destinations[-1]
+
+
 def _public_questions_for_targets(
     targets: list[RepairTarget],
 ) -> dict[tuple[str, str], PublicQuestion]:
@@ -375,7 +555,7 @@ def retry_failed_run(
     output_run_id: str | None = None,
     agent_cmd: str | None = None,
     max_parallel: int = 4,
-    agent_max_attempts: int = 3,
+    agent_max_attempts: int = 10,
     agent_retry_base_seconds: float = 5.0,
     timeout_overrides: Mapping[str, int] | None = None,
     scoring_config_path: Optional[Path] = None,
@@ -428,7 +608,7 @@ def retry_failed_run(
 
     repaired_id = output_run_id or _new_run_id(str(manifest.get("run_id") or source_dir.name))
     _validate_output_run_id(repaired_id)
-    repaired_dir = source_dir.parent / repaired_id
+    repaired_dir = _run_collection_dir(source_dir) / repaired_id
     if repaired_dir.exists():
         raise FileExistsError(f"Repaired run destination already exists: {repaired_dir}")
 
@@ -599,13 +779,13 @@ def retry_failed_run_until_stable(
     output_run_id: str | None = None,
     agent_cmd: str | None = None,
     max_parallel: int = 2,
-    agent_max_attempts: int = 3,
+    agent_max_attempts: int = 10,
     agent_retry_base_seconds: float = 5.0,
     timeout_overrides: Mapping[str, int] | None = None,
-    max_repair_passes: int = 3,
+    max_repair_passes: int = 10,
     scoring_config_path: Optional[Path] = None,
 ) -> RepairLoopSummary:
-    """Retry successive repaired copies until complete, stalled, or capped."""
+    """Retry until stable, archive pre-final copies, and rescore the final run."""
     if max_repair_passes < 1:
         raise ValueError("max_repair_passes must be >= 1")
 
@@ -651,10 +831,20 @@ def retry_failed_run_until_stable(
     else:
         _, remaining = plan_failed_run(current_dir)
 
+    archived_source, archived_passes, final_dir = _archive_pre_final_runs(
+        source_dir,
+        pass_summaries,
+    )
+    if pass_summaries:
+        score_run(
+            run_path=str(final_dir),
+            scoring_config_path=scoring_config_path,
+        )
+
     return RepairLoopSummary(
-        source_run_dir=source_dir,
-        final_run_dir=current_dir,
-        passes=tuple(pass_summaries),
+        source_run_dir=archived_source,
+        final_run_dir=final_dir,
+        passes=archived_passes,
         remaining_targets=tuple(remaining),
         stop_reason=stop_reason,
     )

@@ -50,7 +50,8 @@ def test_eval_automatically_repairs_score_relevant_failures(tmp_path, monkeypatc
     assert calls[0]["run_path"] == run_dir
     assert calls[0]["agent_cmd"] == "fake-agent"
     assert calls[0]["max_parallel"] == 2
-    assert calls[0]["max_repair_passes"] == 3
+    assert calls[0]["agent_max_attempts"] == 10
+    assert calls[0]["max_repair_passes"] == 10
 
 
 def test_eval_automatically_scores_clean_run(tmp_path, monkeypatch):

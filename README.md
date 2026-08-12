@@ -17,7 +17,7 @@ All six cohorts are wired end to end. The reference adapter drives Claude Code o
 | Agent-facing bank | `questions/<cohort>.yaml` — `id`, `category`, `text` only. This is everything the agent under test ever sees |
 | Gold bank | `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` — answers, canonical concept IDs, classifications, and audit prose. Read by the scorer, never by the agent |
 | Agent guidance | `AGENT_INSTRUCTIONS.md` — served verbatim to the agent by the reference adapter |
-| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_vertex_gemma4_26b/` (Codex with Gemma 4 26B on Vertex Agent Platform), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/antigravity_gemini/` (Gemini through Antigravity CLI), `adapters/template/` to write your own |
+| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_vllm_gemma4_31b/` (Codex with local-vLLM Gemma 4 31B), `adapters/opencode_vllm_gemma4_31b/` (OpenCode with local-vLLM Gemma 4 31B), `adapters/codex_vertex_gemma4_26b/` (Codex with Gemma 4 26B on Vertex Agent Platform), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/antigravity_gemini/` (Gemini through Antigravity CLI), `adapters/template/` to write your own |
 
 ### Keeping the answers away from the agent
 
@@ -174,8 +174,10 @@ cp .env.example .env   # Vertex (ANTHROPIC_VERTEX_PROJECT_ID, credentials) + Azu
 
 # Run an agent over one cohort. Each analyze question spawns an agent that runs
 # Python against the cohort files, so a full run takes real time and real spend.
-# Failed stages are attempted up to 3 times with exponential backoff; override
-# with --agent-max-attempts and --agent-retry-base-seconds.
+# Initial-evaluation stages are attempted up to 3 times with exponential
+# backoff; override with --agent-max-attempts and --agent-retry-base-seconds.
+# Automatic repair uses up to 10 attempts per failed stage and up to 10 passes;
+# override with --repair-agent-max-attempts and --repair-max-passes.
 uv run clingen-bench eval \
   --agent "bash adapters/claude_code/run.sh" \
   --agent-name claude_code \
@@ -202,13 +204,16 @@ uv run clingen-bench retry-failures \
 # copies until complete, a pass makes no progress, or --max-repair-passes is
 # reached. Every pass records its hashes, effective timeouts, and provenance.
 # Gold-bearing scorecards are never copied into the repair tree before retries.
-# The source run is never modified. The original model, provider, effort, Vertex
-# project, region, and stage timeouts are restored from its manifest unless an
-# explicit repair-only timeout override is supplied.
+# When repair finishes, the original and intermediate copies are moved under
+# runs/<agent>/pre_repair/; only the final rescored copy remains directly under
+# runs/<agent>/. Lineage references and source hashes are updated after the move.
+# The original model, provider, effort, Vertex project, region, and stage
+# timeouts are restored from its manifest unless an explicit repair-only timeout
+# override is supplied.
 uv run clingen-bench retry-failures \
   --run claude_code/<run_id> \
   --max-parallel 2 \
-  --max-repair-passes 3 \
+  --max-repair-passes 10 \
   --classify-timeout 1200 \
   --disambiguate-timeout 900
 
@@ -227,7 +232,7 @@ configurable effort, so leave the variable unset for that model. Neither setting
 has any role in scoring.
 
 Every run's `manifest.json` includes a non-secret `agent_provenance` block. The
-Claude Code, Codex, and Antigravity adapters record the effective model,
+Claude Code, Codex, OpenCode, and Antigravity adapters record the effective model,
 provider, effort level, and the source of each resolved value; cloud-backed runs
 also record the project and region when available. Codex values are resolved
 from explicit `CODEX_*` overrides, the selected profile, or the base user config
@@ -250,7 +255,7 @@ The harness contract remains model- and framework-agnostic, but a coding-agent
 adapter must put every model-controlled subprocess through
 `agent.isolation.sandboxed_agent_command` and be added to the sandboxed-adapter
 registry. Unregistered adapters fail closed. Claude Code, all Codex adapters,
-and Antigravity are registered; the template adapter is intentionally not
+OpenCode, and Antigravity are registered; the template adapter is intentionally not
 certified for benchmark runs.
 
 The reference Claude adapter builds a system prompt from
