@@ -25,6 +25,7 @@ CSV_FIELDS = (
     "integrity_status",
     "questions_scored",
     "questions_failed_after_retries",
+    "questions_completed_successfully",
     "overall_score_pct",
     "classify_score_pct",
     "disambiguate_score_pct",
@@ -160,6 +161,13 @@ def read_scorecard(scorecard_path: Path, runs_dir: Path) -> dict[str, str | int]
     except ValueError:
         relative_scorecard = scorecard_path
 
+    questions_scored = _questions_scored(overall.get("n"), path=scorecard_path)
+    questions_failed_after_retries = _questions_failed_after_retries(scorecard_path)
+    if questions_failed_after_retries > questions_scored:
+        raise ValueError(
+            f"{scorecard_path}: questions failed after retries cannot exceed overall.n"
+        )
+
     return {
         "agent": _required_string(
             root.get("agent_name"), field="agent_name", path=scorecard_path
@@ -171,9 +179,10 @@ def read_scorecard(scorecard_path: Path, runs_dir: Path) -> dict[str, str | int]
         "provider": _optional_string(provenance.get("provider")),
         "effort": _optional_string(provenance.get("effort_level")),
         "integrity_status": _optional_string(integrity.get("status")),
-        "questions_scored": _questions_scored(overall.get("n"), path=scorecard_path),
-        "questions_failed_after_retries": _questions_failed_after_retries(
-            scorecard_path
+        "questions_scored": questions_scored,
+        "questions_failed_after_retries": questions_failed_after_retries,
+        "questions_completed_successfully": (
+            questions_scored - questions_failed_after_retries
         ),
         "overall_score_pct": _percentage(
             overall.get("overall_score"),

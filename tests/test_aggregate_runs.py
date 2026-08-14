@@ -126,6 +126,7 @@ def test_aggregate_runs_includes_only_active_two_level_scorecards(
         "integrity_status": "valid",
         "questions_scored": "211",
         "questions_failed_after_retries": "2",
+        "questions_completed_successfully": "209",
         "overall_score_pct": "80.0",
         "classify_score_pct": "90.0",
         "disambiguate_score_pct": "70.0",
@@ -135,6 +136,7 @@ def test_aggregate_runs_includes_only_active_two_level_scorecards(
     assert rows[1]["overall_score_pct"] == "62.5"
     assert rows[1]["disambiguate_score_pct"] == ""
     assert rows[1]["questions_failed_after_retries"] == "0"
+    assert rows[1]["questions_completed_successfully"] == "211"
     assert b"\r\n" not in output_path.read_bytes()
 
 
