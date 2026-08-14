@@ -80,7 +80,7 @@ def test_unsloth_adapter_uses_longer_request_and_stage_timeouts(monkeypatch):
     assert adapter._bridge_config().request_timeout_seconds == 42
 
 
-def test_read_only_stages_use_bounded_prompt_and_output_schema():
+def test_all_stages_use_completion_guards_and_output_schemas(monkeypatch):
     classify = {
         "stage": "classify",
         "disambiguation_concept_menu": [],
@@ -105,7 +105,14 @@ def test_read_only_stages_use_bounded_prompt_and_output_schema():
     ]
 
     analyze = {"stage": "analyze"}
-    assert adapter._stage_output_schema(analyze) is None
+    analyze_schema = adapter._stage_output_schema(analyze)
+    assert analyze_schema["required"] == ["answer_type", "answer"]
+    assert "pvalue" in analyze_schema["properties"]["answer_type"]["enum"]
+
+    monkeypatch.setattr(adapter, "_build_prompt", lambda question: "base prompt")
+    analyze_prompt = adapter._build_unsloth_prompt({"stage": "analyze"})
+    assert "analysis completion guard" in analyze_prompt
+    assert "Never end a turn by announcing" in analyze_prompt
 
 
 def test_same_model_contract_fallback_uses_no_tools_and_returns_json(
@@ -183,6 +190,43 @@ def test_response_output_text_ignores_reasoning_items():
     )
 
 
+def test_analyze_contract_aliases_are_normalized_without_changing_values():
+    result = adapter._normalize_analyze_result({
+        "answer_type": "hazard_ratio",
+        "answer": {
+            "hazard_ratio": 0.6511,
+            "ci_lower": 0.2316,
+            "ci_upper": 1.8302,
+            "p_value": 0.415778,
+        },
+        "methods": "Cox model",
+    })
+
+    assert result["answer_type"] == "hazard_ratio_with_ci"
+    assert result["answer"]["value"] == 0.6511
+    assert result["answer"]["ci_low"] == 0.2316
+    assert result["answer"]["ci_high"] == 1.8302
+    assert result["answer"]["p_value"] == 0.415778
+    assert result["methods"] == "Cox model"
+    assert adapter.validate_result(result, "analyze") == []
+
+    median = adapter._normalize_analyze_result({
+        "answer_type": "median_with_ci",
+        "answer": {
+            "median_months": 21.02,
+            "ci_lower_months": 14.51,
+            "ci_upper_months": 39.18,
+            "n_patients": 46,
+            "n_events": 25,
+        },
+    })
+    assert median["answer"]["value"] == 21.02
+    assert median["answer"]["ci_low"] == 14.51
+    assert median["answer"]["ci_high"] == 39.18
+    assert median["answer"]["n_total"] == 46
+    assert adapter.validate_result(median, "analyze") == []
+
+
 def test_invocation_failure_uses_same_model_contract_fallback(tmp_path, monkeypatch):
     output = tmp_path / "result.json"
     question = {
@@ -217,6 +261,54 @@ def test_invocation_failure_uses_same_model_contract_fallback(tmp_path, monkeypa
 
     assert adapter.main() == 0
     assert json.loads(output.read_text())["classification"] == "ambiguous"
+
+
+def test_analyze_continues_same_model_from_scratch_after_planning_final(
+    tmp_path, monkeypatch
+):
+    output = tmp_path / "result.json"
+    question = {
+        "stage": "analyze",
+        "scratch_dir": str(tmp_path / "scratch"),
+        "question_text": "How many eligible patients are there?",
+        "instructions": "Return the typed benchmark JSON.",
+    }
+    calls: list[dict] = []
+
+    def fake_codex_call(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return "Let me fix and run the final script."
+        return '{"answer_type":"count","answer":{"value":7}}'
+
+    monkeypatch.setattr(adapter, "_load_question", lambda path: question)
+    monkeypatch.setattr(
+        adapter, "_build_unsloth_prompt", lambda payload: "initial prompt"
+    )
+    monkeypatch.setattr(adapter, "_codex_call", fake_codex_call)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "adapter.py",
+            "--question-file",
+            str(tmp_path / "question.json"),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert adapter.main() == 0
+    assert json.loads(output.read_text()) == {
+        "answer_type": "count",
+        "answer": {"value": 7},
+    }
+    assert len(calls) == 2
+    assert calls[1]["call_label"] == "continuation_1"
+    assert "Let me fix and run" in calls[1]["prompt"]
+    assert "same writable scratch directory" in calls[1]["prompt"]
+    assert "Do not restart" in calls[1]["prompt"]
+    assert calls[1]["prompt"] != "initial prompt"
 
 
 def test_codex_call_pins_provider_and_shields_studio_token(tmp_path, monkeypatch):

@@ -24,6 +24,7 @@ CSV_FIELDS = (
     "effort",
     "integrity_status",
     "questions_scored",
+    "questions_failed_after_retries",
     "overall_score_pct",
     "classify_score_pct",
     "disambiguate_score_pct",
@@ -63,6 +64,68 @@ def _questions_scored(value: Any, *, path: Path) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ValueError(f"{path}: overall.n must be a non-negative integer")
     return value
+
+
+def _questions_failed_after_retries(scorecard_path: Path) -> int:
+    """Count distinct questions left unmerged by the final repair pass."""
+    manifest_path = scorecard_path.with_name("manifest.json")
+    if not manifest_path.is_file():
+        return 0
+
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"could not read manifest {manifest_path}: {exc}") from exc
+
+    manifest = _mapping(payload, field="manifest", path=manifest_path)
+    repair_history = manifest.get("repair_history")
+    if repair_history is None:
+        return 0
+    if not isinstance(repair_history, list):
+        raise ValueError(f"{manifest_path}: repair_history must be a JSON array")
+    if not repair_history:
+        return 0
+
+    final_repair = _mapping(
+        repair_history[-1],
+        field="repair_history[-1]",
+        path=manifest_path,
+    )
+    targets = final_repair.get("targets")
+    if not isinstance(targets, list):
+        raise ValueError(
+            f"{manifest_path}: repair_history[-1].targets must be a JSON array"
+        )
+
+    failed_questions: set[tuple[str, str]] = set()
+    for index, value in enumerate(targets):
+        target = _mapping(
+            value,
+            field=f"repair_history[-1].targets[{index}]",
+            path=manifest_path,
+        )
+        merged = target.get("merged")
+        if not isinstance(merged, bool):
+            raise ValueError(
+                f"{manifest_path}: repair_history[-1].targets[{index}].merged "
+                "must be a boolean"
+            )
+        if not merged:
+            failed_questions.add(
+                (
+                    _required_string(
+                        target.get("cohort"),
+                        field=f"repair_history[-1].targets[{index}].cohort",
+                        path=manifest_path,
+                    ),
+                    _required_string(
+                        target.get("question_id"),
+                        field=f"repair_history[-1].targets[{index}].question_id",
+                        path=manifest_path,
+                    ),
+                )
+            )
+    return len(failed_questions)
 
 
 def read_scorecard(scorecard_path: Path, runs_dir: Path) -> dict[str, str | int]:
@@ -109,6 +172,9 @@ def read_scorecard(scorecard_path: Path, runs_dir: Path) -> dict[str, str | int]
         "effort": _optional_string(provenance.get("effort_level")),
         "integrity_status": _optional_string(integrity.get("status")),
         "questions_scored": _questions_scored(overall.get("n"), path=scorecard_path),
+        "questions_failed_after_retries": _questions_failed_after_retries(
+            scorecard_path
+        ),
         "overall_score_pct": _percentage(
             overall.get("overall_score"),
             field="overall.overall_score",

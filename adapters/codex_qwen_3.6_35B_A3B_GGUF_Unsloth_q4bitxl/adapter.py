@@ -58,6 +58,21 @@ BRIDGE_TOKEN_ENV = "UNSLOTH_STUDIO_BRIDGE_KEY"
 def _build_unsloth_prompt(question: dict) -> str:
     prompt = _build_prompt(question)
     stage = question["stage"]
+    if stage == "analyze":
+        return (
+            f"{prompt}\n\n"
+            "## Local-model analysis completion guard\n"
+            "Finish the computation in this invocation. Work toward one complete "
+            "analysis script instead of repeatedly exploring or rewriting partial "
+            "scripts. Inspect only the files and columns needed for the requested "
+            "estimand. If a command or script fails, fix and rerun it immediately. "
+            "Never end a turn by announcing what you will inspect, build, fix, or "
+            "run next: perform that action with a tool in the same turn. Do not "
+            "stop after planning a final script. Once you have a defensible result, "
+            "stop further refinement and return the required contract JSON as your "
+            "final message. A best contract-valid result is preferable to an "
+            "unfinished exhaustive analysis.\n"
+        )
     if stage not in {"classify", "disambiguate"}:
         return prompt
     shell_limit = 4 if stage == "classify" else 2
@@ -72,6 +87,33 @@ def _build_unsloth_prompt(question: dict) -> str:
         "tool now or return the required JSON. If further inspection would only "
         "refine confidence, stop and return your best contract-compliant answer "
         "from the evidence already available.\n"
+    )
+
+
+def _build_analyze_continuation_prompt(
+    question: dict, previous_text: str, continuation: int
+) -> str:
+    previous = previous_text.strip()
+    if len(previous) > 2_000:
+        previous = previous[-2_000:]
+    return (
+        f"# Same-model analysis completion continuation {continuation}\n\n"
+        "You are continuing an unfinished cancer-data benchmark analysis in the "
+        "same writable scratch directory. The previous invocation already received "
+        "the full benchmark instructions and created scripts here. Do not restart "
+        "the analysis, reread the general instructions, or broadly explore the "
+        "cohort.\n\n"
+        f"Question: {question['question_text']}\n\n"
+        f"Output contract: {question['instructions']}\n\n"
+        "Start by inspecting the existing .py files in the current directory. "
+        "Select the most complete script, run it, and fix its concrete errors. Use "
+        "at most 8 shell commands. Do not inspect raw data unless a script error "
+        "cannot be repaired from its traceback and code. Never end by announcing "
+        "a future check, fix, script, or command: execute it now. As soon as the "
+        "script yields a defensible result, return only the contract JSON with no "
+        "Markdown or prose.\n\n"
+        "The previous invocation's final message was:\n"
+        f"{previous or '(empty)'}\n"
     )
 
 
@@ -114,7 +156,100 @@ def _stage_output_schema(question: dict) -> dict | None:
             "required": ["concept_ids"],
             "additionalProperties": False,
         }
+    if stage == "analyze":
+        return {
+            "type": "object",
+            "properties": {
+                "answer_type": {
+                    "type": "string",
+                    "enum": [
+                        "count",
+                        "proportion",
+                        "median_with_ci",
+                        "hazard_ratio_with_ci",
+                        "odds_ratio_with_ci",
+                        "pvalue",
+                        "categorical",
+                        "categorical_distribution",
+                    ],
+                },
+                "answer": {"type": "object"},
+                "methods": {"type": "string"},
+                "supporting_evidence": {"type": "object"},
+            },
+            "required": ["answer_type", "answer"],
+            "additionalProperties": False,
+        }
     return None
+
+
+def _normalize_analyze_result(obj: dict | None) -> dict | None:
+    """Map common model field aliases onto the benchmark's typed contract."""
+    if not isinstance(obj, dict):
+        return obj
+    normalized = dict(obj)
+    answer_type_aliases = {
+        "hazard_ratio": "hazard_ratio_with_ci",
+        "odds_ratio": "odds_ratio_with_ci",
+        "median": "median_with_ci",
+        "p_value": "pvalue",
+    }
+    answer_type = normalized.get("answer_type")
+    if isinstance(answer_type, str):
+        answer_type = answer_type_aliases.get(answer_type, answer_type)
+        normalized["answer_type"] = answer_type
+    answer = normalized.get("answer")
+    if not isinstance(answer, dict) or not isinstance(answer_type, str):
+        return normalized
+    answer = dict(answer)
+
+    aliases_by_type: dict[str, dict[str, tuple[str, ...]]] = {
+        "count": {"value": ("count",)},
+        "proportion": {"value": ("proportion", "rate")},
+        "median_with_ci": {
+            "value": ("median", "median_months"),
+            "ci_low": (
+                "ci_lower",
+                "ci_lower_months",
+                "lower_ci",
+                "ci_95_low",
+            ),
+            "ci_high": (
+                "ci_upper",
+                "ci_upper_months",
+                "upper_ci",
+                "ci_95_high",
+            ),
+            "n_total": ("n_patients",),
+        },
+        "hazard_ratio_with_ci": {
+            "value": ("hazard_ratio", "hr"),
+            "ci_low": ("ci_lower", "hr_ci_lower", "lower_ci", "ci_95_low"),
+            "ci_high": ("ci_upper", "hr_ci_upper", "upper_ci", "ci_95_high"),
+            "n_total": ("n_patients",),
+        },
+        "odds_ratio_with_ci": {
+            "value": ("odds_ratio", "or"),
+            "ci_low": ("ci_lower", "or_ci_lower", "lower_ci", "ci_95_low"),
+            "ci_high": ("ci_upper", "or_ci_upper", "upper_ci", "ci_95_high"),
+            "n_total": ("n_patients",),
+        },
+        "pvalue": {
+            "value": ("p_value", "pvalue"),
+            "test_name": ("test",),
+            "n_total": ("n_patients",),
+        },
+        "categorical": {"value": ("category",)},
+    }
+    for canonical, aliases in aliases_by_type.get(answer_type, {}).items():
+        if canonical in answer:
+            continue
+        for alias in aliases:
+            if alias in answer:
+                answer[canonical] = answer[alias]
+                break
+    normalized["answer"] = answer
+    return normalized
 
 
 def _response_output_text(response: Mapping[str, Any]) -> str:
@@ -307,15 +442,17 @@ def _save_attempt_logs(
     stage: str,
     attempt: int,
     proc: subprocess.CompletedProcess[str],
+    call_label: str = "",
 ) -> None:
     if not _env_truthy("CODEX_SAVE_ATTEMPT_LOGS", True):
         return
     audit_dir = scratch_dir.parent / "adapter_audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
-    (audit_dir / f"codex_unsloth_attempt.{stage}.{attempt}.stdout.txt").write_text(
+    suffix = f".{call_label}" if call_label else ""
+    (audit_dir / f"codex_unsloth_attempt.{stage}.{attempt}{suffix}.stdout.txt").write_text(
         proc.stdout or ""
     )
-    (audit_dir / f"codex_unsloth_attempt.{stage}.{attempt}.stderr.txt").write_text(
+    (audit_dir / f"codex_unsloth_attempt.{stage}.{attempt}{suffix}.stderr.txt").write_text(
         proc.stderr or ""
     )
 
@@ -334,7 +471,13 @@ def _is_retryable_unsloth_failure(stderr: str) -> bool:
     )
 
 
-def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
+def _codex_call(
+    *,
+    prompt: str,
+    question: dict,
+    last_message_file: Path,
+    call_label: str = "",
+) -> str:
     stage = question["stage"]
     scratch_dir = Path(question["scratch_dir"]).resolve()
     cohort_dir = Path(question["cohort_dir"]).resolve()
@@ -405,7 +548,10 @@ def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
         audit_path = (
             scratch_dir.parent
             / "adapter_audit"
-            / f"unsloth_bridge.{stage}.{attempt}.jsonl"
+            / (
+                f"unsloth_bridge.{stage}.{attempt}"
+                f"{f'.{call_label}' if call_label else ''}.jsonl"
+            )
         )
         with UnslothResponsesBridge(config, audit_path=audit_path) as bridge:
             attempt_cmd = [*cmd]
@@ -464,6 +610,7 @@ def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
             stage=stage,
             attempt=attempt,
             proc=proc,
+            call_label=call_label,
         )
         if proc.returncode == 0:
             text = (
@@ -498,18 +645,46 @@ def main() -> int:
     scratch_dir.mkdir(parents=True, exist_ok=True)
     last_message_file = scratch_dir / f".codex_last_message.{stage}.txt"
     text = ""
-    try:
-        text = _codex_call(
-            prompt=_build_unsloth_prompt(question),
-            question=question,
-            last_message_file=last_message_file,
+    obj: dict | None = None
+    analyze_continuations = (
+        _env_int("CODEX_ANALYZE_CONTINUATIONS", 2) if stage == "analyze" else 0
+    )
+    for continuation in range(analyze_continuations + 1):
+        call_label = f"continuation_{continuation}" if continuation else ""
+        current_last_message = (
+            scratch_dir / f".codex_last_message.{stage}.{call_label}.txt"
+            if call_label
+            else last_message_file
         )
-    except Exception as exc:
-        sys.stderr.write(f"adapter: Codex/Unsloth invocation failed: {exc}\n")
-        if stage not in {"classify", "disambiguate"}:
-            return 3
+        try:
+            prompt = (
+                _build_unsloth_prompt(question)
+                if continuation == 0
+                else _build_analyze_continuation_prompt(
+                    question, text, continuation
+                )
+            )
+            text = _codex_call(
+                prompt=prompt,
+                question=question,
+                last_message_file=current_last_message,
+                call_label=call_label,
+            )
+        except Exception as exc:
+            sys.stderr.write(f"adapter: Codex/Unsloth invocation failed: {exc}\n")
+            if stage not in {"classify", "disambiguate"}:
+                return 3
+            break
+        obj = _normalize_analyze_result(_extract_json(text))
+        result_errors = validate_result(obj, stage) if obj is not None else []
+        if obj is not None and not result_errors:
+            break
+        if continuation < analyze_continuations:
+            sys.stderr.write(
+                "adapter: analyze final was not valid contract JSON; continuing "
+                "the same model from existing scratch work\n"
+            )
 
-    obj = _extract_json(text)
     contract_errors = (
         validate_result(obj, stage)
         if obj is not None and stage in {"classify", "disambiguate"}
@@ -526,7 +701,7 @@ def main() -> int:
             obj = _direct_contract_result(question)
         except Exception as exc:
             sys.stderr.write(f"adapter: contract finalizer failed: {exc}\n")
-    if obj is None:
+    if obj is None or validate_result(obj, stage):
         sys.stderr.write("adapter: could not extract JSON from Codex output\n")
         sys.stderr.write(text[:2000] + "\n")
         return 3

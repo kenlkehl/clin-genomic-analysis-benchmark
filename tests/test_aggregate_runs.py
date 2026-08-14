@@ -18,6 +18,7 @@ def _write_scorecard(
     classify: float,
     disambiguate: float | None,
     analyze: float,
+    failed_after_retries: int = 0,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -40,6 +41,27 @@ def _write_scorecard(
                         "analyze": analyze,
                     },
                 },
+            }
+        ),
+        encoding="utf-8",
+    )
+    path.with_name("manifest.json").write_text(
+        json.dumps(
+            {
+                "repair_history": [
+                    {
+                        "targets": [
+                            {
+                                "cohort": "test-cohort",
+                                "question_id": f"question-{index}",
+                                "merged": False,
+                            }
+                            for index in range(failed_after_retries)
+                        ]
+                    }
+                ]
+                if failed_after_retries
+                else []
             }
         ),
         encoding="utf-8",
@@ -67,6 +89,7 @@ def test_aggregate_runs_includes_only_active_two_level_scorecards(
         classify=0.9,
         disambiguate=0.7,
         analyze=0.8,
+        failed_after_retries=2,
     )
     _write_scorecard(
         runs_dir / "failed_runs" / "agent-c" / "run-3" / "scorecard.json",
@@ -102,6 +125,7 @@ def test_aggregate_runs_includes_only_active_two_level_scorecards(
         "effort": "high",
         "integrity_status": "valid",
         "questions_scored": "211",
+        "questions_failed_after_retries": "2",
         "overall_score_pct": "80.0",
         "classify_score_pct": "90.0",
         "disambiguate_score_pct": "70.0",
@@ -110,6 +134,7 @@ def test_aggregate_runs_includes_only_active_two_level_scorecards(
     }
     assert rows[1]["overall_score_pct"] == "62.5"
     assert rows[1]["disambiguate_score_pct"] == ""
+    assert rows[1]["questions_failed_after_retries"] == "0"
     assert b"\r\n" not in output_path.read_bytes()
 
 

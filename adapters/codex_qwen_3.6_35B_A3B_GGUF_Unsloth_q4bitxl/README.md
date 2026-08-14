@@ -68,6 +68,7 @@ one long agent request more predictably than several concurrent requests.
 | `CODEX_SANDBOX_MODE` | `workspace-write` | analyze-stage Codex sandbox |
 | `CODEX_EPHEMERAL` | `1` | disable persistent Codex session state |
 | `CODEX_MAX_ATTEMPTS` | `1` | whole-Codex-process attempts inside one harness attempt |
+| `CODEX_ANALYZE_CONTINUATIONS` | `2` | same-model continuations from existing scratch work when analyze ends without valid JSON |
 | `CODEX_RETRY_BASE_SECONDS` | `15` | delay multiplier between Codex-process attempts |
 | `UNSLOTH_REQUEST_TIMEOUT_SECONDS` | `1200` | timeout for one Studio Responses request |
 | `UNSLOTH_MAX_RETRIES` | `3` | retryable upstream attempts per Responses request |
@@ -82,11 +83,23 @@ The bridge requests a non-streaming response from Studio, then replays it to
 Codex as Responses SSE. This permits safe retries before any partial stream has
 been exposed and preserves Studio's native structured tool calls.
 
-Classify and disambiguate invocations also pass an explicit final-response JSON
-schema to Codex and include a bounded-inspection guard. This prevents a slow
-local model from ending on planning prose or growing the context indefinitely
-by repeatedly dumping cohort metadata. Analyze remains unrestricted because it
-may legitimately require a longer multi-step computation.
+Every invocation passes an explicit final-response JSON schema to Codex.
+Classify and disambiguate include a bounded-inspection guard. Analyze keeps its
+full request and output budgets, but includes a completion guard that directs
+the local model to execute fixes immediately and not end on planning prose.
+This preserves room for legitimate multi-step computation while making an
+unfinished "let me build/run/fix" final message less likely.
+
+If analyze nevertheless ends without contract-valid JSON, the adapter invokes
+the same model again in the same scratch directory up to the bounded
+`CODEX_ANALYZE_CONTINUATIONS` limit. The continuation is told to use the
+existing scripts and outputs, execute the unfinished fix, and return the JSON;
+it is not given gold data or an answer from another model.
+
+Before validation, the adapter also normalizes conventional typed-field aliases
+such as `hazard_ratio`/`ci_lower`/`ci_upper` to the benchmark's
+`value`/`ci_low`/`ci_high` names. This is contract repair only: numeric values,
+methods, evidence, and model-selected answer type are otherwise unchanged.
 
 If Codex still ends a classify or disambiguate stage without contract JSON, the
 trusted adapter makes a bounded no-tools finalization request to the same Qwen
