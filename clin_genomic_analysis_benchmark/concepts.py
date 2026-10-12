@@ -36,7 +36,7 @@ CONCEPT_MENU: tuple[Concept, ...] = (
     Concept(
         "DISEASE_STATE_DEFINITION",
         "Disease-state definition",
-        "How a state such as advanced, metastatic, early, resectable, or mCRPC is defined.",
+        "How a state such as advanced, metastatic, early, or resectable is defined.",
     ),
     Concept(
         "CLINICAL_SUBGROUP_DEFINITION",
@@ -68,7 +68,7 @@ CONCEPT_MENU: tuple[Concept, ...] = (
     Concept(
         "TREATMENT_SETTING",
         "Treatment or disease setting",
-        "The adjuvant, neoadjuvant, metastatic, castration-state, or other treatment setting.",
+        "The adjuvant, neoadjuvant, metastatic, or other treatment setting.",
     ),
     Concept(
         "REGIMEN_SELECTION",

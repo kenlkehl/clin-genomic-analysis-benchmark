@@ -86,13 +86,13 @@ The same menu is included as structured data in every `question.json`.
 |---|---|
 | `ANATOMIC_HISTOLOGIC_SCOPE` | eligible cancer sites, `ca_type` values, histologies, or sidedness groups |
 | `DISEASE_EXTENT_SCOPE` | a stage or extent restriction, such as all stages versus Stage IV |
-| `DISEASE_STATE_DEFINITION` | a definition of advanced, metastatic, early, resectable, or mCRPC disease |
+| `DISEASE_STATE_DEFINITION` | a definition of advanced, metastatic, early, resectable, or another disease state |
 | `CLINICAL_SUBGROUP_DEFINITION` | a clinical/molecular subgroup, subtype, age cutoff, population stratum, source variable, coding system, grouping, or demographic dimension |
 | `MISSING_DATA_HANDLING` | a rule for unknown, missing, or not-applicable values |
 | `TREATMENT_DEFINITION` | drugs, classes, backbones, combinations, or procedures that count as treatment |
 | `COMPARATOR_DEFINITION` | a reference or control group |
 | `LINE_OF_THERAPY` | an analytic anchor for first line or another line |
-| `TREATMENT_SETTING` | an adjuvant, neoadjuvant, metastatic, castration-state, or other setting |
+| `TREATMENT_SETTING` | an adjuvant, neoadjuvant, metastatic, or other setting |
 | `REGIMEN_SELECTION` | which qualifying regimen per patient, or whether mono/combination therapy qualifies |
 | `CLINICAL_TRIAL_HANDLING` | a rule for clinical-trial regimens with unannotated composition |
 | `PROCEDURE_OR_TIMING_DEFINITION` | an operational definition of surgery/adjuvant/neoadjuvant timing |
@@ -173,10 +173,7 @@ these grounds alone.
   `regimen_cancer_level_dataset` whose `regimen_drugs` string contains
   drug X (case-insensitive substring), including regimens with additional
   concomitant drugs. Treat biosimilars as identical to the reference
-  molecule (e.g., trastuzumab biosimilars count as trastuzumab), but
-  exclude antibody-drug conjugates that have distinct INNs (e.g.,
-  trastuzumab emtansine, trastuzumab deruxtecan are *not* "trastuzumab"
-  regimens). Biosimilar / prodrug / drug-class granularity is not, by
+  molecule, but treat antibody-drug conjugates with the same antibody but different payloads as distinct drugs. Biosimilar / prodrug / drug-class granularity is not, by
   itself, a source of ambiguity.
 
 - **Regimen attribution** → unless the question explicitly says otherwise,
@@ -291,7 +288,7 @@ menu. Select the named ID when its condition applies.
   the unresolved issue is how to construct a clinical disease state.
 
 - **`DISEASE_STATE_DEFINITION`** — A state such as advanced, metastatic,
-  early, resectable, or mCRPC is used without an operational definition. For
+  early, or resectable is used without an operational definition. For
   example, "metastatic" may mean de novo Stage IV only or may also include
   recurrent/relapsed metastatic disease.
 
@@ -326,9 +323,8 @@ menu. Select the named ID when its condition applies.
   corresponding dataset field make the anchor deterministic.
 
 - **`TREATMENT_SETTING`** — The treatment setting is not fixed, such as
-  adjuvant, neoadjuvant, metastatic, castration-sensitive, castration-resistant,
-  or another clinically distinct context, and the setting changes which
-  treatments or patients qualify.
+  adjuvant, neoadjuvant, metastatic, or another clinically distinct context,
+  and the setting changes which treatments or patients qualify.
 
 - **`REGIMEN_SELECTION`** — The question does not say which qualifying regimen
   to use when a patient has multiple candidates, or whether monotherapy,
@@ -348,8 +344,7 @@ menu. Select the named ID when its condition applies.
   window or ordering rule is supplied.
 
 - **`GENE_OR_GENE_SET`** — A biomarker refers to a pathway, repair process,
-  signature, or gene family without specifying which genes are members. For
-  example, "DNA damage repair alteration" requires a concrete gene set.
+  signature, or gene family without specifying which genes are members.
 
 - **`ALTERATION_TYPE`** — The genomic alteration classes that count are not
   specified, such as SNV/indel mutations, copy-number alterations, fusions, or
@@ -476,17 +471,16 @@ Return one matching the question's expected answer type. All numeric
 fields are JSON numbers; integer counts are JSON integers.
 
 If the question is well specified but the requested estimand cannot be
-estimated from the supplied data (for example, separation or an empty model
-cell), keep it `unambiguous` and return its expected `answer_type` with an
-`answer` of this form:
+estimated from the supplied data, keep it `unambiguous` and return its
+expected `answer_type` with an `answer` of this form:
 
 ```json
 { "unanswerable": true,
-  "value": 1.0,
+  "value": <placeholder number>,
   "unanswerable_reason": "<specific data limitation>" }
 ```
 
-Use an appropriate placeholder `value` (normally the null value for a ratio).
+`value` is a required placeholder number.
 
 | `answer_type`              | Required `answer` fields |
 |---|---|
@@ -509,11 +503,11 @@ so a small category estimated badly is not offset by large ones estimated well.
 ```json
 { "answer_type": "categorical_distribution",
   "answer": {
-    "denominator": 1484,
-    "proportions_by_category": {"Left colon": 0.2925, "Right colon": 0.3288,
-                                "Rectal": 0.3342, "Other": 0.0445},
-    "counts_by_category":      {"Left colon": 434, "Right colon": 488,
-                                "Rectal": 496, "Other": 66}
+    "denominator": 200,
+    "proportions_by_category": {"Category A": 0.50, "Category B": 0.30,
+                                "Category C": 0.20},
+    "counts_by_category":      {"Category A": 100, "Category B": 60,
+                                "Category C": 40}
   }
 }
 ```
