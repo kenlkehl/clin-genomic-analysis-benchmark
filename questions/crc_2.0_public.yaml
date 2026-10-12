@@ -30,8 +30,9 @@ questions:
 - id: crc_2.0_public-Q73ef7699
   category: 2
   text: How many patients in the colorectal cancer cohort had liver metastases present
-    at the time of diagnosis? (Include the full colorectal cancer cohort — colon primaries,
-    rectal/rectosigmoid primaries, and unspecified colorectal primaries.)
+    at the time of diagnosis (within 30 days of diagnosis)? (Include the full colorectal
+    cancer cohort — colon primaries, rectal/rectosigmoid primaries, and unspecified colorectal
+    primaries.)
 - id: crc_2.0_public-Q93f9f64f
   category: 3
   text: How many unique patients with CRC had a tumor with a BRAF V600E mutation?

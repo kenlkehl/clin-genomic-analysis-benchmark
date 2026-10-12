@@ -63,7 +63,7 @@ questions:
 - id: prostate_1.2-Q9e43be6a
   category: 2
   text: Among patients in the prostate cohort diagnosed with stage IV prostate cancer,
-    what proportion had bone metastases at diagnosis?
+    what proportion had bone metastases at diagnosis (within 30 days of diagnosis)?
 - id: prostate_1.2-Qa6e104e6
   category: 2
   text: What proportion of patients in the prostate cancer cohort had Stage IV prostate
