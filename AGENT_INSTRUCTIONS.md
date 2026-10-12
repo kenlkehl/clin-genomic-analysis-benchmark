@@ -103,7 +103,7 @@ The same menu is included as structured data in every `question.json`.
 | `GERMLINE_SOMATIC_SCOPE` | whether germline, somatic, or both alterations count |
 | `PANEL_COVERAGE` | eligibility based on an assay's ability to detect the gene/event |
 | `SPECIMEN_SELECTION` | which specimen or sequencing event to use |
-| `BIOMARKER_TEST_DEFINITION` | the assay/result defining a biomarker, such as MSI versus MMR |
+| `BIOMARKER_TEST_DEFINITION` | the assay/result defining a biomarker |
 | `OUTCOME_METRIC` | the endpoint/version, such as OS, PFS-I, PFS-M, response, or TTNT |
 | `RESPONSE_DEFINITION` | how response is measured or categorized |
 | `TIME_ORIGIN` | the date/event from which follow-up begins |
@@ -353,7 +353,7 @@ menu. Select the named ID when its condition applies.
 
 - **`ALTERATION_TYPE`** — The genomic alteration classes that count are not
   specified, such as SNV/indel mutations, copy-number alterations, fusions, or
-  structural variants. A phrase such as "FGFR3 altered" may require this choice.
+  structural variants.
 
 - **`VARIANT_INCLUSION_CRITERIA`** — The question requires consequence,
   pathogenicity, hotspot, or call-confidence filters that are not resolved by
@@ -379,8 +379,8 @@ menu. Select the named ID when its condition applies.
   the first, latest, pre-treatment, or disease-state-specific specimen.
 
 - **`BIOMARKER_TEST_DEFINITION`** — The assay or result defining a biomarker is
-  unspecified. Examples include whether MSI or MMR status is used, which
-  receptor-status test and threshold applies, or how equivocal results count.
+  unspecified. Examples include which receptor-status test and threshold
+  applies, or how equivocal results count.
 
 - **`OUTCOME_METRIC`** — The endpoint or endpoint version is not fixed, such as
   OS, response, TTNT, PFS-I, PFS-M, PFS-I-or-M, or PFS-I-and-M. In BPC, these

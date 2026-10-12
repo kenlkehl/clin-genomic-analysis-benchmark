@@ -123,7 +123,7 @@ CONCEPT_MENU: tuple[Concept, ...] = (
     Concept(
         "BIOMARKER_TEST_DEFINITION",
         "Biomarker-test definition",
-        "Which test, assay result, or operational biomarker definition is used, such as MSI versus MMR.",
+        "Which test, assay result, or operational biomarker definition is used.",
     ),
     Concept(
         "OUTCOME_METRIC",
