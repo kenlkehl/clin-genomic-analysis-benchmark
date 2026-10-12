@@ -419,12 +419,16 @@ menu. Select the named ID when its condition applies.
   patients tested before the origin, or an explicit alternative. A vulnerable
   time-to-event question must state its rule to be unambiguous.
 
-- **`IMMORTAL_TIME_BIAS`** — An exposure is defined by something occurring
-  after follow-up begins, such as ever receiving a treatment, but the question
-  does not specify a landmark, time-varying exposure, pre-origin ascertainment,
-  or another temporal strategy. A treated-versus-untreated comparison from a
-  common earlier origin otherwise grants the treated group guaranteed
-  event-free time before exposure.
+- **`IMMORTAL_TIME_BIAS`** — An exposure is defined or ascertained after
+  follow-up begins, but the question does not specify a landmark,
+  time-varying exposure, pre-origin ascertainment, or another temporal
+  strategy. This covers treatment exposures, such as ever receiving a drug,
+  and biomarker status from sequencing that can occur after the outcome
+  origin, even when the alteration itself was present earlier. A comparison
+  from a common earlier origin otherwise grants the exposed group guaranteed
+  event-free time before exposure or ascertainment. A stated rule of left
+  truncation at the testing date resolves this for biomarker status from that
+  testing.
 
 - **`ASCERTAINMENT_WINDOW`** — A characteristic or exposure could be measured
   at diagnosis, before the outcome origin, within a fixed window, or ever
