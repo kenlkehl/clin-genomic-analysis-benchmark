@@ -163,7 +163,17 @@ def score_run(
                 agent_result = analyze.get("result") or {}
                 agent_atype = agent_result.get("answer_type")
                 gold_atype = gold_q.analysis_spec.expected_answer_type if gold_q.analysis_spec else None
-                if not gold_atype:
+                if gold_answer.get("unanswerable") is True:
+                    # Gold unanswerable → only the agent's unanswerable flag is
+                    # scored. Agents are not told the expected answer_type, and
+                    # with no estimate to compare the type carries no signal.
+                    qs.answer_type = gold_atype
+                    qs.analysis = disc_mod.score_analysis(
+                        agent_answer=(agent_result.get("answer") or {}),
+                        gold_answer=gold_answer,
+                        answer_type=gold_atype,
+                    )
+                elif not gold_atype:
                     qs.failure_reason = "gold has no expected_answer_type"
                 elif agent_atype != gold_atype:
                     # Wrong answer-type → 0 pts (MAJOR)

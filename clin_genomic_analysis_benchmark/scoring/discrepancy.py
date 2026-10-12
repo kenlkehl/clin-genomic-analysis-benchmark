@@ -245,7 +245,8 @@ def score_analysis(*, agent_answer: dict, gold_answer: dict, answer_type: str,
     that explicitly set `unanswerable: true` are credited as ACCURATE; all
     other answers are MAJOR, even if their value matches the gold placeholder.
     A placeholder match does not establish that the agent recognised the
-    estimand cannot be computed.
+    estimand cannot be computed. The score driver routes these questions here
+    without its answer_type check, so the flag alone decides the band.
     """
     options = options or {}
     if gold_answer.get("unanswerable") is True:
