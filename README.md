@@ -296,7 +296,7 @@ Under `$CLINGEN_GOLD_ROOT`, away from the agent:
 - **Anatomic and histologic scope** *is* a real ambiguity for cancer-level questions in heterogeneous cohorts (colon vs rectal, bladder vs upper tract) unless the question says which subtypes count.
 - **Line of therapy** with no analytic anchor is ambiguous. **"Chemotherapy"** unqualified — cytotoxic only, or any systemic therapy — is ambiguous. So is a **biomarker-frequency denominator** when the question doesn't say whether it's all sequenced patients or only those on gene-covering panels.
 - **Delayed cohort entry** (left-truncate at the sequencing date) and **immortal time bias** (use a landmark) have to be addressed on the time-to-event questions where they bite.
-- **`dmets_<site>`** is an ever-indicator; at-diagnosis questions use `dx_to_dmets_<site>_days <= 30`. **cBioPortal CNA** values run −2 to 2, where 2 is high-level amplification and −2 a deep deletion. **Clinical-trial regimens** (`drugs_ct_yn == 'Yes'`) are excluded only for drug-specific questions.
+- **`dmets_<site>`** is an ever-indicator; at-diagnosis questions use `dx_to_dmets_<site>_days <= 30`. **cBioPortal CNA** values run −2 to 2, where 2 is high-level amplification and −2 a deep deletion. **Clinical-trial regimens** (`drugs_ct_yn == 'Yes'`) have unannotated drug composition and no default rule: a question that depends on them either states one (e.g. "assume any clinical-trial regimen did not contain X") or carries `CLINICAL_TRIAL_HANDLING`.
 - **`analysis_plan_summary`** in the workbook is a self-contained prose method spec for each unambiguous question.
 
 ## Pointers
