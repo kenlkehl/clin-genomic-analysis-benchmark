@@ -111,7 +111,7 @@ The same menu is included as structured data in every `question.json`.
 | `SUMMARY_MEASURE` | mean, median, count, proportion, or survival probability |
 | `STATISTICAL_ESTIMAND` | the target contrast/statistic, such as subgroup HRs or an interaction |
 | `MODEL_SPECIFICATION` | the model, test, covariates, or interaction terms |
-| `CENSORING_RULE` | handling of ongoing follow-up or competing/absent events |
+| `CENSORING_RULE` | handling of ongoing follow-up or competing events |
 | `DELAYED_ENTRY` | risk-set entry after the outcome time origin / left truncation |
 | `IMMORTAL_TIME_BIAS` | temporal handling of post-origin exposure or biomarker ascertainment |
 | `ASCERTAINMENT_WINDOW` | when a characteristic is measured, such as at diagnosis versus ever |
@@ -408,9 +408,9 @@ menu. Select the named ID when its condition applies.
   remain after applying the defaults. Do not select this solely to question
   the conventional univariable Cox model when that default directly applies.
 
-- **`CENSORING_RULE`** — Handling of ongoing follow-up, absent events,
-  competing events, or treatment changes is required but not specified, and
-  plausible censoring choices materially change the time-to-event analysis.
+- **`CENSORING_RULE`** — Handling of ongoing follow-up, competing events, or
+  treatment changes is required but not specified, and plausible censoring
+  choices materially change the time-to-event analysis.
 
 - **`DELAYED_ENTRY`** — The outcome origin can precede genomic testing, but
   the question does not say how patients enter the risk set. BPC inclusion

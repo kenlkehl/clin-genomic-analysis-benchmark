@@ -163,7 +163,7 @@ CONCEPT_MENU: tuple[Concept, ...] = (
     Concept(
         "CENSORING_RULE",
         "Censoring rule",
-        "How ongoing follow-up, competing events, or absent subsequent treatment is censored.",
+        "How ongoing follow-up or competing events are censored.",
     ),
     Concept(
         "DELAYED_ENTRY",
