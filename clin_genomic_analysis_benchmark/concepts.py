@@ -183,7 +183,7 @@ CONCEPT_MENU: tuple[Concept, ...] = (
     Concept(
         "REPEATED_OBSERVATIONS",
         "Repeated-observation handling",
-        "How multiple regimens, sequential treatments, samples, or observations per patient are handled.",
+        "How multiple regimens, samples, or observations per patient are handled.",
     ),
     Concept(
         "DENOMINATOR_DEFINITION",
