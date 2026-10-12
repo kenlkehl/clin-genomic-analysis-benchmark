@@ -12,7 +12,7 @@ All six cohorts are wired end to end. The reference adapter drives Claude Code o
 
 | Component | Status |
 |---|---|
-| Question bank | **211 questions — 96 unambiguous, 115 ambiguous**, after four rounds of oncologist review. Curated in `bpc_benchmark_review_6-19-26.xlsx` under `$CLINGEN_GOLD_ROOT` |
+| Question bank | **211 questions — 96 unambiguous, 115 ambiguous**, after 14 rounds of iteration: 11 rounds with spot checks and 3 full manual review rounds. Curated in `bpc_benchmark_review_6-19-26.xlsx` under `$CLINGEN_GOLD_ROOT` |
 | Gold answers | 96 / 96 unambiguous questions have a computed, re-runnable gold answer; 1 is marked `unanswerable` (see below) |
 | Agent-facing bank | `questions/<cohort>.yaml` — `id`, `category`, `text` only. This is everything the agent under test ever sees |
 | Gold bank | `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` — answers, canonical concept IDs, classifications, and audit prose. Read by the scorer, never by the agent |
