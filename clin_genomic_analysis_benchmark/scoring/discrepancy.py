@@ -242,24 +242,18 @@ def score_analysis(*, agent_answer: dict, gold_answer: dict, answer_type: str,
 
     Special case — when the gold answer carries `unanswerable: true`, the
     estimand is structurally unidentifiable on the supplied cohort. Agents
-    that recognise this (by setting `unanswerable: true` themselves OR by
-    matching the placeholder gold value) are credited as ACCURATE; agents
-    that produce a confident different value are MAJOR (the analysis cannot
-    be computed, so a confident answer is wrong).
+    that explicitly set `unanswerable: true` are credited as ACCURATE; all
+    other answers are MAJOR, even if their value matches the gold placeholder.
+    A placeholder match does not establish that the agent recognised the
+    estimand cannot be computed.
     """
     options = options or {}
     if gold_answer.get("unanswerable") is True:
         agent_unans = agent_answer.get("unanswerable") is True
-        agent_value = _safe_float(agent_answer.get("value"))
-        gold_value = _safe_float(gold_answer.get("value"))
         if agent_unans:
             return DiscrepancyResult(Band.ACCURATE, _POINTS[Band.ACCURATE],
                                      "unanswerable_match", 0.0,
                                      "agent flagged unanswerable; gold also unanswerable")
-        if agent_value is not None and gold_value is not None and abs(agent_value - gold_value) <= 1e-6:
-            return DiscrepancyResult(Band.ACCURATE, _POINTS[Band.ACCURATE],
-                                     "unanswerable_match", 0.0,
-                                     f"agent value matched gold placeholder ({gold_value}); gold unanswerable")
         return DiscrepancyResult(Band.MAJOR, _POINTS[Band.MAJOR],
                                  "unanswerable_mismatch", None,
                                  f"gold is unanswerable (sample-size); agent returned value={agent_answer.get('value')!r}")

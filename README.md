@@ -140,7 +140,7 @@ Thresholds are configurable per answer type and per question in `scoring_configs
 
 Occasionally a question is perfectly well specified but the data cannot identify the estimand — for example `prostate_1.2-Qf17acd7c`, a Cox interaction between docetaxel and PTEN homozygous deletion where one cell of the 2×2 is nearly empty and the model separates.
 
-These stay `classification: unambiguous`, and the gold carries `unanswerable: true` along with the cell counts and an explanation. An agent that recognises the problem and flags `unanswerable: true` itself is scored ACCURATE; an agent that returns a confident number is scored MAJOR.
+These stay `classification: unambiguous`, and the gold carries `unanswerable: true` along with the cell counts and an explanation. An agent that recognises the problem and flags `unanswerable: true` itself is scored ACCURATE (2 points). Any other answer is scored MAJOR (0 points), including a numeric value that matches the gold placeholder with an omitted or false `unanswerable` flag.
 
 **Do not reclassify these as ambiguous.** The question is fine — the data are insufficient, which is a different finding and one the benchmark deliberately tests for.
 

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from clin_genomic_analysis_benchmark.scoring.discrepancy import (
     Band,
+    score_analysis,
     score_categorical,
     score_categorical_distribution,
     score_count,
@@ -108,3 +111,49 @@ def test_categorical_distribution_absolute_pp_mode():
                                        accurate_threshold=0.05, minor_threshold=0.15)
     assert r.band == Band.ACCURATE
     assert r.metric == "max_per_category_absolute_pp"
+
+
+@pytest.mark.parametrize("flag", [{}, {"unanswerable": False}], ids=["omitted", "false"])
+@pytest.mark.parametrize("value", [1.0, 1.0 + 5e-7, 2.0], ids=["exact", "near", "different"])
+def test_unanswerable_gold_requires_explicit_true_flag(flag, value):
+    result = score_analysis(
+        agent_answer={"value": value, **flag},
+        gold_answer={"value": 1.0, "unanswerable": True},
+        answer_type="hazard_ratio_with_ci",
+    )
+
+    assert result.band == Band.MAJOR
+    assert result.points == 0
+    assert result.metric == "unanswerable_mismatch"
+    assert result.metric_value is None
+
+
+@pytest.mark.parametrize("value", [1.0, 2.0])
+def test_unanswerable_gold_credits_explicit_true_flag(value):
+    result = score_analysis(
+        agent_answer={"value": value, "unanswerable": True},
+        gold_answer={"value": 1.0, "unanswerable": True},
+        answer_type="hazard_ratio_with_ci",
+    )
+
+    assert result.band == Band.ACCURATE
+    assert result.points == 2
+    assert result.metric == "unanswerable_match"
+    assert result.metric_value == 0.0
+
+
+@pytest.mark.parametrize("gold_flag", [{}, {"unanswerable": False}], ids=["omitted", "false"])
+@pytest.mark.parametrize(
+    "value, expected_band, expected_points",
+    [(100, Band.ACCURATE, 2), (110, Band.MINOR, 1), (130, Band.MAJOR, 0)],
+)
+def test_answerable_gold_keeps_ordinary_numeric_scoring(gold_flag, value, expected_band, expected_points):
+    result = score_analysis(
+        agent_answer={"value": value},
+        gold_answer={"value": 100, **gold_flag},
+        answer_type="count",
+    )
+
+    assert result.band == expected_band
+    assert result.points == expected_points
+    assert result.metric == "relative_pct"
