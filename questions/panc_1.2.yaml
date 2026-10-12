@@ -1,5 +1,5 @@
 cohort: panc_1.2
-generated_at: '2026-08-06T18:52:26.349162Z'
+generated_at: '2026-10-12T23:06:03.956330Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -54,7 +54,8 @@ questions:
     the hazard ratio for overall survival (measured from a 6-month post-diagnosis
     landmark) comparing those who received an adjuvant gemcitabine-containing regimen
     as their first regimen after surgery within that 6-month window versus those who
-    received no systemic therapy within 6 months of diagnosis; assume any clinical-trial
+    received no systemic therapy within 6 months of diagnosis, with risk-set adjustment
+    for delayed cohort entry (left-truncating at NGS testing date); assume any clinical-trial
     regimen did not contain gemcitabine?
 - id: panc_1.2-Qae74ea33
   category: 6
