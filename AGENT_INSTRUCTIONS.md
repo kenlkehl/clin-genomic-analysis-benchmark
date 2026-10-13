@@ -144,6 +144,21 @@ Only label **AMBIGUOUS** when the question genuinely leaves a *material*
 analytic choice open — one that competent analysts using standard
 conventions would still resolve differently.
 
+**What counts as material.** A choice is material when plausible
+alternatives would yield a different denominator, cohort, regimen set,
+measurement set, method, exposure, or outcome, judged with the same 5%
+relative tolerance used to grade numeric answers:
+
+- A choice that changes which records are analysed — the patients in a
+  cohort or denominator, the regimens, the specimens or measurements, or
+  the members of an exposure or comparison group — is material when it
+  changes the size of any analysed group by more than 5% (relative).
+- A choice of method, statistic, or outcome (e.g. OS vs PFS, an
+  interaction p-value vs subgroup hazard ratios) is material when the
+  alternatives estimate different quantities.
+- A choice that changes the analysed records by 5% or less, or that
+  cannot affect the requested answer by construction, is not material.
+
 ---
 
 ## Conventional defaults
@@ -176,6 +191,11 @@ these grounds alone.
   molecule, but treat antibody-drug conjugates with the same antibody but different payloads as distinct drugs. Biosimilar / prodrug / drug-class granularity is not, by
   itself, a source of ambiguity.
 
+- **"Assume any clinical-trial regimen did not contain drug X"** → treat
+  every regimen with `drugs_ct_yn == 'Yes'` as not containing X, even when
+  its `regimen_drugs` string names X. Trial rows often list some drugs and
+  mask others (e.g. "Investigational Drug").
+
 - **Regimen attribution** → unless the question explicitly says otherwise,
   count only regimens administered for the patient's **key index cancer**
   (see below); do not count regimens given for a non-index cancer or for a
@@ -188,6 +208,18 @@ these grounds alone.
   specifies adjustment. Patients without sequencing are excluded (not
   treated as wild-type) when the exposure is a mutation.
 
+- **"NGS testing date"** → the patient's earliest sequencing report date
+  for the relevant cancer (`dx_cpt_rep_days` in
+  `cancer_panel_test_level_dataset.csv`). When left-truncating, a patient
+  enters the risk set at that date on the outcome's time scale, or at the
+  time origin if sequencing came first.
+
+- **Outcomes of treated patients** → when every patient analysed has a
+  qualifying regimen (one regimen group, regimens compared with each
+  other, or groups compared among recipients of a regimen), outcomes are
+  measured from the start of that regimen unless the question says
+  otherwise.
+
 - **Median with 95% CI for time-to-event** → Kaplan–Meier median with
   Brookmeyer–Crowley CI (lifelines default).
 
@@ -197,7 +229,7 @@ these grounds alone.
 
 - **"OS"** → use the canonical OS variable for the time-origin in
   question (`tt_os_g_*` from regimen start, `tt_os_dx_*` from diagnosis,
-  `tt_os_d1_*` from advanced-disease index, etc.) — pick the one matching
+  `tt_os_adv_*` from advanced-disease diagnosis, etc.) — pick the one matching
   the question's stated origin. If there is no canonical variable for a given anchor date, OS will need to be calculated as a derived entity.
 
 - **"Stage IV"** → `stage_dx == 'Stage IV'` (stage at diagnosis), unless
@@ -332,9 +364,10 @@ menu. Select the named ID when its condition applies.
   Select this for the regimen-selection rule, not for the definition of a
   drug or class itself.
 
-- **`CLINICAL_TRIAL_HANDLING`** — Clinical-trial regimen rows have unannotated
-  composition and could materially affect treatment eligibility or assignment,
-  but the question gives no rule. Plausible rules include assuming the drug of
+- **`CLINICAL_TRIAL_HANDLING`** — Clinical-trial regimen rows
+  (`drugs_ct_yn == 'Yes'`) may mask some or all of their drugs, so their
+  composition is uncertain and could materially affect treatment eligibility
+  or assignment, but the question gives no rule. Plausible rules include assuming the drug of
   interest is absent, excluding trial regimens, or treating trial regimens as a
   separate group.
 
@@ -367,7 +400,9 @@ menu. Select the named ID when its condition applies.
   the gene or event, but the question does not specify a coverage rule. For a
   biomarker frequency, this commonly means choosing between all sequenced
   patients/samples and only those tested on a panel covering the gene. A plain
-  alteration count with no denominator is not ambiguous on this ground alone.
+  alteration count with no denominator is not ambiguous on this ground alone,
+  and neither is a gene listed on every gene panel used in the cohort (the
+  `data_gene_panel_*.txt` files).
 
 - **`SPECIMEN_SELECTION`** — More than one specimen or sequencing event could
   be used and the defaults above do not determine which one qualifies, such as
@@ -388,7 +423,8 @@ menu. Select the named ID when its condition applies.
 
 - **`TIME_ORIGIN`** — Follow-up could plausibly begin at more than one event
   and the question does not choose among them, such as diagnosis, advanced-
-  disease onset, regimen start, surgery, or another landmark.
+  disease onset, regimen start, surgery, or another landmark. Not ambiguous
+  when the treated-patient default above (regimen start) applies.
 
 - **`TIME_HORIZON`** — A follow-up horizon, filter cutoff, or summary time
   point is required but missing. Examples include "long-term survivor" without
