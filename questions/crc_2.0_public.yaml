@@ -1,5 +1,5 @@
 cohort: crc_2.0_public
-generated_at: '2026-08-06T18:52:26.349162Z'
+generated_at: '2026-10-13T00:52:35.625601Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -24,15 +24,16 @@ questions:
     other biologic/targeted agent), what is the hazard ratio for overall survival
     measured from regimen start, with risk-set adjustment for delayed cohort entry
     (left-truncating at NGS testing date), excluding patients whose first-line regimen
-    was a clinical-trial regimen (composition not annotated in BPC)? (Include the
-    full colorectal cancer cohort — colon primaries, rectal/rectosigmoid primaries,
+    was a clinical-trial regimen (composition not annotated in BPC)? (FOLFOX regimens
+    that add another cytotoxic agent, such as FOLFOXIRI, count in neither arm.) (Include
+    the full colorectal cancer cohort — colon primaries, rectal/rectosigmoid primaries,
     and unspecified colorectal primaries.)
 - id: crc_2.0_public-Q73ef7699
   category: 2
   text: How many patients in the colorectal cancer cohort had liver metastases present
     at the time of diagnosis (within 30 days of diagnosis)? (Include the full colorectal
-    cancer cohort — colon primaries, rectal/rectosigmoid primaries, and unspecified colorectal
-    primaries.)
+    cancer cohort — colon primaries, rectal/rectosigmoid primaries, and unspecified
+    colorectal primaries.)
 - id: crc_2.0_public-Q93f9f64f
   category: 3
   text: How many unique patients with CRC had a tumor with a BRAF V600E mutation?

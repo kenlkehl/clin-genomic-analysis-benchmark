@@ -1,5 +1,5 @@
 cohort: bladder_1.2
-generated_at: '2026-08-06T18:52:26.349162Z'
+generated_at: '2026-10-13T00:52:35.625601Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -163,13 +163,14 @@ questions:
   category: 8
   text: Among patients with Stage IV bladder cancer receiving first-line platinum-based
     chemotherapy without concurrent immunotherapy for the cancer, does an ERCC2 mutation
-    modify the effect of cisplatin- versus carboplatin-containing regimens on overall
-    survival from regimen start, expressed as separate subgroup hazard ratios within
-    ERCC2-mutant and ERCC2-wildtype strata, with risk-set adjustment for delayed cohort
-    entry (left-truncating at NGS testing date), excluding patients whose first-line
-    regimen was a clinical-trial regimen (composition not annotated in BPC)? (Treat
-    'bladder cancer' here as urothelial carcinoma arising from either the urinary
-    bladder or the upper urinary tract / renal pelvis.)
+    (restricted to patients whose sequencing panel covers ERCC2) modify the effect
+    of cisplatin- versus carboplatin-containing regimens on overall survival from
+    regimen start, as assessed by the interaction-term p-value in a Cox proportional
+    hazards model, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
+    regimen (composition not annotated in BPC)? (Treat 'bladder cancer' here as urothelial
+    carcinoma arising from either the urinary bladder or the upper urinary tract /
+    renal pelvis.)
 - id: bladder_1.2-Qb3f6a73a
   category: 5
   text: Among regimens containing cisplatin administered for bladder cancer, what

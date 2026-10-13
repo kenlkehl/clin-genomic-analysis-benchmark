@@ -1,5 +1,5 @@
 cohort: breast_1.2
-generated_at: '2026-08-06T18:52:26.349162Z'
+generated_at: '2026-10-13T00:52:35.625601Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -163,7 +163,7 @@ questions:
 - id: breast_1.2-Qd3de1f04
   category: 6
   text: Among patients with Stage IV triple-negative breast cancer, is there an association
-    between BRCA1 and/or BRCA2 pathogenic/likely-pathogenic somatic mutation status
+    between BRCA1 and/or BRCA2 somatic mutation status (any non-synonymous mutation)
     (comparing patients with a BRCA1- and/or BRCA2-mutant tumor to patients whose
     tumor has mutations in neither gene) and overall survival from diagnosis, with
     risk-set adjustment for delayed cohort entry (left-truncating at NGS testing date)?

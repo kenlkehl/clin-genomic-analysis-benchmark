@@ -1,5 +1,5 @@
 cohort: prostate_1.2
-generated_at: '2026-08-06T18:52:26.349162Z'
+generated_at: '2026-10-13T00:52:35.625601Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -11,8 +11,8 @@ questions:
 - id: prostate_1.2-Q1e8d34c1
   category: 2
   text: How many patients in the prostate cohort had prostate cancer with high-grade
-    disease at diagnosis (Gleason score ≥ 8 / ISUP grade group 4–5; missing/unknown
-    grade treated as not high-grade)?
+    disease at diagnosis (initial clinical Gleason score ≥ 8 / ISUP grade group 4–5;
+    missing/unknown grade treated as not high-grade)?
 - id: prostate_1.2-Q31783668
   category: 4
   text: How many unique patients in the prostate cohort ever received docetaxel in
@@ -25,10 +25,11 @@ questions:
 - id: prostate_1.2-Q5a10607f
   category: 5
   text: Among patients in the prostate cancer cohort who received any prostate cancer-directed
-    systemic therapy, what is the median overall survival in months from regimen start
-    (Kaplan-Meier with 95% CI), with risk-set adjustment for delayed cohort entry
-    (left-truncating at NGS testing date)? Include all systemic therapy regimens regardless
-    of burden of disease/intent of therapy.
+    systemic therapy, what is the median overall survival in months from the start
+    of their first prostate cancer-directed systemic regimen (Kaplan-Meier with 95%
+    CI), with risk-set adjustment for delayed cohort entry (left-truncating at NGS
+    testing date)? Include all systemic therapy regimens regardless of burden of disease/intent
+    of therapy.
 - id: prostate_1.2-Q62b56bf7
   category: 3
   text: Among patients in the prostate cohort whose sequenced prostate cancer specimen

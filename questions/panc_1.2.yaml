@@ -1,5 +1,5 @@
 cohort: panc_1.2
-generated_at: '2026-10-12T23:06:03.956330Z'
+generated_at: '2026-10-13T00:52:35.625601Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -52,11 +52,11 @@ questions:
   text: Among patients with stage I-III pancreatic cancer who underwent surgical resection
     within 6 months of diagnosis and survived to 6 months after diagnosis, what is
     the hazard ratio for overall survival (measured from a 6-month post-diagnosis
-    landmark) comparing those who received an adjuvant gemcitabine-containing regimen
-    as their first regimen after surgery within that 6-month window versus those who
-    received no systemic therapy within 6 months of diagnosis, with risk-set adjustment
-    for delayed cohort entry (left-truncating at NGS testing date); assume any clinical-trial
-    regimen did not contain gemcitabine?
+    landmark) comparing those whose first regimen for the cancer was an adjuvant gemcitabine-containing
+    regimen started after surgery within that 6-month window (no systemic therapy
+    before surgery) versus those who received no systemic therapy within 6 months
+    of diagnosis, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date); assume any clinical-trial regimen did not contain gemcitabine?
 - id: panc_1.2-Qae74ea33
   category: 6
   text: Among patients with Stage IV pancreatic cancer at diagnosis, is the presence
@@ -146,10 +146,12 @@ questions:
 - id: panc_1.2-Q7c645417
   category: 6
   text: Among patients with Stage IV pancreatic cancer treated with first-line gemcitabine
-    + nab-paclitaxel, is CDKN2A homozygous deletion (ascertained before regimen start)
-    associated with overall survival from regimen start, reported as a Cox hazard
-    ratio, with risk-set adjustment for delayed cohort entry (left-truncating at NGS
-    testing date), excluding patients whose first-line regimen was a clinical-trial
+    + nab-paclitaxel, is CDKN2A homozygous deletion associated with overall survival
+    from regimen start, reported as a Cox hazard ratio comparing patients whose tumors
+    have a CDKN2A homozygous deletion vs patients whose tumors have no CDKN2A deletion
+    (shallow/heterozygous loss counts as neither; restricted to patients whose tested
+    panel covered CDKN2A), with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
     regimen (composition not annotated in BPC)?
 - id: panc_1.2-Q834775b1
   category: 8
@@ -169,10 +171,6 @@ questions:
   text: Among patients with Stage IV pancreatic cancer who received first-line FOLFIRINOX
     (first regimen for the cancer), what is the median progression-free survival (PFS-I)
     in months from regimen start, with 95% CI?
-- id: panc_1.2-Q9de6bfd5
-  category: 3
-  text: What proportion of patients with pancreatic cancer had a tumor with a pathogenic
-    KRAS mutation?
 - id: panc_1.2-Qb12e3347
   category: 5
   text: Do patients with pancreatic cancer treated with FOLFIRINOX have better outcomes
