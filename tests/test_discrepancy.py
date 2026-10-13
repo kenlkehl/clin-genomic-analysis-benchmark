@@ -56,6 +56,13 @@ def test_ratio_log_hr():
     # gold HR ≈ 1: special-case handled (uses log(1+threshold))
     r = score_ratio_log({"value": 1.04}, {"value": 1.0})       # ≤ log(1.05)
     assert r.band == Band.ACCURATE
+    # gold near but not exactly 1: the relative metric would divide by ~0
+    r = score_ratio_log({"value": 1.01}, {"value": 1.000226})
+    assert r.band == Band.ACCURATE
+    r = score_ratio_log({"value": 1.10}, {"value": 1.000226})  # ≤ log(1.15)
+    assert r.band == Band.MINOR
+    r = score_ratio_log({"value": 1.20}, {"value": 1.000226})
+    assert r.band == Band.MAJOR
 
 
 def test_pvalue_bucket():

@@ -89,7 +89,9 @@ def score_ratio_log(agent: dict, gold: dict, *, accurate_threshold: float = _ACC
                     minor_threshold: float = _MIN_THRESH) -> DiscrepancyResult:
     """Score HR/OR by relative % difference on the log scale.
 
-    metric = |log(a) - log(g)| / |log(g)|, clamped at 1.0 when log(g) is near 0.
+    metric = |log(a) - log(g)| / |log(g)|. When the gold is within the accurate
+    threshold of 1 (|log g| < log(1 + accurate_threshold)), the relative metric
+    degenerates, so the absolute log difference is compared with log(1 + threshold).
     """
     a = _safe_float(agent.get("value"))
     g = _safe_float(gold.get("value"))
@@ -99,7 +101,7 @@ def score_ratio_log(agent: dict, gold: dict, *, accurate_threshold: float = _ACC
     log_a = math.log(a)
     log_g = math.log(g)
     denom = abs(log_g)
-    if denom < 1e-9:
+    if denom < math.log(1.0 + accurate_threshold):
         # gold is HR ≈ 1; use absolute log difference vs log(1+threshold)
         diff = abs(log_a - log_g)
         ref = math.log(1.0 + accurate_threshold)
