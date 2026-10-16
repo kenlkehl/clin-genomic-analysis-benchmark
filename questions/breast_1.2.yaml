@@ -1,5 +1,5 @@
 cohort: breast_1.2
-generated_at: '2026-10-13T00:52:35.625601Z'
+generated_at: '2026-10-16T18:14:54.820688Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -10,7 +10,8 @@ questions:
   category: 4
   text: Among patients with Stage IV breast cancer at diagnosis, what is the median
     number of distinct regimens received for that index cancer? (Restrict to invasive
-    breast carcinoma; exclude the small subset of breast sarcomas.)
+    breast carcinoma; exclude the small subset of breast sarcomas.) (Count each BPC
+    regimen record for that cancer; patients with no regimen count as zero.)
 - id: breast_1.2-Q522c00c5
   category: 6
   text: Among patients with Stage IV breast cancer at diagnosis, what is the hazard
@@ -124,8 +125,8 @@ questions:
     a trastuzumab-containing regimen as first-line therapy for metastatic disease,
     what is the hazard ratio for PFS-I-or-M comparing patients with a tumor harboring
     ERBB2 high-level amplification versus those without, restricted to patients whose
-    sequencing panel covers ERBB2 and whose ERBB2 status was ascertained before first-line
-    metastatic therapy start?
+    sequencing panel covers ERBB2, with risk-set adjustment for delayed cohort entry
+    (left-truncating at NGS testing date)?
 - id: breast_1.2-Q81d813d0
   category: 4
   text: What proportion of patients in the breast cohort ever received a regimen containing
@@ -145,7 +146,8 @@ questions:
     containing both trastuzumab and pertuzumab versus regimens containing trastuzumab
     without pertuzumab, with risk-set adjustment for delayed cohort entry (left-truncating
     at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
-    regimen (composition not annotated in BPC)?
+    regimen (composition not annotated in BPC)? (Count each BPC regimen record as
+    a regimen, including separately curated LHRH-agonist records.)
 - id: breast_1.2-Q993b440a
   category: 3
   text: In the breast cancer cohort, how many patients have at least one tumor with

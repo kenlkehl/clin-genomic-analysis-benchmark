@@ -1,5 +1,5 @@
 cohort: nsclc_2.0_public
-generated_at: '2026-08-06T18:52:26.349162Z'
+generated_at: '2026-10-13T22:14:16.097743Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -14,7 +14,7 @@ questions:
 - id: nsclc_2.0_public-Q75afd228
   category: 2
   text: Among non-small cell lung cancers with curated histology, what proportion
-    are classified as adenocarcinoma?
+    are classified as adenocarcinoma? (Include all NSCLC histologic subtypes.)
 - id: nsclc_2.0_public-Q9027ef59
   category: 1
   text: Among patients with Stage IV NSCLC at diagnosis, what proportion were former
@@ -36,7 +36,8 @@ questions:
 - id: nsclc_2.0_public-Q04488571
   category: 1
   text: How many patients in the NSCLC cancer cohort were classified as never having
-    used cigarettes at the time of NSCLC diagnosis?
+    used cigarettes at the time of NSCLC diagnosis? (Include all NSCLC histologic
+    subtypes.)
 - id: nsclc_2.0_public-Q0cef3bbc
   category: 4
   text: Among patients with Stage IV NSCLC at diagnosis, what proportion ever received
@@ -148,8 +149,9 @@ questions:
   category: 4
   text: Among patients with Stage IV NSCLC (any NSCLC histologic subtype) whose first
     systemic regimen for the cancer included carboplatin and pemetrexed, what is the
-    median time on regimen in months (from regimen start to end of all drugs)? Assume
-    any clinical-trial regimen did not contain carboplatin or pemetrexed (exclude
+    median time on regimen in months (from regimen start to end of all drugs), with
+    risk-set adjustment for delayed cohort entry (left-truncating at NGS testing date)?
+    Assume any clinical-trial regimen did not contain carboplatin or pemetrexed (exclude
     regimens with drugs_ct_yn == 'Yes' from the carboplatin+pemetrexed identification).
 - id: nsclc_2.0_public-Qc51cfeb9
   category: 8

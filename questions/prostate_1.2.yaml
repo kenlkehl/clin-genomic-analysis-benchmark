@@ -1,5 +1,5 @@
 cohort: prostate_1.2
-generated_at: '2026-10-13T00:52:35.625601Z'
+generated_at: '2026-10-14T01:10:58.695545Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -7,7 +7,7 @@ questions:
   category: 3
   text: In the prostate cancer cohort, among sequenced samples obtained for a prostate
     cancer diagnosis, how many unique samples show a high-level (deep) deletion of
-    PTEN?
+    PTEN? (Count only CNA value -2 as a deep deletion.)
 - id: prostate_1.2-Q1e8d34c1
   category: 2
   text: How many patients in the prostate cohort had prostate cancer with high-grade
@@ -18,10 +18,6 @@ questions:
   text: How many unique patients in the prostate cohort ever received docetaxel in
     any regimen for their prostate cancer? Assume any clinical-trial regimen did not
     contain docetaxel.
-- id: prostate_1.2-Q3e2aaa54
-  category: 2
-  text: Among patients in the prostate cancer cohort, what proportion were diagnosed
-    with stage IV prostate cancer?
 - id: prostate_1.2-Q5a10607f
   category: 5
   text: Among patients in the prostate cancer cohort who received any prostate cancer-directed
@@ -69,10 +65,6 @@ questions:
   category: 2
   text: What proportion of patients in the prostate cancer cohort had Stage IV prostate
     cancer at diagnosis?
-- id: prostate_1.2-Qadfbc974
-  category: 1
-  text: What is the median age at diagnosis of prostate cancer in the prostate cancer
-    cohort?
 - id: prostate_1.2-Qafe15a6b
   category: 7
   text: Among first regimens for prostate cancer that contain docetaxel, what is the
@@ -82,7 +74,8 @@ questions:
 - id: prostate_1.2-Qb89136fd
   category: 4
   text: What is the median number of distinct cancer-directed regimens administered
-    for prostate cancer to patients in the prostate cancer cohort?
+    for prostate cancer to patients in the prostate cancer cohort? (Count each BPC
+    regimen record for that cancer; patients with no regimen count as zero.)
 - id: prostate_1.2-Qd8337668
   category: 3
   text: Among patients in the prostate cancer cohort, how many unique patients had
@@ -179,11 +172,14 @@ questions:
   category: 8
   text: Among patients with Stage IV prostate cancer receiving a first regimen for
     the cancer, is there a statistically significant interaction between PTEN homozygous
-    deletion and docetaxel exposure (docetaxel-containing vs non-docetaxel-containing
-    first regimen) on overall survival from regimen start, restricted to tumors assayed
-    on panels that cover PTEN, fit using a Cox proportional hazards model with a treatment-by-biomarker
-    interaction term, with risk-set adjustment for delayed cohort entry (left-truncating
-    at NGS testing date), assuming any clinical-trial regimen did not contain docetaxel?
+    deletion (versus PTEN copy-number neutral or amplified) and docetaxel exposure
+    (docetaxel-containing vs non-docetaxel-containing first regimen) on overall survival
+    from regimen start, restricted to tumors assayed on panels that cover PTEN, fit
+    using a Cox proportional hazards model with a treatment-by-biomarker interaction
+    term, with risk-set adjustment for delayed cohort entry (left-truncating at NGS
+    testing date), assuming any clinical-trial regimen did not contain docetaxel?
+    (Count each BPC regimen record as a regimen, including separately curated LHRH-agonist
+    records.)
 - id: prostate_1.2-Qf8b44f4f
   category: 3
   text: Among patients in the prostate cancer cohort whose tumors were sequenced,

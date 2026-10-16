@@ -1,5 +1,5 @@
 cohort: crc_2.0_public
-generated_at: '2026-10-13T00:52:35.625601Z'
+generated_at: '2026-10-15T16:54:18.715464Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -123,16 +123,12 @@ questions:
   text: Among patients in the colorectal cancer cohort, what is the median number
     of distinct cancer-directed regimens administered for that cancer? (Include the
     full colorectal cancer cohort — colon primaries, rectal/rectosigmoid primaries,
-    and unspecified colorectal primaries.)
+    and unspecified colorectal primaries.) (Count each BPC regimen record for that
+    cancer; patients with no regimen count as zero.)
 - id: crc_2.0_public-Qb46e39d8
   category: 4
   text: Among patients with stage I-III colorectal cancer who received adjuvant chemotherapy
     after surgery for the cancer, what proportion received a FOLFOX-based regimen?
-- id: crc_2.0_public-Qb728b26a
-  category: 2
-  text: Among patients in the colorectal cancer cohort, what proportion had stage
-    4 disease? Allow any colorectal cancer subtype, including colon, rectal, or rectosigmoid
-    and unspecified colorectal primary tumors.
 - id: crc_2.0_public-Qb79df7cb
   category: 5
   text: Among patients with colorectal cancer whose first treatment for advanced/metastatic
@@ -161,7 +157,8 @@ questions:
     (Fluorouracil + Leucovorin + Irinotecan) with Cetuximab versus first-line FOLFIRI
     with Bevacizumab, what is the median PFS-I from regimen start in months with 95%
     CI for each arm, excluding patients whose first-line regimen was a clinical-trial
-    regimen (composition not annotated in BPC)?
+    regimen (composition not annotated in BPC)? (FOLFIRI regimens that add another
+    cytotoxic agent, such as FOLFOXIRI, count in neither arm.)
 - id: crc_2.0_public-Qd3b880cf
   category: 1
   text: What is the average age of patients in the colorectal cancer cohort at the

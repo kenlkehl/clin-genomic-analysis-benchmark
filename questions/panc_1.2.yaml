@@ -1,5 +1,5 @@
 cohort: panc_1.2
-generated_at: '2026-10-13T00:52:35.625601Z'
+generated_at: '2026-10-13T21:14:39.444929Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -16,12 +16,13 @@ questions:
 - id: panc_1.2-Q172ee2a2
   category: 4
   text: Among patients with pancreatic cancer, what is the median number of distinct
-    cancer-directed regimens received per patient for that cancer?
+    cancer-directed regimens received per patient for that cancer? (Count each BPC
+    regimen record for that cancer; patients with no regimen count as zero.)
 - id: panc_1.2-Q194c29b3
   category: 8
-  text: Among patients with Stage IV pancreatic adenocarcinoma receiving first-line
-    FOLFIRINOX (fluorouracil + leucovorin + oxaliplatin + irinotecan) versus first-line
-    gemcitabine + nab-paclitaxel for the cancer, does KRAS mutation status (any non-synonymous
+  text: Among patients with Stage IV pancreatic cancer receiving first-line FOLFIRINOX
+    (fluorouracil + leucovorin + oxaliplatin + irinotecan) versus first-line gemcitabine
+    + nab-paclitaxel for the cancer, does KRAS mutation status (any non-synonymous
     KRAS mutation) modify the treatment effect on overall survival from regimen start,
     as assessed by the interaction term p-value in a Cox proportional hazards model,
     with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
@@ -81,19 +82,14 @@ questions:
   category: 2
   text: Among patients with pancreatic cancer diagnosed at Stage IV, what proportion
     had liver metastases documented at diagnosis?
-- id: panc_1.2-Qe8681a92
-  category: 2
-  text: What proportion of patients in the pancreatic cohort presented with Stage
-    IV pancreatic cancer at diagnosis?
 - id: panc_1.2-Q0457f850
   category: 8
-  text: In patients with metastatic pancreatic adenocarcinoma (de novo Stage IV or
-    recurrent/relapsed metastatic) treated with first-line gemcitabine-containing
-    regimens (where first-line refers to the first regimen after onset of metastatic
-    disease), does TP53 mutation status (ascertained before regimen start) modify
-    the treatment effect on PFS-I from regimen start when compared to fluoropyrimidine-only
-    first-line regimens, as measured by the interaction term hazard ratio (ratio of
-    HRs) with 95% CI?
+  text: In patients with metastatic pancreatic cancer (de novo Stage IV or recurrent/relapsed
+    metastatic) treated with first-line gemcitabine-containing regimens (where first-line
+    refers to the first regimen after onset of metastatic disease), does TP53 mutation
+    status (ascertained before regimen start) modify the treatment effect on PFS-I
+    from regimen start when compared to fluoropyrimidine-only first-line regimens,
+    as measured by the interaction term hazard ratio (ratio of HRs) with 95% CI?
 - id: panc_1.2-Q07d410a5
   category: 8
   text: Among patients with Stage IV pancreatic cancer receiving FOLFIRINOX as first-line
@@ -118,7 +114,7 @@ questions:
   text: Does SMAD4 alteration status (any mutation or homozygous deletion) modify
     the effect of receiving any oxaliplatin-containing first-line regimen versus any
     gemcitabine-containing first-line regimen on overall survival from regimen start
-    among patients with Stage IV pancreatic adenocarcinoma, as captured by the interaction
+    among patients with Stage IV pancreatic cancer, as captured by the interaction
     p-value in a Cox proportional hazards model, with risk-set adjustment for delayed
     cohort entry (left-truncating at NGS testing date), excluding patients whose first-line
     regimen was a clinical-trial regimen (composition not annotated in BPC)?
