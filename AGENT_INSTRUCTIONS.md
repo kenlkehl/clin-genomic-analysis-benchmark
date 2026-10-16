@@ -24,7 +24,8 @@ a conventionally answerable one, (b) naming the *material* gaps when a question 
 1. **Default to UNAMBIGUOUS** when a competent BPC analyst would reach for one column, one filter, and
    one method without asking (see "Default rule for classification"). Flag **AMBIGUOUS** only for a
    *material* choice that competent analysts using the conventions below would still resolve
-   differently — and would *materially* change the result.
+   differently — and would *materially* change the result. Check each candidate choice against
+   the data (see "What counts as material").
 2. **Apply every "Conventional default" before deciding.** Most apparent gaps are already resolved
    there (key index cancer, genomic-specimen scope, biosimilars, "contains" drug match, any-positive
    aggregation, CI methods, OS/time-origin variables, patient-level attributes). Never flag anything
@@ -151,13 +152,27 @@ relative tolerance used to grade numeric answers:
 
 - A choice that changes which records are analysed — the patients in a
   cohort or denominator, the regimens, the specimens or measurements, or
-  the members of an exposure or comparison group — is material when it
-  changes the size of any analysed group by more than 5% (relative).
+  the members of an exposure or comparison group — is material when, for
+  any analysed group, the records added plus the records removed between
+  plausible alternatives exceed 5% of that group. Measure against the
+  smaller of the two versions of the group, counted as actually analysed
+  (after filters the analysis requires, such as a non-missing outcome).
+  Swaps count even when the group's size barely changes.
 - A choice of method, statistic, or outcome (e.g. OS vs PFS, an
   interaction p-value vs subgroup hazard ratios) is material when the
   alternatives estimate different quantities.
 - A choice that changes the analysed records by 5% or less, or that
   cannot affect the requested answer by construction, is not material.
+
+**Check each candidate ambiguity against the data.** Do not judge
+materiality from the wording alone. For each candidate source of
+ambiguity, list the interpretations a competent analyst could plausibly
+adopt, then use the cohort data to build every analysed group under each
+interpretation and compare them with the threshold above. Flag the
+concept only if the alternatives cross that threshold (or estimate
+different quantities). A choice that sounds open but moves 5% or less of
+the records in this cohort is not a reason for ambiguity, and a question
+whose candidate choices are all immaterial is UNAMBIGUOUS.
 
 ---
 
@@ -183,6 +198,13 @@ these grounds alone.
 - **"panel covers gene X"** → use `data_gene_matrix.txt` (or the panel
   column in `data_clinical_sample.txt`) to identify which patients/
   samples were tested on a panel including gene X.
+
+- **Copy-number profiling** → a sample is copy-number profiled only if it
+  has a column in `data_CNA.txt`; some assays report no copy-number data
+  even though their gene panels list the gene. Biomarkers defined wholly
+  or partly by copy number are assessed only in patients/samples with
+  copy-number data; exclude the others, as unsequenced patients are
+  excluded for mutation exposures.
 
 - **"regimen containing drug X"** → any row in
   `regimen_cancer_level_dataset` whose `regimen_drugs` string contains
@@ -311,7 +333,11 @@ menu. Select the named ID when its condition applies.
   values, histologies, or sidedness groups are not specified and materially
   different choices would change the analysis population. This commonly
   applies to cancer-level questions in heterogeneous cohorts. Patient-level
-  demographic questions remain exempt under the convention above.
+  demographic questions remain exempt under the convention above. Judge
+  this by which cancers the researcher could mean (for example, one primary
+  site versus the whole cohort), not by which column records cancer type;
+  when the intended cancers are clear but the data record them in more than
+  one place, use `DATA_AVAILABILITY` instead.
 
 - **`DISEASE_EXTENT_SCOPE`** — The question does not specify a required stage
   or extent restriction, such as all stages versus Stage IV, and more than one
