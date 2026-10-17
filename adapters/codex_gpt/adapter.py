@@ -19,7 +19,6 @@ import time
 from pathlib import Path
 
 from clin_genomic_analysis_benchmark.agent.isolation import (
-    SANDBOX_COHORT_DIR,
     SANDBOX_SCRATCH_DIR,
     export_agent_session_audit,
     sandbox_question_view,
@@ -351,7 +350,9 @@ def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
     cmd = [
         codex_bin, "exec",
         "-C", str(SANDBOX_SCRATCH_DIR),
-        "--add-dir", str(SANDBOX_COHORT_DIR),
+        # The cohort is readable without --add-dir. Codex treats added dirs as
+        # writable roots, and since 0.162 its sandbox mkdirs protected paths
+        # (e.g. .aws) inside them, which fails on the read-only cohort mount.
         "--skip-git-repo-check",
         "--sandbox", _sandbox_for(stage),
         "-c", 'approval_policy="never"',

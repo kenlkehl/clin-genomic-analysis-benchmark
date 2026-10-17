@@ -37,7 +37,6 @@ from unsloth_bridge import (  # noqa: E402
     UnslothResponsesClient,
 )
 from clin_genomic_analysis_benchmark.agent.isolation import (  # noqa: E402
-    SANDBOX_COHORT_DIR,
     SANDBOX_SCRATCH_DIR,
     export_agent_session_audit,
     sandboxed_agent_command,
@@ -512,8 +511,9 @@ def _codex_call(
         "exec",
         "-C",
         str(SANDBOX_SCRATCH_DIR),
-        "--add-dir",
-        str(SANDBOX_COHORT_DIR),
+        # The cohort is readable without --add-dir. Codex treats added dirs as
+        # writable roots, and since 0.162 its sandbox mkdirs protected paths
+        # (e.g. .aws) inside them, which fails on the read-only cohort mount.
         "--skip-git-repo-check",
         "--ignore-user-config",
         "--sandbox",

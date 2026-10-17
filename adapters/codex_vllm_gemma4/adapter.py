@@ -1,4 +1,4 @@
-"""Codex CLI adapter for Gemma 4 31B on an OpenAI-compatible vLLM server."""
+"""Codex CLI adapter for Gemma 4 models on an OpenAI-compatible vLLM server."""
 
 from __future__ import annotations
 
@@ -26,22 +26,21 @@ from adapters.codex_gpt.adapter import (  # noqa: E402
     _load_question,
     _sandbox_for,
 )
-from adapters.codex_vllm_gemma4_31b.vllm_bridge import (  # noqa: E402
+from adapters.codex_vllm_gemma4.vllm_bridge import (  # noqa: E402
     BridgeConfig,
     VLLMResponsesBridge,
 )
 from clin_genomic_analysis_benchmark.agent.isolation import (  # noqa: E402
-    SANDBOX_COHORT_DIR,
     SANDBOX_SCRATCH_DIR,
     export_agent_session_audit,
     sandboxed_agent_command,
 )
 
 
-PROVIDER_NAME = "local_vllm_gemma4_31b"
+PROVIDER_NAME = "local_vllm_gemma4"
 DEFAULT_MODEL = "gemma4-31b"
 DEFAULT_BASE_URL = "http://camus.dfci.harvard.edu:8002/v1"
-MODEL_CONTEXT_WINDOW = 262_144
+DEFAULT_CONTEXT_WINDOW = 262_144
 TOKEN_ENV = "VLLM_TOKEN"
 BRIDGE_TOKEN_ENV = "VLLM_GEMMA_BRIDGE_KEY"
 
@@ -55,6 +54,11 @@ def _model() -> str:
     if any(character.isspace() for character in model):
         raise RuntimeError("VLLM_MODEL must be a single model identifier")
     return model
+
+
+def _context_window() -> int:
+    """Return the served context length; set it to the server's max_model_len."""
+    return _env_int("VLLM_CONTEXT_WINDOW", DEFAULT_CONTEXT_WINDOW)
 
 
 def _base_url() -> str:
@@ -144,8 +148,9 @@ def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
         "exec",
         "-C",
         str(SANDBOX_SCRATCH_DIR),
-        "--add-dir",
-        str(SANDBOX_COHORT_DIR),
+        # The cohort is readable without --add-dir. Codex treats added dirs as
+        # writable roots, and since 0.162 its sandbox mkdirs protected paths
+        # (e.g. .aws) inside them, which fails on the read-only cohort mount.
         "--skip-git-repo-check",
         "--ignore-user-config",
         "--sandbox",
@@ -165,7 +170,7 @@ def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
         "--model",
         config.model,
         "-c",
-        f"model_context_window={MODEL_CONTEXT_WINDOW}",
+        f"model_context_window={_context_window()}",
     ]
 
     last_error = ""
@@ -180,7 +185,7 @@ def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
         with VLLMResponsesBridge(config, audit_path=audit_path) as bridge:
             attempt_cmd = [*cmd]
             attempt_cmd += _provider_override(
-                "name", "Local vLLM (Gemma 4 31B compatibility bridge)"
+                "name", "Local vLLM (Gemma 4 compatibility bridge)"
             )
             attempt_cmd += _provider_override("base_url", bridge.base_url)
             attempt_cmd += _provider_override("env_key", BRIDGE_TOKEN_ENV)

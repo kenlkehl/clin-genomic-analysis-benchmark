@@ -1,20 +1,32 @@
-# Codex + Gemma 4 31B on local vLLM
+# Codex + Gemma 4 on local vLLM
 
 This adapter runs the benchmark through the OpenAI Codex CLI while using the
-OpenAI-compatible Responses API exposed by a vLLM server. Its current defaults
-match the live Camus deployment:
+OpenAI-compatible Responses API exposed by a vLLM server. It works with any
+Gemma 4 variant; select the server and model with `VLLM_BASE_URL`,
+`VLLM_MODEL`, and `VLLM_CONTEXT_WINDOW`. Its defaults match the Camus
+deployment of Gemma 4 31B:
 
 - API root: `http://camus.dfci.harvard.edu:8002/v1`
 - served model ID: `gemma4-31b`
 - backing model: `RedHatAI/Gemma-4-31B-IT-FP8-Dynamic`
 - context window: 262,144 tokens
 
+Known deployments:
+
+| Model | `VLLM_BASE_URL` | `VLLM_MODEL` | `VLLM_CONTEXT_WINDOW` |
+|---|---|---|---|
+| `RedHatAI/Gemma-4-31B-IT-FP8-Dynamic` | `http://camus.dfci.harvard.edu:8002/v1` | `gemma4-31b` | `262144` (default) |
+| `nvidia/Gemma-4-26B-A4B-NVFP4` | `http://sn4622130540:8000/v1` | `gemma4-26b-a4b` | `250000` |
+
+Check `max_model_len` in the server's `/v1/models` response and set
+`VLLM_CONTEXT_WINDOW` to match.
+
 The adapter does not depend on or modify `~/.codex/config.toml`. Each stage runs
 in the benchmark's mandatory bubblewrap isolation with a disposable Codex home.
 The cohort is read-only and only the per-question scratch directory is writable
 during an analysis stage.
 
-The current server returns Gemma 4's native `<|tool_call>...` markup as ordinary
+The Camus server returns Gemma 4's native `<|tool_call>...` markup as ordinary
 response text rather than parsed Responses API tool-call items. For each Codex
 invocation, the adapter therefore starts an authenticated, localhost-only
 compatibility bridge. It forwards requests to vLLM, converts raw Gemma tool
@@ -35,7 +47,7 @@ and the Gemma 4 tool chat template. See the official
 - network access to the vLLM server
 - the benchmark's normal BPC cohort data and gold-root configuration
 
-Confirm the server is available:
+Confirm the server is available and note its model ID and `max_model_len`:
 
 ```bash
 curl http://camus.dfci.harvard.edu:8002/v1/models
@@ -43,22 +55,27 @@ curl http://camus.dfci.harvard.edu:8002/v1/models
 
 ## Run it
 
-Smoke-test one question:
+Smoke-test one question (against the default 31B deployment):
 
 ```bash
 uv run clingen-bench eval \
-  --agent "bash adapters/codex_vllm_gemma4_31b/run.sh" \
+  --agent "bash adapters/codex_vllm_gemma4/run.sh" \
   --agent-name codex_vllm_gemma4_31b \
   --question bladder_1.2-Q6f9dd68e \
   --no-retry-failures
 ```
 
-Run the full benchmark:
+Run the full benchmark against another Gemma 4 deployment. Use an
+`--agent-name` that identifies the model so its runs land in their own
+directory:
 
 ```bash
+VLLM_BASE_URL=http://sn4622130540:8000/v1 \
+VLLM_MODEL=gemma4-26b-a4b \
+VLLM_CONTEXT_WINDOW=250000 \
 uv run clingen-bench eval \
-  --agent "bash adapters/codex_vllm_gemma4_31b/run.sh" \
-  --agent-name codex_vllm_gemma4_31b \
+  --agent "bash adapters/codex_vllm_gemma4/run.sh" \
+  --agent-name codex_vllm_gemma4_26b_a4b_nvfp4 \
   --cohort all \
   --max-parallel 4
 ```
@@ -66,7 +83,7 @@ uv run clingen-bench eval \
 Then score the resulting run:
 
 ```bash
-uv run clingen-bench score --run codex_vllm_gemma4_31b/<run_id>
+uv run clingen-bench score --run <agent-name>/<run_id>
 ```
 
 ## Configuration
@@ -77,6 +94,7 @@ All settings are optional:
 |---|---|---|
 | `VLLM_BASE_URL` | `http://camus.dfci.harvard.edu:8002/v1` | OpenAI-compatible API root; `/v1` is added when omitted |
 | `VLLM_MODEL` | `gemma4-31b` | served model ID |
+| `VLLM_CONTEXT_WINDOW` | `262144` | context length Codex assumes; match the server's `max_model_len` |
 | `CODEX_MODEL` | unset | fallback model override when `VLLM_MODEL` is unset |
 | `VLLM_TOKEN` | unset | optional bearer token; never written to run provenance |
 | `CODEX_BIN` | `codex` | Codex executable |

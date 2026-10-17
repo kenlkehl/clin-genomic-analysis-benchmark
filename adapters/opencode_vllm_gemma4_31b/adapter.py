@@ -24,7 +24,7 @@ from adapters.codex_gpt.adapter import (  # noqa: E402
     _extract_json,
     _load_question,
 )
-from adapters.codex_vllm_gemma4_31b.vllm_bridge import (  # noqa: E402
+from adapters.codex_vllm_gemma4.vllm_bridge import (  # noqa: E402
     BridgeConfig,
     VLLMResponsesBridge,
 )

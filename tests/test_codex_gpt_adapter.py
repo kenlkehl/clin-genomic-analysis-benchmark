@@ -68,6 +68,7 @@ def test_codex_call_passes_explicit_provider_model_and_effort(tmp_path, monkeypa
     assert captured["cmd"][captured["cmd"].index("--model") + 1] == "gpt-5.6-sol"
     assert 'model_provider="azure"' in captured["cmd"]
     assert 'model_reasoning_effort="xhigh"' in captured["cmd"]
+    assert "--add-dir" not in captured["cmd"]
 
 
 @pytest.mark.skipif(not Path("/usr/bin/bwrap").is_file(), reason="bwrap unavailable")

@@ -1,4 +1,4 @@
-"""Tests for the Codex/local-vLLM Gemma 4 31B adapter."""
+"""Tests for the Codex/local-vLLM Gemma 4 adapter."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from adapters.codex_vllm_gemma4_31b import adapter
-from adapters.codex_vllm_gemma4_31b.vllm_bridge import (
+from adapters.codex_vllm_gemma4 import adapter
+from adapters.codex_vllm_gemma4.vllm_bridge import (
     BridgeConfig,
     VLLMResponsesBridge,
     VLLMResponsesClient,
@@ -44,6 +44,7 @@ def test_codex_call_pins_vllm_responses_provider(tmp_path, monkeypatch):
     dictionary.write_text("dictionary")
     monkeypatch.setenv("VLLM_BASE_URL", "http://vllm.internal:8000")
     monkeypatch.setenv("VLLM_MODEL", "test-gemma")
+    monkeypatch.setenv("VLLM_CONTEXT_WINDOW", "250000")
     monkeypatch.setenv("CODEX_REASONING_EFFORT", "xhigh")
     monkeypatch.delenv("VLLM_TOKEN", raising=False)
 
@@ -93,13 +94,14 @@ def test_codex_call_pins_vllm_responses_provider(tmp_path, monkeypatch):
     assert result == '{"classification":"ambiguous"}'
     assert command[command.index("--model") + 1] == "test-gemma"
     assert f'model_provider="{adapter.PROVIDER_NAME}"' in command
-    assert f"model_context_window={adapter.MODEL_CONTEXT_WINDOW}" in command
+    assert "model_context_window=250000" in command
     assert any(
         "base_url" in value and "http://127.0.0.1:12345/v1" in value
         for value in command
     )
     assert any("wire_api" in value and "responses" in value for value in command)
     assert "--ignore-user-config" in command
+    assert "--add-dir" not in command
     assert any(
         "env_key" in value and adapter.BRIDGE_TOKEN_ENV in value
         for value in command
@@ -257,27 +259,30 @@ def test_local_bridge_streams_repaired_tool_call(monkeypatch, tmp_path):
 
 
 def test_adapter_is_registered_and_provenance_excludes_token():
-    command = "bash adapters/codex_vllm_gemma4_31b/run.sh"
-    assert require_supported_adapter(command) == "codex_vllm_gemma4_31b"
+    command = "bash adapters/codex_vllm_gemma4/run.sh"
+    assert require_supported_adapter(command) == "codex_vllm_gemma4"
 
     provenance = _agent_provenance(
         command,
         environ={
             "VLLM_BASE_URL": "http://vllm.internal:8000",
             "VLLM_MODEL": "test-gemma",
+            "VLLM_CONTEXT_WINDOW": "250000",
             "VLLM_TOKEN": "must-not-appear",
             "CODEX_REASONING_EFFORT": "xhigh",
         },
     )
 
-    assert provenance["adapter"] == "codex_vllm_gemma4_31b"
+    assert provenance["adapter"] == "codex_vllm_gemma4"
     assert provenance["provider"] == adapter.PROVIDER_NAME
     assert provenance["model"] == "test-gemma"
     assert provenance["base_url"] == "http://vllm.internal:8000/v1"
     assert provenance["wire_api"] == "responses"
+    assert provenance["context_window_tokens"] == 250_000
     assert provenance["effort_supported"] is False
     assert provenance["environment"] == {
         "VLLM_BASE_URL": "http://vllm.internal:8000",
         "VLLM_MODEL": "test-gemma",
+        "VLLM_CONTEXT_WINDOW": "250000",
     }
     assert "must-not-appear" not in str(provenance)

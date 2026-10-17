@@ -176,7 +176,7 @@ computes the reference answer directly from the cohort data. Layout:
 
   Run one:
     .venv/bin/python "gold_standard/<cohort>/<qid>.py" \
-        "bpc_from_synapse/<cohort>" \
+        "$CLINGEN_DATA_ROOT/<cohort>" \
         "gold_standard/<cohort>/<qid>.result.json"
 
   The gold answers are reproducible: re-running a script must reproduce the
@@ -188,9 +188,10 @@ computes the reference answer directly from the cohort data. Layout:
   gold_script column (K) of the current workbook.
 
 
-THE UNDERLYING DATA  (bpc_from_synapse/)
+THE UNDERLYING DATA  ($CLINGEN_DATA_ROOT)
 -------------------------------------------------------------------------------
 One read-only directory per cohort, in standard GENIE BPC + cBioPortal format.
+CLINGEN_DATA_ROOT has to be set to the directory that contains them.
 Key files an analysis draws on:
 
     cancer_level_dataset_index.csv        one row per index cancer (redcap_ca_index)
@@ -218,7 +219,7 @@ HOW IT FITS TOGETHER
   - To understand the task an agent faces:        read AGENT_INSTRUCTIONS.md.
   - To see the questions + gold verdicts/answers: open the review .xlsx.
   - To see/run how a gold answer was computed:    open gold_standard/<cohort>/<qid>.py.
-  - To inspect the data being analyzed:           browse bpc_from_synapse/<cohort>/.
+  - To inspect the data being analyzed:           browse $CLINGEN_DATA_ROOT/<cohort>/.
 
 A typical evaluation: serve column E (question_text) to the agent with the cohort
 directory; compare the agent's classify verdict to column D; for ambiguous,

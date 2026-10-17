@@ -374,6 +374,7 @@ def test_codex_call_pins_provider_and_shields_studio_token(tmp_path, monkeypatch
     assert f'model_provider="{adapter.PROVIDER_NAME}"' in command
     assert f"model_context_window={adapter.MODEL_CONTEXT_WINDOW}" in command
     assert "--ignore-user-config" in command
+    assert "--add-dir" not in command
     assert "--ephemeral" in command
     assert command[command.index("--output-schema") + 1] == str(
         adapter.SANDBOX_SCRATCH_DIR / ".codex_output_schema.classify.json"

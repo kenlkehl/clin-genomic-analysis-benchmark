@@ -17,7 +17,7 @@ All six cohorts are wired end to end. The reference adapter drives Claude Code o
 | Agent-facing bank | `questions/<cohort>.yaml` — `id`, `category`, `text` only. This is everything the agent under test ever sees |
 | Gold bank | `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` — answers, canonical concept IDs, classifications, and audit prose. Read by the scorer, never by the agent |
 | Agent guidance | `AGENT_INSTRUCTIONS.md` — served verbatim to the agent by the reference adapter |
-| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_vllm_gemma4_31b/` (Codex with local-vLLM Gemma 4 31B), `adapters/opencode_vllm_gemma4_31b/` (OpenCode with local-vLLM Gemma 4 31B), `adapters/codex_vertex_gemma4_26b/` (Codex with Gemma 4 26B on Vertex Agent Platform), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` and `adapters/codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/antigravity_gemini/` (Gemini through Antigravity CLI), `adapters/template/` to write your own |
+| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_vllm_gemma4/` (Codex with any Gemma 4 model on local vLLM), `adapters/opencode_vllm_gemma4_31b/` (OpenCode with local-vLLM Gemma 4 31B), `adapters/codex_vertex_gemma4_26b/` (Codex with Gemma 4 26B on Vertex Agent Platform), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` and `adapters/codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/antigravity_gemini/` (Gemini through Antigravity CLI), `adapters/template/` to write your own |
 
 ### Keeping the answers away from the agent
 
@@ -146,7 +146,7 @@ These stay `classification: unambiguous`, and the gold carries `unanswerable: tr
 
 ## Cohorts
 
-`bladder_1.2`, `breast_1.2`, `crc_2.0_public`, `nsclc_2.0_public`, `panc_1.2`, `prostate_1.2` — read-only under `bpc_from_synapse/<cohort>/`, not in git. Questions are scored per cohort as well as overall.
+`bladder_1.2`, `breast_1.2`, `crc_2.0_public`, `nsclc_2.0_public`, `panc_1.2`, `prostate_1.2` — one read-only directory per cohort, not in git. `CLINGEN_DATA_ROOT` has to be set to the directory that contains them. Questions are scored per cohort as well as overall.
 
 ## The question bank and how to change it
 
@@ -168,6 +168,7 @@ For an older workbook that has reviewed prose concepts but no canonical-ID colum
 uv sync
 command -v bwrap             # required; evaluation fails closed without it
 cp .env.example .env   # Vertex (ANTHROPIC_VERTEX_PROJECT_ID, credentials) + Azure OpenAI
+export CLINGEN_DATA_ROOT=/path/to/cohort/data   # required: directory containing the cohort folders
 
 # Make sure the YAML banks match the workbook
 .venv/bin/python scripts/sync_yaml_from_review.py
@@ -283,7 +284,6 @@ Under `$CLINGEN_GOLD_ROOT`, away from the agent:
 - `bpc_benchmark_review_6-19-26.xlsx` — the curated bank, source of truth
 - `questions/<cohort>.yaml` — the gold banks the scorer reads
 - `gold_standard/<cohort>/` — a Python script and `result.json` per unambiguous question. The live set is whatever the workbook's `gold_script` column points at; the folders also hold leftovers from removed or reclassified questions
-- `bpc_from_synapse/<cohort>/` — cohort data and data dictionaries
 - `bpc_benchmark_for_msk_6-20-26/` — a shareable snapshot that intentionally bundles gold
 
 ## Conventions the bank assumes

@@ -235,6 +235,7 @@ def test_adapter_pins_local_provider_without_reasoning(tmp_path, monkeypatch):
     assert command[command.index("--model") + 1] == DEFAULT_MODEL
     assert f"model_context_window={adapter.MODEL_CONTEXT_WINDOW}" in command
     assert f'model_provider="{adapter.PROVIDER_NAME}"' in command
+    assert "--add-dir" not in command
     assert any("wire_api" in value and "responses" in value for value in command)
     assert not any("model_reasoning_effort" in value for value in command)
     assert captured["env"]["VERTEX_GEMMA_BRIDGE_KEY"] == "bridge-token"

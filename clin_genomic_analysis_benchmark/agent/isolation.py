@@ -62,7 +62,7 @@ _SUPPORTED_ADAPTER_DIRS = {
     "antigravity_gemini",
     "claude_code",
     "codex_gpt",
-    "codex_vllm_gemma4_31b",
+    "codex_vllm_gemma4",
     "codex_vertex_gemma4_26b",
     "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl",
     "codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl",

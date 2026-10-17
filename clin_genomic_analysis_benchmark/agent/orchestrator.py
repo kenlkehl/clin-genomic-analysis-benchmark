@@ -119,6 +119,7 @@ _SAFE_AGENT_ENV_VARS = (
     "VLLM_RETRY_BASE_SECONDS",
     "VLLM_MAX_RETRY_SLEEP_SECONDS",
     "VLLM_MAX_REQUESTS",
+    "VLLM_CONTEXT_WINDOW",
     "OPENCODE_AGENT",
     "OPENCODE_MAX_OUTPUT_TOKENS",
     "OPENCODE_MAX_ATTEMPTS",
@@ -311,8 +312,8 @@ def _vertex_gemma_provenance(
 def _vllm_gemma_provenance(
     *, agent_cmd: str, env: Mapping[str, str]
 ) -> dict | None:
-    """Resolve the pinned local-vLLM Gemma adapter without user Codex config."""
-    if "adapters/codex_vllm_gemma4_31b/" not in agent_cmd:
+    """Resolve the local-vLLM Gemma 4 adapter without user Codex config."""
+    if "adapters/codex_vllm_gemma4/" not in agent_cmd:
         return None
     model = (
         env.get("VLLM_MODEL", "").strip()
@@ -325,9 +326,10 @@ def _vllm_gemma_provenance(
     ).rstrip("/")
     if not base_url.endswith("/v1"):
         base_url += "/v1"
+    context_window = env.get("VLLM_CONTEXT_WINDOW", "").strip()
     return {
-        "adapter": "codex_vllm_gemma4_31b",
-        "provider": "local_vllm_gemma4_31b",
+        "adapter": "codex_vllm_gemma4",
+        "provider": "local_vllm_gemma4",
         "provider_source": "adapter",
         "model": model,
         "model_source": (
@@ -349,7 +351,10 @@ def _vllm_gemma_provenance(
         "wire_api": "responses",
         "tool_call_compatibility": "trusted_local_gemma4_parser_bridge",
         "authentication_boundary": "trusted_local_bridge",
-        "context_window_tokens": 262_144,
+        "context_window_tokens": int(context_window) if context_window else 262_144,
+        "context_window_source": (
+            "VLLM_CONTEXT_WINDOW" if context_window else "adapter_default"
+        ),
     }
 
 
