@@ -1,5 +1,5 @@
 cohort: panc_1.2
-generated_at: '2026-10-13T21:14:39.444929Z'
+generated_at: '2026-10-16T23:39:26.361338Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -87,9 +87,11 @@ questions:
   text: In patients with metastatic pancreatic cancer (de novo Stage IV or recurrent/relapsed
     metastatic) treated with first-line gemcitabine-containing regimens (where first-line
     refers to the first regimen after onset of metastatic disease), does TP53 mutation
-    status (ascertained before regimen start) modify the treatment effect on PFS-I
-    from regimen start when compared to fluoropyrimidine-only first-line regimens,
-    as measured by the interaction term hazard ratio (ratio of HRs) with 95% CI?
+    status modify the treatment effect on PFS-I from regimen start when compared to
+    first-line regimens containing a fluoropyrimidine but no gemcitabine (e.g. FOLFIRINOX),
+    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
+    date), as measured by the interaction term hazard ratio (ratio of HRs) with 95%
+    CI?
 - id: panc_1.2-Q07d410a5
   category: 8
   text: Among patients with Stage IV pancreatic cancer receiving FOLFIRINOX as first-line
