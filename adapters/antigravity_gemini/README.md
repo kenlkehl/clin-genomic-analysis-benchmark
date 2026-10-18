@@ -48,9 +48,9 @@ availability can vary independently of the display names in documentation.
 | `AGY_CLI_DISABLE_AUTO_UPDATE` | forced to `true` | prevents the CLI binary changing during a benchmark run |
 | `AGY_USE_SANDBOX` | `0` | experimental nested Antigravity sandbox; leave disabled for benchmark runs |
 | `AGY_SKIP_PERMISSIONS` | `0` | emergency diagnostic override; avoid in benchmark runs because it bypasses Antigravity permission checks |
-| `AGY_PRINT_TIMEOUT_CLASSIFY` | `9m30s` | Antigravity print timeout for classify |
-| `AGY_PRINT_TIMEOUT_DISAMBIGUATE` | `4m30s` | Antigravity print timeout for disambiguate |
-| `AGY_PRINT_TIMEOUT_ANALYZE` | `29m30s` | Antigravity print timeout for analyze |
+| `AGY_PRINT_TIMEOUT_CLASSIFY` | `29m30s` | Antigravity print timeout for classify |
+| `AGY_PRINT_TIMEOUT_DISAMBIGUATE` | `29m30s` | Antigravity print timeout for disambiguate |
+| `AGY_PRINT_TIMEOUT_ANALYZE` | `59m30s` | Antigravity print timeout for analyze |
 | `AGY_PRINT_TIMEOUT` | unset | fallback Antigravity print timeout for all stages |
 
 The adapter reads safe runtime fields from

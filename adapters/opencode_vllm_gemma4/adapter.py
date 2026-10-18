@@ -1,4 +1,4 @@
-"""OpenCode adapter for Gemma 4 31B on an OpenAI-compatible vLLM server."""
+"""OpenCode adapter for Gemma 4 models on an OpenAI-compatible vLLM server."""
 
 from __future__ import annotations
 
@@ -34,10 +34,10 @@ from clin_genomic_analysis_benchmark.agent.isolation import (  # noqa: E402
 )
 
 
-PROVIDER_NAME = "local_vllm_gemma4_31b"
+PROVIDER_NAME = "local_vllm_gemma4"
 DEFAULT_MODEL = "gemma4-31b"
 DEFAULT_BASE_URL = "http://camus.dfci.harvard.edu:8002/v1"
-MODEL_CONTEXT_WINDOW = 262_144
+DEFAULT_CONTEXT_WINDOW = 262_144
 DEFAULT_MAX_OUTPUT_TOKENS = 32_768
 TOKEN_ENV = "VLLM_TOKEN"
 BRIDGE_TOKEN_ENV = "OPENCODE_VLLM_BRIDGE_KEY"
@@ -72,6 +72,11 @@ def _model() -> str:
     return model
 
 
+def _context_window() -> int:
+    """Return the served context length; set it to the server's max_model_len."""
+    return _env_int("VLLM_CONTEXT_WINDOW", DEFAULT_CONTEXT_WINDOW)
+
+
 def _base_url() -> str:
     """Return a validated OpenAI-compatible API root, adding ``/v1`` if absent."""
     raw = os.environ.get("VLLM_BASE_URL", DEFAULT_BASE_URL).strip().rstrip("/")
@@ -103,6 +108,9 @@ def _bridge_config() -> BridgeConfig:
             "VLLM_MAX_RETRY_SLEEP_SECONDS", 30.0, minimum=0.0
         ),
         max_requests=_env_int("VLLM_MAX_REQUESTS", 256),
+        # Gemma 4 sometimes ends an OpenCode session with its answer only in
+        # the reasoning channel; pass that text through instead of an empty turn.
+        reasoning_fallback=_env_truthy("OPENCODE_REASONING_FALLBACK", True),
     )
 
 
@@ -118,7 +126,7 @@ def _opencode_config(*, bridge_url: str, max_output_tokens: int) -> str:
                 # The OpenAI AI SDK provider uses /v1/responses, which is what
                 # the local Gemma tool-call compatibility bridge implements.
                 "npm": "@ai-sdk/openai",
-                "name": "Local vLLM (Gemma 4 31B compatibility bridge)",
+                "name": "Local vLLM (Gemma 4 compatibility bridge)",
                 "options": {
                     "baseURL": bridge_url,
                     "apiKey": f"{{env:{BRIDGE_TOKEN_ENV}}}",
@@ -131,9 +139,9 @@ def _opencode_config(*, bridge_url: str, max_output_tokens: int) -> str:
                 },
                 "models": {
                     model: {
-                        "name": "Gemma 4 31B",
+                        "name": model,
                         "limit": {
-                            "context": MODEL_CONTEXT_WINDOW,
+                            "context": _context_window(),
                             "output": max_output_tokens,
                         },
                     }

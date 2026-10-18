@@ -17,7 +17,7 @@ All six cohorts are wired end to end. The reference adapter drives Claude Code o
 | Agent-facing bank | `questions/<cohort>.yaml` — `id`, `category`, `text` only. This is everything the agent under test ever sees |
 | Gold bank | `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` — answers, canonical concept IDs, classifications, and audit prose. Read by the scorer, never by the agent |
 | Agent guidance | `AGENT_INSTRUCTIONS.md` — served verbatim to the agent by the reference adapter |
-| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_vllm_gemma4/` (Codex with any Gemma 4 model on local vLLM), `adapters/opencode_vllm_gemma4_31b/` (OpenCode with local-vLLM Gemma 4 31B), `adapters/codex_vertex_gemma4_26b/` (Codex with Gemma 4 26B on Vertex Agent Platform), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` and `adapters/codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/antigravity_gemini/` (Gemini through Antigravity CLI), `adapters/template/` to write your own |
+| Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/claude_code_vllm_gemma4/` (Claude Code with any Gemma 4 model on local vLLM), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_vllm_gemma4/` (Codex with any Gemma 4 model on local vLLM), `adapters/opencode_vllm_gemma4/` (OpenCode with any Gemma 4 model on local vLLM), `adapters/codex_vertex_gemma4_26b/` (Codex with Gemma 4 26B on Vertex Agent Platform), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` and `adapters/codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/antigravity_gemini/` (Gemini through Antigravity CLI), `adapters/template/` to write your own |
 
 ### Keeping the answers away from the agent
 
@@ -215,8 +215,8 @@ uv run clingen-bench retry-failures \
   --run claude_code/<run_id> \
   --max-parallel 2 \
   --max-repair-passes 10 \
-  --classify-timeout 1200 \
-  --disambiguate-timeout 900
+  --classify-timeout 3600 \
+  --disambiguate-timeout 3600
 
 # One question, for a smoke test
 uv run clingen-bench eval --agent "bash adapters/claude_code/run.sh" \

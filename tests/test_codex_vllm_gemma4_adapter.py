@@ -16,6 +16,7 @@ from adapters.codex_vllm_gemma4.vllm_bridge import (
     VLLMResponsesBridge,
     VLLMResponsesClient,
     parse_gemma_tool_calls,
+    promote_reasoning_to_message,
     repair_gemma_tool_calls,
 )
 from clin_genomic_analysis_benchmark.agent.isolation import require_supported_adapter
@@ -256,6 +257,122 @@ def test_local_bridge_streams_repaired_tool_call(monkeypatch, tmp_path):
     assert "<|tool_call>" not in stream
     audit = (tmp_path / "audit.jsonl").read_text()
     assert '"repaired_tool_call_count": 1' in audit
+
+
+def _reasoning(text: str) -> dict:
+    return {
+        "id": "rs_test",
+        "type": "reasoning",
+        "summary": [],
+        "content": [{"type": "reasoning_text", "text": text}],
+    }
+
+
+def _message(text: str) -> dict:
+    return {
+        "id": "msg_test",
+        "type": "message",
+        "role": "assistant",
+        "status": "completed",
+        "content": [{"type": "output_text", "text": text}],
+    }
+
+
+def test_reasoning_is_promoted_only_when_nothing_else_is_actionable():
+    answer = '{"classification": "answerable"}'
+
+    for output in ([_reasoning(answer)], [_reasoning(answer), _message("  ")]):
+        promoted, changed = promote_reasoning_to_message({"output": output})
+        assert changed is True
+        assert [item["type"] for item in promoted["output"]] == ["reasoning", "message"]
+        assert promoted["output"][-1]["content"][0]["text"] == answer
+        repaired, _ = repair_gemma_tool_calls(promoted, tools=[])
+        assert [item["type"] for item in repaired["output"]] == ["message"]
+
+    call = {"type": "function_call", "name": "bash", "arguments": "{}"}
+    for output in (
+        [_reasoning("thinking"), _message(answer)],
+        [_reasoning("thinking"), call],
+        [_reasoning("   ")],
+        [],
+    ):
+        unchanged, changed = promote_reasoning_to_message({"output": output})
+        assert changed is False
+        assert unchanged["output"] == output
+
+
+def test_tool_call_in_reasoning_becomes_a_real_tool_call():
+    # Observed from Gemma 4 26B: the call lands in the reasoning channel and
+    # loses its <|tool_call> start token.
+    reasoning = (
+        'thoughtthoughtcall:bash{command:<|"|>python3 -c "print({1: 2})"<|"|>,'
+        'description:<|"|>Check values.<|"|>}<tool_call|>'
+    )
+    promoted, changed = promote_reasoning_to_message({"output": [_reasoning(reasoning)]})
+    assert changed is True
+
+    repaired, count = repair_gemma_tool_calls(
+        promoted, tools=[{"type": "function", "name": "bash"}]
+    )
+    assert count == 1
+    assert [item["type"] for item in repaired["output"]] == ["function_call"]
+    assert repaired["output"][0]["name"] == "bash"
+    assert json.loads(repaired["output"][0]["arguments"]) == {
+        "command": 'python3 -c "print({1: 2})"',
+        "description": "Check values.",
+    }
+
+    # A call fragment with nothing parseable falls back to the plain text.
+    promoted, changed = promote_reasoning_to_message(
+        {"output": [_reasoning("thought<tool_call|>")]}
+    )
+    assert changed is True
+    assert promoted["output"][-1]["content"][0]["text"] == "thought<tool_call|>"
+
+
+def _stream_reasoning_only(monkeypatch, tmp_path, config: BridgeConfig) -> str:
+    monkeypatch.setattr(
+        VLLMResponsesClient,
+        "complete",
+        lambda self, payload: {
+            "id": "resp_test",
+            "object": "response",
+            "status": "completed",
+            "model": "gemma4-31b",
+            "output": [_reasoning('{"classification": "answerable"}')],
+            "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+        },
+    )
+    with VLLMResponsesBridge(config, audit_path=tmp_path / "audit.jsonl") as bridge:
+        request = urllib.request.Request(
+            f"{bridge.base_url}/responses",
+            data=json.dumps({"input": "classify", "stream": True}).encode(),
+            headers={
+                "Authorization": f"Bearer {bridge.bearer_token}",
+                "Content-Type": "application/json",
+            },
+        )
+        return urllib.request.urlopen(request).read().decode()
+
+
+def test_bridge_passes_reasoning_through_only_when_enabled(monkeypatch, tmp_path):
+    enabled = BridgeConfig(
+        base_url="http://unused.invalid/v1",
+        model="gemma4-31b",
+        reasoning_fallback=True,
+    )
+    stream = _stream_reasoning_only(monkeypatch, tmp_path / "on", enabled)
+    assert "event: response.output_text.done" in stream
+    assert '\\"classification\\": \\"answerable\\"' in stream
+    assert '"reasoning_promoted": true' in (tmp_path / "on" / "audit.jsonl").read_text()
+
+    default = BridgeConfig(base_url="http://unused.invalid/v1", model="gemma4-31b")
+    stream = _stream_reasoning_only(monkeypatch, tmp_path / "off", default)
+    assert "response.output_text" not in stream
+    assert "answerable" not in stream
+    assert '"reasoning_promoted": false' in (
+        tmp_path / "off" / "audit.jsonl"
+    ).read_text()
 
 
 def test_adapter_is_registered_and_provenance_excludes_token():

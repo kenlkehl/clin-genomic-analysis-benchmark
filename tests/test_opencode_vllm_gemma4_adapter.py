@@ -1,4 +1,4 @@
-"""Tests for the OpenCode/local-vLLM Gemma 4 31B adapter."""
+"""Tests for the OpenCode/local-vLLM Gemma 4 adapter."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from adapters.opencode_vllm_gemma4_31b import adapter
+from adapters.opencode_vllm_gemma4 import adapter
 from clin_genomic_analysis_benchmark.agent.isolation import require_supported_adapter
 from clin_genomic_analysis_benchmark.agent.orchestrator import _agent_provenance
 
@@ -120,6 +120,7 @@ def test_opencode_call_uses_disposable_config_and_bridge(tmp_path, monkeypatch):
     assert captured["input"] == "benchmark prompt"
     assert captured["home_kind"] == "opencode_vllm"
     assert captured["bridge_config"].api_key == "upstream-secret"
+    assert captured["bridge_config"].reasoning_fallback is True
     assert adapter.TOKEN_ENV not in captured["env"]
     assert "OPENAI_API_KEY" not in captured["env"]
     assert captured["env"][adapter.BRIDGE_TOKEN_ENV] == "bridge-token"
@@ -136,9 +137,22 @@ def test_opencode_call_uses_disposable_config_and_bridge(tmp_path, monkeypatch):
     assert inline_config["snapshot"] is False
 
 
+def test_reasoning_fallback_can_be_disabled(monkeypatch):
+    monkeypatch.setenv("OPENCODE_REASONING_FALLBACK", "0")
+    assert adapter._bridge_config().reasoning_fallback is False
+
+    command = "bash adapters/opencode_vllm_gemma4/run.sh"
+    provenance = _agent_provenance(
+        command, environ={"OPENCODE_REASONING_FALLBACK": "0"}
+    )
+    assert provenance["reasoning_fallback"] is False
+    assert provenance["reasoning_fallback_source"] == "OPENCODE_REASONING_FALLBACK"
+    assert provenance["environment"] == {"OPENCODE_REASONING_FALLBACK": "0"}
+
+
 def test_adapter_is_registered_and_provenance_excludes_tokens():
-    command = "bash adapters/opencode_vllm_gemma4_31b/run.sh"
-    assert require_supported_adapter(command) == "opencode_vllm_gemma4_31b"
+    command = "bash adapters/opencode_vllm_gemma4/run.sh"
+    assert require_supported_adapter(command) == "opencode_vllm_gemma4"
 
     provenance = _agent_provenance(
         command,
@@ -152,7 +166,7 @@ def test_adapter_is_registered_and_provenance_excludes_tokens():
         },
     )
 
-    assert provenance["adapter"] == "opencode_vllm_gemma4_31b"
+    assert provenance["adapter"] == "opencode_vllm_gemma4"
     assert provenance["client"] == "opencode"
     assert provenance["provider"] == adapter.PROVIDER_NAME
     assert provenance["model"] == "test-gemma"
@@ -161,6 +175,8 @@ def test_adapter_is_registered_and_provenance_excludes_tokens():
     assert provenance["effort_supported"] is False
     assert provenance["max_output_tokens"] == 16384
     assert provenance["agent_profile"] == "build"
+    assert provenance["reasoning_fallback"] is True
+    assert provenance["reasoning_fallback_source"] == "adapter_default"
     assert provenance["environment"] == {
         "VLLM_BASE_URL": "http://vllm.internal:8000",
         "VLLM_MODEL": "test-gemma",

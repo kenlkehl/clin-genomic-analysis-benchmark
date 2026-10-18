@@ -35,9 +35,9 @@ ADAPTER_DIR = Path(__file__).resolve().parent
 _MAX_ERROR_STREAM_CHARS = 4000
 
 DEFAULT_PRINT_TIMEOUTS = {
-    "classify": "9m30s",
-    "disambiguate": "4m30s",
-    "analyze": "29m30s",
+    "classify": "29m30s",
+    "disambiguate": "29m30s",
+    "analyze": "59m30s",
 }
 
 

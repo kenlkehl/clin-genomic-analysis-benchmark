@@ -94,9 +94,9 @@ class AzureConfig:
 @dataclass(frozen=True)
 class TimeoutConfig:
     """Per-stage agent timeouts (seconds)."""
-    classify: int = 600
-    disambiguate: int = 300
-    analyze: int = 1800
+    classify: int = 1800
+    disambiguate: int = 1800
+    analyze: int = 3600
 
 
 @dataclass(frozen=True)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OpenCode adapter for Gemma 4 31B on the Camus vLLM server.
+# OpenCode adapter for Gemma 4 models on an OpenAI-compatible vLLM server.
 
 set -euo pipefail
 
@@ -13,7 +13,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --question-file) QFILE="$2"; shift 2 ;;
     --output)        OUT="$2";    shift 2 ;;
-    *) echo "opencode_vllm_gemma4_31b adapter: unknown arg $1" >&2; exit 2 ;;
+    *) echo "opencode_vllm_gemma4 adapter: unknown arg $1" >&2; exit 2 ;;
   esac
 done
 if [[ -z "$QFILE" || -z "$OUT" ]]; then

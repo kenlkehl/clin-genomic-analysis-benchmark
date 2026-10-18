@@ -38,6 +38,14 @@ _CALL_RE = re.compile(
     + r"(\{[\s\S]*?\})\s*"
     + re.escape(TOOL_CALL_END)
 )
+# Tool calls emitted inside the reasoning channel lose the special start token,
+# e.g. ``thoughtcall:bash{command:<|"|>ls<|"|>}<tool_call|>``.
+_REASONING_CALL_RE = re.compile(
+    r"(?:" + re.escape(TOOL_CALL_START) + r")?"
+    + r"\s*call:([A-Za-z_][A-Za-z0-9_.-]*)\s*"
+    + r"(\{[\s\S]*?\})\s*"
+    + re.escape(TOOL_CALL_END)
+)
 
 
 class BridgeError(RuntimeError):
@@ -58,6 +66,7 @@ class BridgeConfig:
     retry_base_seconds: float = 2.0
     max_retry_sleep_seconds: float = 30.0
     max_requests: int = 256
+    reasoning_fallback: bool = False
 
     @property
     def responses_url(self) -> str:
@@ -221,6 +230,73 @@ def _message_item(text: str, original: Mapping[str, Any]) -> dict[str, Any]:
         "annotations": [],
     }]
     return item
+
+
+def _reasoning_text(item: Mapping[str, Any]) -> str:
+    """Return a reasoning item's text, preferring full content over summaries."""
+    for key in ("content", "summary"):
+        parts = [
+            str(part.get("text") or "")
+            for part in item.get(key) or []
+            if isinstance(part, Mapping)
+        ]
+        text = "\n".join(part for part in parts if part.strip()).strip()
+        if text:
+            return text
+    return ""
+
+
+def _reasoning_tool_call_markup(text: str) -> str:
+    """Return canonical markup for parseable tool calls found in reasoning text."""
+    calls: list[str] = []
+    for match in _REASONING_CALL_RE.finditer(text):
+        try:
+            _ArgumentsParser(match.group(2)).parse()
+        except ValueError:
+            continue
+        calls.append(
+            f"{TOOL_CALL_START}call:{match.group(1)}{match.group(2)}{TOOL_CALL_END}"
+        )
+    return "".join(calls)
+
+
+def promote_reasoning_to_message(
+    response: Mapping[str, Any],
+) -> tuple[dict[str, Any], bool]:
+    """Surface reasoning text as the message when a response has nothing else.
+
+    Gemma 4 sometimes ends a turn with all of its output in the reasoning
+    channel and no message or tool call. ``repair_gemma_tool_calls`` drops
+    reasoning items, so the client would receive an empty turn and stop with
+    no answer. When no actionable item exists, the reasoning output becomes the
+    assistant message instead. If the reasoning holds tool calls, only their
+    canonical markup is kept, so ``repair_gemma_tool_calls`` turns them into
+    real tool calls; otherwise the full reasoning text is used.
+    """
+    output = [
+        item for item in response.get("output") or [] if isinstance(item, Mapping)
+    ]
+    reasoning = [item for item in output if item.get("type") == "reasoning"]
+    for item in output:
+        if item.get("type") == "reasoning":
+            continue
+        if item.get("type") == "message" and not _message_text(item).strip():
+            continue
+        return dict(response), False
+    text = "\n\n".join(part for part in map(_reasoning_text, reasoning) if part)
+    if not text:
+        return dict(response), False
+    text = _reasoning_tool_call_markup(text) or text
+    promoted = copy.deepcopy(dict(response))
+    promoted["output"] = [copy.deepcopy(dict(item)) for item in reasoning]
+    promoted["output"].append({
+        "id": f"msg_{uuid.uuid4().hex}",
+        "type": "message",
+        "role": "assistant",
+        "status": "completed",
+        "content": [{"type": "output_text", "text": text, "annotations": []}],
+    })
+    return promoted, True
 
 
 def repair_gemma_tool_calls(
@@ -478,6 +554,11 @@ class VLLMResponsesBridge(AbstractContextManager["VLLMResponsesBridge"]):
                         "stream": bool(body.get("stream")),
                     })
                     upstream = client.complete(body)
+                    reasoning_promoted = False
+                    if bridge.config.reasoning_fallback:
+                        upstream, reasoning_promoted = promote_reasoning_to_message(
+                            upstream
+                        )
                     response, repaired_count = repair_gemma_tool_calls(
                         upstream, tools=body.get("tools")
                     )
@@ -502,6 +583,7 @@ class VLLMResponsesBridge(AbstractContextManager["VLLMResponsesBridge"]):
                         "request_number": request_number,
                         "output_item_count": len(response.get("output") or []),
                         "repaired_tool_call_count": repaired_count,
+                        "reasoning_promoted": reasoning_promoted,
                     })
                 except BridgeError as exc:
                     bridge._audit({

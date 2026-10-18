@@ -61,12 +61,13 @@ class SandboxedCommand:
 _SUPPORTED_ADAPTER_DIRS = {
     "antigravity_gemini",
     "claude_code",
+    "claude_code_vllm_gemma4",
     "codex_gpt",
     "codex_vllm_gemma4",
     "codex_vertex_gemma4_26b",
     "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl",
     "codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl",
-    "opencode_vllm_gemma4_31b",
+    "opencode_vllm_gemma4",
 }
 
 
@@ -154,6 +155,11 @@ _PASSTHROUGH_ENV = {
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_AUTH_TOKEN",
     "ANTHROPIC_BASE_URL",
+    # Non-secret model aliases that point Claude Code at a non-Anthropic model.
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL",
+    "CLAUDE_CODE_SUBAGENT_MODEL",
     "ANTHROPIC_VERTEX_PROJECT_ID",
     "ANTHROPIC_VERTEX_REGION",
     "CLAUDE_CODE_USE_VERTEX",
@@ -355,6 +361,13 @@ def _seed_claude_home(home: Path, source_env: Mapping[str, str]) -> None:
         copied = home / ".config/gcloud/application_default_credentials.json"
         copied.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_credential, copied)
+
+
+def _seed_claude_vllm_home(home: Path) -> None:
+    """Claude Code against a local vLLM endpoint needs no cloud credentials."""
+    claude_home = home / ".claude"
+    claude_home.mkdir(parents=True, exist_ok=True)
+    (claude_home / "settings.json").write_text("{}")
 
 
 def _seed_google_adc(home: Path, source_env: Mapping[str, str]) -> None:
@@ -568,6 +581,8 @@ def _seed_home(home: Path, kind: str, source_env: Mapping[str, str]) -> None:
         _seed_minimal_codex_home(home, source_env)
     elif kind == "claude":
         _seed_claude_home(home, source_env)
+    elif kind == "claude_vllm":
+        _seed_claude_vllm_home(home)
     elif kind == "antigravity":
         _seed_antigravity_home(home, source_env)
 
@@ -834,6 +849,7 @@ def export_agent_session_audit(
             Path(".gemini/antigravity-cli/log"),
         ),
         "claude": (Path(".claude/projects"), Path(".claude/debug")),
+        "claude_vllm": (Path(".claude/projects"), Path(".claude/debug")),
         "codex": (Path(".codex/sessions"), Path(".codex/log")),
         "codex_qwen": (Path(".codex/sessions"), Path(".codex/log")),
         "codex_vllm": (Path(".codex/sessions"), Path(".codex/log")),

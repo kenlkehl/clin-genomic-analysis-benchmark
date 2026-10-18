@@ -13,7 +13,7 @@ $ ./run.sh --question-file <abs question.json> --output <abs result.json>
 - Exit 0 = success. A nonzero exit, timeout, missing/invalid JSON, or schema
   violation is retried by the harness (three attempts by default). If every
   attempt fails, the stage fails and downstream stages are not attempted.
-- Per-stage default timeouts: 600s (classify) / 300s (disambiguate) / 1800s (analyze).
+- Per-stage default timeouts: 1800s (classify) / 1800s (disambiguate) / 3600s (analyze).
 - Stdout + stderr are captured to `<stage>.agent.log` in the per-question run directory.
 
 ### `question.json`

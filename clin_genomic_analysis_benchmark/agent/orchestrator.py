@@ -124,6 +124,7 @@ _SAFE_AGENT_ENV_VARS = (
     "OPENCODE_MAX_OUTPUT_TOKENS",
     "OPENCODE_MAX_ATTEMPTS",
     "OPENCODE_RETRY_BASE_SECONDS",
+    "OPENCODE_REASONING_FALLBACK",
     "UNSLOTH_STUDIO_BASE_URL",
     "UNSLOTH_MODEL",
     "UNSLOTH_REQUEST_TIMEOUT_SECONDS",
@@ -361,8 +362,8 @@ def _vllm_gemma_provenance(
 def _opencode_vllm_gemma_provenance(
     *, agent_cmd: str, env: Mapping[str, str]
 ) -> dict | None:
-    """Resolve the pinned OpenCode/local-vLLM Gemma adapter."""
-    adapter = "opencode_vllm_gemma4_31b"
+    """Resolve the OpenCode/local-vLLM Gemma 4 adapter."""
+    adapter = "opencode_vllm_gemma4"
     if f"adapters/{adapter}/" not in agent_cmd:
         return None
     model = env.get("VLLM_MODEL", "").strip() or "gemma4-31b"
@@ -374,10 +375,12 @@ def _opencode_vllm_gemma_provenance(
         base_url += "/v1"
     agent = env.get("OPENCODE_AGENT", "").strip()
     output_tokens = env.get("OPENCODE_MAX_OUTPUT_TOKENS", "").strip()
+    context_window = env.get("VLLM_CONTEXT_WINDOW", "").strip()
+    reasoning_fallback = env.get("OPENCODE_REASONING_FALLBACK")
     return {
         "adapter": adapter,
         "client": "opencode",
-        "provider": "local_vllm_gemma4_31b",
+        "provider": "local_vllm_gemma4",
         "provider_source": "adapter",
         "model": model,
         "model_source": (
@@ -395,10 +398,55 @@ def _opencode_vllm_gemma_provenance(
         "wire_api": "responses",
         "tool_call_compatibility": "trusted_local_gemma4_parser_bridge",
         "authentication_boundary": "trusted_local_bridge",
-        "context_window_tokens": 262_144,
+        "context_window_tokens": int(context_window) if context_window else 262_144,
+        "context_window_source": (
+            "VLLM_CONTEXT_WINDOW" if context_window else "adapter_default"
+        ),
         "max_output_tokens": int(output_tokens) if output_tokens else 32_768,
         "agent_profile": agent or "build",
         "agent_profile_source": "OPENCODE_AGENT" if agent else "adapter_default",
+        "reasoning_fallback": (
+            True
+            if reasoning_fallback is None
+            else reasoning_fallback.strip().lower()
+            not in {"0", "false", "no", "off", ""}
+        ),
+        "reasoning_fallback_source": (
+            "adapter_default"
+            if reasoning_fallback is None
+            else "OPENCODE_REASONING_FALLBACK"
+        ),
+    }
+
+
+def _claude_vllm_gemma_provenance(
+    *, agent_cmd: str, env: Mapping[str, str]
+) -> dict | None:
+    """Resolve the Claude Code adapter for Gemma 4 on vLLM's Anthropic API."""
+    adapter = "claude_code_vllm_gemma4"
+    if f"adapters/{adapter}/" not in agent_cmd:
+        return None
+    model = env.get("VLLM_MODEL", "").strip()
+    base_url = env.get("VLLM_BASE_URL", "").strip().rstrip("/")
+    if base_url and not base_url.endswith("/v1"):
+        base_url += "/v1"
+    return {
+        "adapter": adapter,
+        "client": "claude_code",
+        "provider": "local_vllm_gemma4",
+        "provider_source": "adapter",
+        "model": model or None,
+        "model_source": "VLLM_MODEL" if model else "unresolved_required_setting",
+        "effort_level": None,
+        "effort_supported": False,
+        "effort_source": "unsupported_by_model",
+        "base_url": base_url or None,
+        "base_url_source": (
+            "VLLM_BASE_URL" if base_url else "unresolved_required_setting"
+        ),
+        "wire_api": "anthropic_messages",
+        "tool_call_compatibility": "vllm_native_anthropic_messages",
+        "authentication_boundary": "unauthenticated_endpoint",
     }
 
 
@@ -625,6 +673,16 @@ def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) 
             if name.startswith("VLLM_") or name.startswith("OPENCODE_")
         }
         provenance.update(opencode_vllm)
+        return provenance
+
+    claude_vllm = _claude_vllm_gemma_provenance(agent_cmd=agent_cmd, env=env)
+    if claude_vllm is not None:
+        provenance["environment"] = {
+            name: value
+            for name, value in explicit_env.items()
+            if name.startswith("VLLM_")
+        }
+        provenance.update(claude_vllm)
         return provenance
 
     vllm_gemma = _vllm_gemma_provenance(agent_cmd=agent_cmd, env=env)
