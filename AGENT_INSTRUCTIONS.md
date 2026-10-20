@@ -69,7 +69,7 @@ an informed decision.
 Only invoked if the agent classified the question as AMBIGUOUS. Select the
 concrete concepts a questioner would need to specify to make the question
 deterministically answerable from the cohort data. Use only IDs from the
-`disambiguation_concept_menu` supplied in `question.json`. Select every
+disambiguation concept menu below (`disambiguation_concept_menu`). Select every
 material unresolved concept, but do not select merely related concepts:
 exact gold IDs earn points and non-gold IDs incur a false-positive penalty.
 
@@ -80,8 +80,6 @@ exact gold IDs earn points and non-gold IDs incur a false-positive penalty.
 ```
 
 ### Disambiguation concept menu
-
-The same menu is included as structured data in every `question.json`.
 
 | ID | Select when the question needs... |
 |---|---|
