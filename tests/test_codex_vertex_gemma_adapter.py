@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import io
 import json
 import subprocess
+import urllib.error
 import urllib.request
 from contextlib import contextmanager
 from types import SimpleNamespace
 
-from adapters.codex_vertex_gemma4_26b import adapter
+import pytest
+
+from adapters.codex_vertex_gemma4_26b import adapter, vertex_bridge
 from adapters.codex_vertex_gemma4_26b.vertex_bridge import (
     DEFAULT_MODEL,
     BridgeConfig,
+    BridgeError,
     VertexChatClient,
     VertexResponsesBridge,
     chat_response_to_response,
@@ -176,6 +181,73 @@ def test_local_bridge_requires_auth_and_streams(monkeypatch, tmp_path):
     records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
     assert any(record["event"] == "response" for record in records)
     assert "secret-question-text" not in (tmp_path / "audit.jsonl").read_text()
+
+
+class _FakeTokenSource:
+    def __init__(self):
+        self.issued = 0
+
+    def get(self):
+        self.issued += 1
+        return f"token-{self.issued}"
+
+    def invalidate(self):
+        pass
+
+
+class _FakeUpstreamResponse(io.BytesIO):
+    status = 200
+    headers = {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+
+def _scripted_urlopen(monkeypatch, statuses):
+    """Answer upstream requests with the given statuses, recording each token."""
+    tokens = []
+    remaining = list(statuses)
+
+    def fake_urlopen(request, timeout):
+        tokens.append(request.get_header("Authorization"))
+        status = remaining.pop(0)
+        if status != 200:
+            raise urllib.error.HTTPError(
+                request.full_url, status, "error", {},
+                io.BytesIO(json.dumps({"error": {"message": f"HTTP {status}"}}).encode()),
+            )
+        return _FakeUpstreamResponse(json.dumps({"choices": []}).encode())
+
+    monkeypatch.setattr(vertex_bridge.urllib.request, "urlopen", fake_urlopen)
+    sleeps = []
+    monkeypatch.setattr(vertex_bridge.time, "sleep", sleeps.append)
+    return tokens, sleeps
+
+
+def test_upstream_401_retries_once_with_a_fresh_token(monkeypatch):
+    tokens, sleeps = _scripted_urlopen(monkeypatch, [401, 200])
+    audit = []
+    client = VertexChatClient(BridgeConfig(project_id="test-project"), _FakeTokenSource(), audit.append)
+
+    assert client.complete({"messages": []}) == {"choices": []}
+    assert tokens == ["Bearer token-1", "Bearer token-2"]
+    assert sleeps == []
+    assert [(record["status"], record.get("retryable")) for record in audit] == [
+        (401, True), (200, None),
+    ]
+
+
+def test_repeated_upstream_401_fails_without_further_retries(monkeypatch):
+    tokens, _ = _scripted_urlopen(monkeypatch, [401, 401, 200])
+    client = VertexChatClient(BridgeConfig(project_id="test-project"), _FakeTokenSource(), lambda record: None)
+
+    with pytest.raises(BridgeError) as excinfo:
+        client.complete({"messages": []})
+    assert excinfo.value.status == 401
+    assert len(tokens) == 2
 
 
 def test_adapter_pins_local_provider_without_reasoning(tmp_path, monkeypatch):

@@ -61,6 +61,8 @@ class SandboxedCommand:
 _SUPPORTED_ADAPTER_DIRS = {
     "antigravity_gemini",
     "claude_code",
+    "claude_code_vertex_gemini",
+    "claude_code_vertex_gemma4",
     "claude_code_vllm_gemma4",
     "codex_gpt",
     "codex_vllm_gemma4",
@@ -364,7 +366,7 @@ def _seed_claude_home(home: Path, source_env: Mapping[str, str]) -> None:
 
 
 def _seed_claude_vllm_home(home: Path) -> None:
-    """Claude Code against a local vLLM endpoint needs no cloud credentials."""
+    """Claude Code against local vLLM or a trusted bridge needs no cloud credentials."""
     claude_home = home / ".claude"
     claude_home.mkdir(parents=True, exist_ok=True)
     (claude_home / "settings.json").write_text("{}")
@@ -581,7 +583,7 @@ def _seed_home(home: Path, kind: str, source_env: Mapping[str, str]) -> None:
         _seed_minimal_codex_home(home, source_env)
     elif kind == "claude":
         _seed_claude_home(home, source_env)
-    elif kind == "claude_vllm":
+    elif kind in {"claude_vllm", "claude_vertex"}:
         _seed_claude_vllm_home(home)
     elif kind == "antigravity":
         _seed_antigravity_home(home, source_env)
@@ -850,6 +852,7 @@ def export_agent_session_audit(
         ),
         "claude": (Path(".claude/projects"), Path(".claude/debug")),
         "claude_vllm": (Path(".claude/projects"), Path(".claude/debug")),
+        "claude_vertex": (Path(".claude/projects"), Path(".claude/debug")),
         "codex": (Path(".codex/sessions"), Path(".codex/log")),
         "codex_qwen": (Path(".codex/sessions"), Path(".codex/log")),
         "codex_vllm": (Path(".codex/sessions"), Path(".codex/log")),

@@ -40,5 +40,6 @@ effort as unsupported.
 Useful reliability controls are `VERTEX_GEMMA_MAX_RETRIES` (default `6`),
 `VERTEX_GEMMA_RETRY_BASE_SECONDS` (default `5`), and
 `VERTEX_GEMMA_REQUEST_TIMEOUT_SECONDS` (default `600`). The bridge retries
-transient `429` and `5xx` responses and saves content-free request metadata in
+transient `429` and `5xx` responses, retries a `401` once with a freshly
+fetched access token, and saves content-free request metadata in
 each question's `adapter_audit/vertex_bridge.*.jsonl` file.

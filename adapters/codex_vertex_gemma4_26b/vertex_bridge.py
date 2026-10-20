@@ -478,6 +478,7 @@ class VertexChatClient:
     def complete(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         encoded = json.dumps(payload).encode()
         last_error = "Vertex request failed"
+        refreshed_after_401 = False
         for attempt in range(1, self.config.max_retries + 1):
             started = time.monotonic()
             request = urllib.request.Request(
@@ -508,9 +509,14 @@ class VertexChatClient:
             except urllib.error.HTTPError as exc:
                 raw = exc.read(8192)
                 last_error = self._error_message(raw)
+                # gcloud can return a cached token that is close to expiry, so it
+                # may lapse within our reuse window. Retry a 401 once, at once,
+                # with a freshly fetched token; a second 401 is a real failure.
+                refresh_token = exc.code == 401 and not refreshed_after_401
                 if exc.code == 401:
                     self.token_source.invalidate()
-                retryable = exc.code in RETRYABLE_STATUS_CODES
+                    refreshed_after_401 = True
+                retryable = refresh_token or exc.code in RETRYABLE_STATUS_CODES
                 self.audit({
                     "event": "upstream_attempt",
                     "attempt": attempt,
@@ -524,6 +530,8 @@ class VertexChatClient:
                         f"Vertex Chat Completions failed with HTTP {exc.code}: {last_error}",
                         status=502 if retryable else exc.code,
                     ) from exc
+                if refresh_token:
+                    continue
                 retry_after = exc.headers.get("Retry-After")
                 try:
                     sleep_for = float(retry_after) if retry_after else 0.0

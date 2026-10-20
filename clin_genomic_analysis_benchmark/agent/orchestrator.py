@@ -141,6 +141,16 @@ _SAFE_AGENT_ENV_VARS = (
     "VERTEX_GEMMA_MAX_RETRY_SLEEP_SECONDS",
     "VERTEX_GEMMA_MAX_OUTPUT_TOKENS",
     "VERTEX_GEMMA_MAX_REQUESTS",
+    "VERTEX_GEMINI_PROJECT_ID",
+    "VERTEX_GEMINI_LOCATION",
+    "VERTEX_GEMINI_MODEL",
+    "VERTEX_GEMINI_REASONING_EFFORT",
+    "VERTEX_GEMINI_REQUEST_TIMEOUT_SECONDS",
+    "VERTEX_GEMINI_MAX_RETRIES",
+    "VERTEX_GEMINI_RETRY_BASE_SECONDS",
+    "VERTEX_GEMINI_MAX_RETRY_SLEEP_SECONDS",
+    "VERTEX_GEMINI_MAX_OUTPUT_TOKENS",
+    "VERTEX_GEMINI_MAX_REQUESTS",
     "AGY_MODEL",
     "AGY_EFFORT",
     "AGY_AGENT",
@@ -450,6 +460,83 @@ def _claude_vllm_gemma_provenance(
     }
 
 
+def _claude_vertex_gemini_provenance(
+    *, agent_cmd: str, env: Mapping[str, str]
+) -> dict | None:
+    """Resolve the Claude Code adapter for Gemini on Vertex Agent Platform."""
+    adapter = "claude_code_vertex_gemini"
+    if f"adapters/{adapter}/" not in agent_cmd:
+        return None
+    model = env.get("VERTEX_GEMINI_MODEL", "").strip()
+    if model and "/" not in model:
+        model = f"google/{model}"
+    project = env.get("VERTEX_GEMINI_PROJECT_ID", "").strip()
+    location = env.get("VERTEX_GEMINI_LOCATION", "").strip()
+    effort = env.get("VERTEX_GEMINI_REASONING_EFFORT", "").strip().lower()
+    return {
+        "adapter": adapter,
+        "client": "claude_code",
+        "provider": "google_vertex_agent_platform",
+        "provider_source": "adapter",
+        "model": model or None,
+        "model_source": (
+            "VERTEX_GEMINI_MODEL" if model else "unresolved_required_setting"
+        ),
+        "effort_level": effort or None,
+        "effort_supported": True,
+        "effort_source": (
+            "VERTEX_GEMINI_REASONING_EFFORT" if effort else "model_default"
+        ),
+        "project_id": project or None,
+        "project_id_source": (
+            "VERTEX_GEMINI_PROJECT_ID" if project else "unresolved_required_setting"
+        ),
+        "region": location or "global",
+        "region_source": (
+            "VERTEX_GEMINI_LOCATION" if location else "adapter_default"
+        ),
+        "wire_api": "anthropic_messages",
+        "api_translation": "anthropic_messages_to_chat_completions",
+        "authentication_boundary": "trusted_local_bridge",
+    }
+
+
+def _claude_vertex_gemma_provenance(
+    *, agent_cmd: str, env: Mapping[str, str]
+) -> dict | None:
+    """Resolve the Claude Code adapter for Gemma 4 MaaS on Vertex Agent Platform."""
+    adapter = "claude_code_vertex_gemma4"
+    if f"adapters/{adapter}/" not in agent_cmd:
+        return None
+    model = env.get("VERTEX_GEMMA_MODEL", "").strip()
+    if model and "/" not in model:
+        model = f"google/{model}"
+    project = env.get("VERTEX_GEMMA_PROJECT_ID", "").strip()
+    location = env.get("VERTEX_GEMMA_LOCATION", "").strip()
+    return {
+        "adapter": adapter,
+        "client": "claude_code",
+        "provider": "google_vertex_agent_platform",
+        "provider_source": "adapter",
+        "model": model or "google/gemma-4-26b-a4b-it-maas",
+        "model_source": "VERTEX_GEMMA_MODEL" if model else "adapter_default",
+        "effort_level": None,
+        "effort_supported": False,
+        "effort_source": "unsupported_by_model",
+        "project_id": project or None,
+        "project_id_source": (
+            "VERTEX_GEMMA_PROJECT_ID" if project else "unresolved_required_setting"
+        ),
+        "region": location or "global",
+        "region_source": (
+            "VERTEX_GEMMA_LOCATION" if location else "adapter_default"
+        ),
+        "wire_api": "anthropic_messages",
+        "api_translation": "anthropic_messages_to_chat_completions",
+        "authentication_boundary": "trusted_local_bridge",
+    }
+
+
 def _unsloth_qwen_provenance(
     *, agent_cmd: str, env: Mapping[str, str]
 ) -> dict | None:
@@ -683,6 +770,26 @@ def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) 
             if name.startswith("VLLM_")
         }
         provenance.update(claude_vllm)
+        return provenance
+
+    claude_vertex_gemma = _claude_vertex_gemma_provenance(agent_cmd=agent_cmd, env=env)
+    if claude_vertex_gemma is not None:
+        provenance["environment"] = {
+            name: value
+            for name, value in explicit_env.items()
+            if name.startswith("VERTEX_GEMMA_")
+        }
+        provenance.update(claude_vertex_gemma)
+        return provenance
+
+    claude_vertex = _claude_vertex_gemini_provenance(agent_cmd=agent_cmd, env=env)
+    if claude_vertex is not None:
+        provenance["environment"] = {
+            name: value
+            for name, value in explicit_env.items()
+            if name.startswith("VERTEX_GEMINI_")
+        }
+        provenance.update(claude_vertex)
         return provenance
 
     vllm_gemma = _vllm_gemma_provenance(agent_cmd=agent_cmd, env=env)
