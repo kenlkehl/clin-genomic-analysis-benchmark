@@ -69,6 +69,7 @@ _SUPPORTED_ADAPTER_DIRS = {
     "codex_vertex_gemma4_26b",
     "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl",
     "codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl",
+    "opencode_azure_gpt",
     "opencode_vllm_gemma4",
 }
 
@@ -150,7 +151,10 @@ _PASSTHROUGH_ENV = {
     "VLLM_GEMMA_BRIDGE_KEY",
     # OpenCode receives only this ephemeral local-bridge key and inline config.
     "OPENCODE_VLLM_BRIDGE_KEY",
+    "OPENCODE_AZURE_BRIDGE_KEY",
     "OPENCODE_CONFIG_CONTENT",
+    # Raises OpenCode's 32k output cap; reasoning tokens count against it.
+    "OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX",
     # Ephemeral token for the trusted localhost Unsloth credential bridge.
     "UNSLOTH_STUDIO_BRIDGE_KEY",
     # Anthropic and Google Vertex.

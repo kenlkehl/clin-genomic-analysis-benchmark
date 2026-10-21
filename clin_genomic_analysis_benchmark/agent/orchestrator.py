@@ -125,6 +125,14 @@ _SAFE_AGENT_ENV_VARS = (
     "OPENCODE_MAX_ATTEMPTS",
     "OPENCODE_RETRY_BASE_SECONDS",
     "OPENCODE_REASONING_FALLBACK",
+    "OPENCODE_AZURE_MODEL",
+    "OPENCODE_AZURE_REASONING_EFFORT",
+    "OPENCODE_AZURE_CONTEXT_WINDOW",
+    "OPENCODE_AZURE_REQUEST_TIMEOUT_SECONDS",
+    "OPENCODE_AZURE_MAX_RETRIES",
+    "OPENCODE_AZURE_RETRY_BASE_SECONDS",
+    "OPENCODE_AZURE_MAX_RETRY_SLEEP_SECONDS",
+    "OPENCODE_AZURE_MAX_REQUESTS",
     "UNSLOTH_STUDIO_BASE_URL",
     "UNSLOTH_MODEL",
     "UNSLOTH_REQUEST_TIMEOUT_SECONDS",
@@ -366,6 +374,51 @@ def _vllm_gemma_provenance(
         "context_window_source": (
             "VLLM_CONTEXT_WINDOW" if context_window else "adapter_default"
         ),
+    }
+
+
+def _opencode_azure_gpt_provenance(
+    *, agent_cmd: str, env: Mapping[str, str]
+) -> dict | None:
+    """Resolve the OpenCode/Azure OpenAI GPT adapter."""
+    adapter = "opencode_azure_gpt"
+    if f"adapters/{adapter}/" not in agent_cmd:
+        return None
+    model = env.get("OPENCODE_AZURE_MODEL", "").strip()
+    effort = env.get("OPENCODE_AZURE_REASONING_EFFORT", "").strip().lower()
+    endpoint = env.get("AZURE_OPENAI_ENDPOINT", "").strip().rstrip("/")
+    if endpoint and not endpoint.endswith("/openai/v1"):
+        endpoint += "/openai/v1"
+    agent = env.get("OPENCODE_AGENT", "").strip()
+    output_tokens = env.get("OPENCODE_MAX_OUTPUT_TOKENS", "").strip()
+    context_window = env.get("OPENCODE_AZURE_CONTEXT_WINDOW", "").strip()
+    return {
+        "adapter": adapter,
+        "client": "opencode",
+        "provider": "azure",
+        "provider_source": "adapter",
+        "model": model or None,
+        "model_source": (
+            "OPENCODE_AZURE_MODEL" if model else "unresolved_required_setting"
+        ),
+        "effort_level": effort or None,
+        "effort_supported": True,
+        "effort_source": (
+            "OPENCODE_AZURE_REASONING_EFFORT" if effort else "model_default"
+        ),
+        "base_url": endpoint or None,
+        "base_url_source": (
+            "AZURE_OPENAI_ENDPOINT" if endpoint else "unresolved_required_setting"
+        ),
+        "wire_api": "responses",
+        "authentication_boundary": "trusted_local_bridge",
+        "context_window_tokens": int(context_window) if context_window else 272_000,
+        "context_window_source": (
+            "OPENCODE_AZURE_CONTEXT_WINDOW" if context_window else "adapter_default"
+        ),
+        "max_output_tokens": int(output_tokens) if output_tokens else 128_000,
+        "agent_profile": agent or "build",
+        "agent_profile_source": "OPENCODE_AGENT" if agent else "adapter_default",
     }
 
 
@@ -749,6 +802,16 @@ def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) 
         if env.get(name, "").strip()
     }
     provenance: dict = {"environment": explicit_env}
+
+    opencode_azure = _opencode_azure_gpt_provenance(agent_cmd=agent_cmd, env=env)
+    if opencode_azure is not None:
+        provenance["environment"] = {
+            name: value
+            for name, value in explicit_env.items()
+            if name.startswith("OPENCODE_")
+        }
+        provenance.update(opencode_azure)
+        return provenance
 
     opencode_vllm = _opencode_vllm_gemma_provenance(
         agent_cmd=agent_cmd, env=env
