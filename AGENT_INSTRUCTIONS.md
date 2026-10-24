@@ -1,46 +1,22 @@
 # Instructions for agents evaluated on the clin-genomic-analysis-benchmark
 
-You are an LLM agent being evaluated on the Clinical Genomic Analysis Benchmark, which measures performance at interpreting, disambiguating, and performing clinico-genomic data analyses in oncology.
+You are an LLM agent being evaluated on the Clinical Genomic Analysis Benchmark, which measures performance on clinico-genomic data analyses in oncology. Core tasks include classifying questions as ambiguous or unambiguously specified, given definitions of those concepts; disambiguating ambiguous questions by identifying the issues that made them ambiguous, given a menu of options; and performing data analysis to answer unambiguous questions. The dataset to be analyzed comes from the AACR GENIE Biopharma Collaborative (BPC) dataset, which includes longitudinal, granular clinical annotations of cancer diagnosis, treatments, outcomes, and cancer panel (NGS) test specimens and results.
 
-This document describes what the benchmark expects an agent under
-evaluation to do, and the conventions it should follow when computing
-answers. 
+This document describes what the benchmark expects an agent under evaluation to do, and the conventions it should follow when computing answers. 
 
-The benchmark serves each clinical question to the agent in three stages:
-**classify**, **disambiguate**, and **analyze**. The agent receives the
-question text, the cohort directory (read-only), a data dictionary, and a
-scratch directory for intermediate files. Outputs are JSON objects with
-the fixed schemas below; the harness validates them and discards anything
-extra.
+The benchmark serves each clinical question to the agent in three stages: **classify**, **disambiguate**, and **analyze**. The agent receives the question text, the cohort directory (read-only), a data dictionary, and a scratch directory for intermediate files. Outputs are JSON objects with the fixed schemas below; the harness validates them and discards anything extra.
 
 ---
 
 ## How to score highly (quick checklist)
 
-The benchmark rewards three things: (a) correctly distinguishing a genuinely ambiguous question from
-a conventionally answerable one, (b) naming the *material* gaps when a question is ambiguous, and
-(c) computing the conventional answer exactly when it is unambiguous. To maximize your score:
+The benchmark rewards three things: (a) correctly distinguishing a genuinely ambiguous question from a conventionally answerable one, (b) naming the *material* gaps when a question is ambiguous, and (c) computing the conventional answer exactly when it is unambiguous. To maximize your score:
 
-1. **Default to UNAMBIGUOUS** when a competent BPC analyst would reach for one column, one filter, and
-   one method without asking (see "Default rule for classification"). Flag **AMBIGUOUS** only for a
-   *material* choice that competent analysts using the conventions below would still resolve
-   differently — and would *materially* change the result. Check each candidate choice against
-   the data (see "What counts as material").
-2. **Apply every "Conventional default" before deciding.** Most apparent gaps are already resolved
-   there (key index cancer, genomic-specimen scope, biosimilars, "contains" drug match, any-positive
-   aggregation, CI methods, OS/time-origin variables, patient-level attributes). Never flag anything
-   listed under "Avoid flagging … on these grounds alone".
-3. **The key index cancer is assumed.** A question that says "patients with <cohort> cancer" means
-   each patient's key index cancer; stems will usually NOT contain the word "index". Genomic and
-   treatment facts come from that cancer (see "Genomic-specimen scope").
-4. **Flag AMBIGUOUS only for a trigger in "What still counts as AMBIGUOUS"** (e.g. unanchored
-   line-of-therapy, undefined outcome metric, missing/underivable comparator, cancer-level
-   anatomic/histologic scope in a heterogeneous cohort, biomarker-frequency denominator, unaddressed
-   delayed cohort entry or immortal time bias, missing time origin or filter cut-off). Then select
-   only the applicable IDs from the supplied concept menu. Correct IDs earn credit and incorrect IDs lose credit.
-5. **When unambiguous, compute deterministically and return only the typed JSON** (see "Answer-type
-   schemas" and "Output discipline"): use the conventional statistic, exclude unsequenced patients
-   for mutation exposures, and adjust for left truncation whenever the time-origin precedes sequencing.
+1. **Default to UNAMBIGUOUS** when a competent BPC analyst would reach for one column, one filter, and one method without asking (see "Default rule for classification"). Flag **AMBIGUOUS** only for a *material* choice that competent analysts using the conventions below would still resolve differently — and would *materially* change the result. Check each candidate choice against the data (see "What counts as material").
+2. **Apply every "Conventional default" before deciding.** Most apparent gaps are already resolved there. Never flag anything listed under "Avoid flagging … on these grounds alone".
+3. **The key index cancer is assumed.** A question that says "patients with <cohort> cancer" means each patient's key index cancer; stems will usually NOT contain the word "index". Genomic and treatment facts come from that cancer (see "Genomic-specimen scope").
+4. **Flag AMBIGUOUS only for a trigger in "What still counts as AMBIGUOUS"** . Then select only the applicable IDs from the supplied concept menu. Correct IDs earn credit and incorrect IDs lose credit.
+5. **When unambiguous, compute deterministically and return only the typed JSON** (see "Answer-type schemas" and "Output discipline"): use the conventional statistic, exclude unsequenced patients for mutation exposures, and adjust for left truncation whenever the time-origin precedes sequencing.
 
 ---
 
@@ -48,14 +24,9 @@ a conventionally answerable one, (b) naming the *material* gaps when a question 
 
 ### 1. classify
 
-Decide whether the question is **UNAMBIGUOUS** (two careful analysts
-working from this dataset and standard oncology biostatistics conventions
-would compute the same answer) or **AMBIGUOUS** (the question leaves a
-material analytic choice underspecified that two competent analysts could
-reasonably resolve in different ways, materially changing the result).
+Decide whether the question is **UNAMBIGUOUS** (two careful analysts working from this dataset and standard oncology biostatistics conventions would compute the same answer) or **AMBIGUOUS** (the question leaves a material analytic choice underspecified that two competent analysts could reasonably resolve in different ways, materially changing the result).
 
-It is fine to inspect the data dictionary or peek at file headers to make
-an informed decision.
+It is fine to inspect the data dictionary and look at data file headers to make an informed decision, but do not attempt to search for an answer key; such attempts will be monitored and will result in a zero score.
 
 **Output:**
 
@@ -66,12 +37,7 @@ an informed decision.
 
 ### 2. disambiguate
 
-Only invoked if the agent classified the question as AMBIGUOUS. Select the
-concrete concepts a questioner would need to specify to make the question
-deterministically answerable from the cohort data. Use only IDs from the
-disambiguation concept menu below (`disambiguation_concept_menu`). Select every
-material unresolved concept, but do not select merely related concepts:
-exact gold IDs earn points and non-gold IDs incur a false-positive penalty.
+Only invoked if the agent classified the question as AMBIGUOUS. Select the concrete concepts a questioner would need to specify to make the question deterministically answerable from the cohort data. Use only IDs from the disambiguation concept menu below (`disambiguation_concept_menu`). Select every material unresolved concept, but do not select merely related concepts: exact gold IDs earn points and non-gold IDs incur a false-positive penalty.
 
 **Output:**
 
@@ -81,7 +47,7 @@ exact gold IDs earn points and non-gold IDs incur a false-positive penalty.
 
 ### Disambiguation concept menu
 
-| ID | Select when the question needs... |
+| ID | Select when the question needs clarification about... |
 |---|---|
 | `ANATOMIC_HISTOLOGIC_SCOPE` | eligible cancer sites, `ca_type` values, histologies, or sidedness groups |
 | `DISEASE_EXTENT_SCOPE` | a stage or extent restriction, such as all stages versus Stage IV |
