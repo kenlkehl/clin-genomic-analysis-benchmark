@@ -56,8 +56,7 @@ Only invoked if the agent classified the question as AMBIGUOUS. Select the concr
 | `MISSING_DATA_HANDLING` | a rule for unknown, missing, or not-applicable values |
 | `TREATMENT_DEFINITION` | drugs, classes, backbones, combinations, or procedures that count as treatment |
 | `COMPARATOR_DEFINITION` | a reference or control group |
-| `LINE_OF_THERAPY` | an analytic anchor for first line or another line |
-| `TREATMENT_SETTING` | an adjuvant, neoadjuvant, metastatic, or other setting |
+| `LINE_OF_THERAPY` | the line or setting of qualifying treatment, such as first regimen ever versus first for metastatic disease, or adjuvant versus metastatic versus any setting |
 | `REGIMEN_SELECTION` | which qualifying regimen per patient, or whether mono/combination therapy qualifies |
 | `CLINICAL_TRIAL_HANDLING` | a rule for clinical-trial regimens with unannotated composition |
 | `PROCEDURE_OR_TIMING_DEFINITION` | an operational definition of surgery/adjuvant/neoadjuvant timing |
@@ -337,16 +336,18 @@ menu. Select the named ID when its condition applies.
   have several plausible reference groups, or the stated population may make
   the proposed exposure constant and leave no comparator.
 
-- **`LINE_OF_THERAPY`** — "First-line," "second-line," or another line lacks
-  an analytic anchor. Plausible anchors include the first regimen for the
-  index cancer, the first regimen after metastatic diagnosis, the first
+- **`LINE_OF_THERAPY`** — The line or setting that determines which treatment
+  qualifies is not fixed, and the choice changes which treatments or patients
+  qualify. This covers a "first-line," "second-line," or other line that lacks
+  an analytic anchor, and an unstated setting such as adjuvant, neoadjuvant,
+  metastatic, or any setting. Plausible anchors include the first regimen for
+  the index cancer, the first regimen after metastatic diagnosis, the first
   systemic or cytotoxic regimen, or the first regimen after a landmark. An
   unqualified line is ambiguous unless the population and setting plus a
-  corresponding dataset field make the anchor deterministic.
-
-- **`TREATMENT_SETTING`** — The treatment setting is not fixed, such as
-  adjuvant, neoadjuvant, metastatic, or another clinically distinct context,
-  and the setting changes which treatments or patients qualify.
+  corresponding dataset field make the anchor deterministic. Use
+  `DISEASE_STATE_DEFINITION` instead when the open question is which patients
+  are in a disease state, and `PROCEDURE_OR_TIMING_DEFINITION` when a named
+  setting such as adjuvant lacks a surgery-relative timing window.
 
 - **`REGIMEN_SELECTION`** — The question does not say which qualifying regimen
   to use when a patient has multiple candidates, or whether monotherapy,

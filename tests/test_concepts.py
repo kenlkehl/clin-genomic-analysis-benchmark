@@ -17,3 +17,14 @@ def test_subgroup_and_category_definitions_share_one_concept() -> None:
     assert infer_legacy_concept_ids(
         "race vs ethnicity field choice (NAACCR vs derived)"
     ) == ["CLINICAL_SUBGROUP_DEFINITION"]
+
+
+def test_treatment_setting_folds_into_line_of_therapy() -> None:
+    assert "LINE_OF_THERAPY" in CONCEPT_IDS
+    assert "TREATMENT_SETTING" not in CONCEPT_IDS
+    assert infer_legacy_concept_ids(
+        "treatment setting (adjuvant vs. neoadjuvant vs. metastatic vs. any setting)"
+    ) == ["LINE_OF_THERAPY"]
+    assert infer_legacy_concept_ids(
+        "line of therapy / treatment setting (first-line vs any line)"
+    ) == ["LINE_OF_THERAPY"]

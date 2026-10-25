@@ -62,13 +62,10 @@ CONCEPT_MENU: tuple[Concept, ...] = (
     ),
     Concept(
         "LINE_OF_THERAPY",
-        "Line-of-therapy anchor",
-        "How first line or another line is anchored and operationalized.",
-    ),
-    Concept(
-        "TREATMENT_SETTING",
-        "Treatment or disease setting",
-        "The adjuvant, neoadjuvant, metastatic, or other treatment setting.",
+        "Line of therapy or treatment setting",
+        "Which line or setting defines the qualifying treatment, such as the first "
+        "regimen ever versus the first for metastatic disease, or adjuvant versus "
+        "metastatic versus any setting.",
     ),
     Concept(
         "REGIMEN_SELECTION",
@@ -245,10 +242,8 @@ def infer_legacy_concept_ids(raw: str) -> list[str]:
         return ["OUTCOME_METRIC", "TIME_HORIZON"]
     if lead == "outcome metric" and "time-origin" in text.lower():
         return ["OUTCOME_METRIC", "TIME_ORIGIN"]
-    if lead in {"anti-egfr drug list and line of therapy", "line of therapy / treatment setting"}:
-        return (["TREATMENT_DEFINITION", "LINE_OF_THERAPY"]
-                if lead.startswith("anti-egfr")
-                else ["LINE_OF_THERAPY", "TREATMENT_SETTING"])
+    if lead == "anti-egfr drug list and line of therapy":
+        return ["TREATMENT_DEFINITION", "LINE_OF_THERAPY"]
     if lead == "alteration scope" and _has(text, r"germline|somatic"):
         return ["ALTERATION_TYPE", "GERMLINE_SOMATIC_SCOPE"]
     if lead == "brca variant filter" and _has(text, r"germline"):
@@ -273,8 +268,7 @@ def infer_legacy_concept_ids(raw: str) -> list[str]:
         (r"^handling of (unknown|missing)|^treatment of unknown|^missing/unknown|^denominator handling for unknown", "MISSING_DATA_HANDLING"),
         (r"^chemotherapy backbone|^definition of ['\"]?(chemotherapy|immunotherapy|targeted therapy|folfox-based regimen|gemcitabine-based)|^specific anti-egfr agent|^comparator chemotherapy regimen definition|^first-line treatment class|^whether the cdk4/6|^exclusion of adt", "TREATMENT_DEFINITION"),
         (r"^comparator", "COMPARATOR_DEFINITION"),
-        (r"^line[- ]of[- ]therapy|^line of therapy|^first-line anchor|^operational definition of ['\"]?first-line|^definition of ['\"]?first-line|^first regimen for the index|^regimen line", "LINE_OF_THERAPY"),
-        (r"^treatment setting|^treatment context|^disease context|^disease setting$|^disease context for docetaxel|^castration-sensitive", "TREATMENT_SETTING"),
+        (r"^line[- ]of[- ]therapy|^line of therapy|^first-line anchor|^operational definition of ['\"]?first-line|^definition of ['\"]?first-line|^first regimen for the index|^regimen line|^treatment setting|^treatment context|^disease context|^disease setting$|^castration-sensitive", "LINE_OF_THERAPY"),
         (r"^monotherapy vs combination|^whether the .*regimen may also include", "REGIMEN_SELECTION"),
         (r"^regimen counting unit|^handling of patients with more than one|^patients receiving both agents sequentially", "REPEATED_OBSERVATIONS"),
         (r"^operational definition of adjuvant|^adjuvant regimen window", "PROCEDURE_OR_TIMING_DEFINITION"),
@@ -329,10 +323,8 @@ def infer_legacy_concept_ids(raw: str) -> list[str]:
         add("TREATMENT_DEFINITION")
     if _has(text, r"comparator|comparison group|reference group"):
         add("COMPARATOR_DEFINITION")
-    if _has(text, r"line[- ]of[- ]therapy|line of therapy|first-line anchor|first regimen .* vs first regimen|operational definition of ['\"]?first-line|definition of ['\"]?first-line|regimen line"):
+    if _has(text, r"line[- ]of[- ]therapy|line of therapy|first-line anchor|first regimen .* vs first regimen|operational definition of ['\"]?first-line|definition of ['\"]?first-line|regimen line|treatment setting|disease context|disease setting|castration-sensitive|castration-resistant|treatment context"):
         add("LINE_OF_THERAPY")
-    if _has(text, r"treatment setting|disease context|disease setting|castration-sensitive|castration-resistant|treatment context"):
-        add("TREATMENT_SETTING")
     if _has(text, r"monotherapy vs combination|regimen selection|regimen inclusion|may also include|first .* regimen per patient"):
         add("REGIMEN_SELECTION")
     if _has(text, r"clinical-trial|clinical trial"):
