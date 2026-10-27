@@ -82,7 +82,7 @@ def test_environment_and_prompt_paths_are_scrubbed(tmp_path):
         "cohort_dir": str(cohort),
         "data_dictionary_path": str(dictionary),
         "scratch_dir": str(scratch),
-        "stage": "classify",
+        "stage": "assess",
     }
     view = isolation.sandbox_question_view(question)
     assert view["cohort_dir"] == "/data/cohort"
@@ -277,7 +277,7 @@ def test_preflight_and_forbidden_marker_audit(tmp_path):
     assert isolation.run_isolation_preflight()["passed"] is True
     clean = tmp_path / "clean"
     clean.mkdir()
-    (clean / "response.json").write_text('{"classification":"ambiguous"}')
+    (clean / "response.json").write_text('{"outcome":{"needs_clarification":true}}')
     assert isolation.audit_agent_artifacts(clean) == []
 
     (clean / "agent.log").write_text("I opened scorecard.json")

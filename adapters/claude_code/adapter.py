@@ -279,11 +279,12 @@ def _extract_json(text: str) -> dict | None:
 
 
 def _allowed_tools_for(stage: str) -> str:
-    """Allow agentic file-reading and Python execution; deny network/edit tools."""
-    if stage == "analyze":
-        # Analysis needs to run code
-        return "Read,Glob,Grep,Bash"
-    return "Read,Glob,Grep"
+    """Allow agentic file-reading and Python execution; deny network/edit tools.
+
+    Both stages run code: analyze computes the answer, and assess checks the
+    cohort data where the rubric requires it.
+    """
+    return "Read,Glob,Grep,Bash"
 
 
 def _truncate_error_stream(text: str, limit: int = _MAX_ERROR_STREAM_CHARS) -> str:

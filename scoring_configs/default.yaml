@@ -1,26 +1,17 @@
 # Scoring configuration.
 #
-# subtask_weights: how the three subtasks combine into the headline score.
-# Each subtask is first scored as a fraction of its own possible points, then
-# these weights are applied. They are renormalised if they do not sum to 1, and
-# a subtask with nothing to score in a given cohort drops out.
-#
-# This is deliberately NOT a raw point sum. The raw scales are very different
-# (classify 1 pt/question, disambiguate 1 pt/gold concept before penalties,
-# analyze 2 pts/question), so raw point totals would still overweight questions
-# with long disambiguation lists.
+# subtask_weights: how the two subtasks combine into the headline score.
+# Each subtask is a fraction in [0, 1]:
+#   assess  — mean over the four components (denominator, outcome, covariates,
+#             analysis_plan) of balanced accuracy on the needs-clarification
+#             verdicts. Balanced accuracy scores "always clear" and "always
+#             unclear" at 50%, which plain accuracy would not.
+#   analyze — 2/1/0 points per gold-unambiguous question, over 2 per question.
+# Weights are renormalised if they do not sum to 1, and a subtask with nothing
+# to score in a given cohort drops out.
 subtask_weights:
-  classify: 0.3333
-  disambiguate: 0.3333
-  analyze: 0.3333
-
-# Exact concept-ID scoring. Correct selections earn points; selections that are
-# absent from the gold set subtract points. Each question is floored at zero.
-# With the default 0.25 penalty, four false positives cancel one true positive,
-# while selecting the whole menu is still strongly disfavored.
-disambiguation:
-  correct_concept_points: 1.0
-  incorrect_concept_penalty: 0.25
+  assess: 0.5
+  analyze: 0.5
 
 # Per-answer-type discrepancy options, e.g.:
 # defaults:

@@ -30,15 +30,18 @@ from clin_genomic_analysis_benchmark.agent.isolation import (
     sandboxed_agent_command,
 )
 from clin_genomic_analysis_benchmark.agent.contract import _RESULT_SCHEMAS
+from clin_genomic_analysis_benchmark.components import COMPONENT_IDS
 
 ADAPTER_DIR = Path(__file__).resolve().parent
 _MAX_ERROR_STREAM_CHARS = 4000
 
 DEFAULT_PRINT_TIMEOUTS = {
-    "classify": "29m30s",
-    "disambiguate": "29m30s",
+    "assess": "59m30s",
     "analyze": "59m30s",
 }
+
+# Top-level keys that mark an already-unwrapped stage result.
+_RESULT_KEYS = (*COMPONENT_IDS, "answer_type")
 
 
 class AntigravityInvocationError(RuntimeError):
@@ -71,9 +74,9 @@ def _build_prompt(question: dict) -> str:
         f"{question['instructions']}\n\n"
         f"Your current working directory is your scratch directory: "
         f"`{question['scratch_dir']}`. Write intermediate files only there. "
-        f"The cohort directory is read-only. For analyze stages, use Python "
-        f"(pandas/numpy/scipy/statsmodels/lifelines as needed) to compute the "
-        f"answer from the cohort files.\n\n"
+        f"The cohort directory is read-only. Use Python "
+        f"(pandas/numpy/scipy/statsmodels/lifelines as needed) for data checks "
+        f"in assess and to compute the answer from the cohort files in analyze.\n\n"
         f"Output ONLY the final JSON object as your last response, with no "
         f"surrounding prose and no Markdown fences."
     )
@@ -304,7 +307,7 @@ def _extract_cli_result(text: str) -> dict | None:
             return _extract_json(value)
         if not isinstance(value, dict):
             return None
-        if any(key in value for key in ("classification", "concept_ids", "answer_type")):
+        if any(key in value for key in _RESULT_KEYS):
             return value
         for key in (
             "structured_output",

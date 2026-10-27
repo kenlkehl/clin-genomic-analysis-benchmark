@@ -158,7 +158,8 @@ def compute_gold(cohort: str, max_repair_iters: int, only: str | None,
 @click.option("--cohort", default="all", show_default=True)
 @click.option("--question", default=None,
               help="Restrict to a single question id (across cohorts).")
-@click.option("--stages", default="classify,disambiguate,analyze", show_default=True)
+@click.option("--stages", default="assess,analyze", show_default=True,
+              help="Comma-separated stages to run: assess, analyze.")
 @click.option("--max-parallel", default=4, type=int, show_default=True)
 @click.option("--agent-max-attempts", default=3, type=click.IntRange(min=1),
               show_default=True,
@@ -177,11 +178,8 @@ def compute_gold(cohort: str, max_repair_iters: int, only: str | None,
 @click.option("--repair-max-parallel", default=2, type=click.IntRange(min=1),
               show_default=True,
               help="Maximum concurrent calls during automatic repair.")
-@click.option("--repair-classify-timeout", default=None, type=click.IntRange(min=1),
-              help="Override the classification timeout during repair, in seconds.")
-@click.option("--repair-disambiguate-timeout", default=None,
-              type=click.IntRange(min=1),
-              help="Override the disambiguation timeout during repair, in seconds.")
+@click.option("--repair-assess-timeout", default=None, type=click.IntRange(min=1),
+              help="Override the assessment timeout during repair, in seconds.")
 @click.option("--repair-analyze-timeout", default=None, type=click.IntRange(min=1),
               help="Override the analysis timeout during repair, in seconds.")
 @click.option("--run-id", default=None)
@@ -191,8 +189,7 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
          agent_retry_base_seconds: float, retry_failures: bool,
          repair_max_passes: int, repair_agent_max_attempts: int,
          repair_max_parallel: int,
-         repair_classify_timeout: int | None,
-         repair_disambiguate_timeout: int | None,
+         repair_assess_timeout: int | None,
          repair_analyze_timeout: int | None,
          run_id: str | None, verbose: bool) -> None:
     """Evaluate an agent against the benchmark (Phase D)."""
@@ -259,8 +256,7 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
         timeout_overrides = {
             stage: value
             for stage, value in {
-                "classify": repair_classify_timeout,
-                "disambiguate": repair_disambiguate_timeout,
+                "assess": repair_assess_timeout,
                 "analyze": repair_analyze_timeout,
             }.items()
             if value is not None
@@ -309,10 +305,8 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
 @click.option("--max-repair-passes", default=10, type=click.IntRange(min=1),
               show_default=True,
               help="Stop after this many repair passes even if failures remain.")
-@click.option("--classify-timeout", default=None, type=click.IntRange(min=1),
-              help="Override classification timeout during repair, in seconds.")
-@click.option("--disambiguate-timeout", default=None, type=click.IntRange(min=1),
-              help="Override disambiguation timeout during repair, in seconds.")
+@click.option("--assess-timeout", default=None, type=click.IntRange(min=1),
+              help="Override assessment timeout during repair, in seconds.")
 @click.option("--analyze-timeout", default=None, type=click.IntRange(min=1),
               help="Override analysis timeout during repair, in seconds.")
 @click.option("--config", default=None, type=click.Path(exists=True),
@@ -323,7 +317,7 @@ def eval(agent: str, agent_name: str, cohort: str, question: str | None,
 def retry_failures(run: str, output_run_id: str | None, agent: str | None,
                    max_parallel: int, agent_max_attempts: int,
                    agent_retry_base_seconds: float, max_repair_passes: int,
-                   classify_timeout: int | None, disambiguate_timeout: int | None,
+                   assess_timeout: int | None,
                    analyze_timeout: int | None, config: str | None,
                    dry_run: bool, verbose: bool) -> None:
     """Retry technical failures in a copied run and regenerate its scorecard."""
@@ -360,8 +354,7 @@ def retry_failures(run: str, output_run_id: str | None, agent: str | None,
         timeout_overrides = {
             stage: value
             for stage, value in {
-                "classify": classify_timeout,
-                "disambiguate": disambiguate_timeout,
+                "assess": assess_timeout,
                 "analyze": analyze_timeout,
             }.items()
             if value is not None

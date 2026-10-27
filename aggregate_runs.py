@@ -4,6 +4,11 @@
 Only scorecards at ``RUNS_DIR/<agent>/<run>/scorecard.json`` are included.
 This intentionally excludes deeper archive/grouping directories such as
 ``runs/failed_runs`` and ``runs/contaminated_gpt_cheated``.
+
+Only scorecards from the four-component scorer (``deterministic-rules-v3``)
+are aggregated. Older scorecards (classify/disambiguate, concept-ID scoring)
+measure a different task, so they are skipped with a note on stderr rather
+than mixed into the comparison.
 """
 
 from __future__ import annotations
@@ -12,9 +17,14 @@ import argparse
 import csv
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Any
 
+from clin_genomic_analysis_benchmark.components import COMPONENT_IDS
+
+SCORER = "deterministic-rules-v3"
+COMPONENT_METRICS = ("balanced_accuracy", "sensitivity", "specificity")
 
 CSV_FIELDS = (
     "agent",
@@ -27,11 +37,20 @@ CSV_FIELDS = (
     "questions_failed_after_retries",
     "questions_completed_successfully",
     "overall_score_pct",
-    "classify_score_pct",
-    "disambiguate_score_pct",
+    "assess_score_pct",
     "analyze_score_pct",
+    "question_level_accuracy_pct",
+    *(
+        f"{component}_{metric}_pct"
+        for component in COMPONENT_IDS
+        for metric in COMPONENT_METRICS
+    ),
     "scorecard",
 )
+
+
+class IncompatibleScorecard(ValueError):
+    """A well-formed scorecard from a scorer this CSV does not compare."""
 
 
 def _mapping(value: Any, *, field: str, path: Path) -> dict[str, Any]:
@@ -129,14 +148,44 @@ def _questions_failed_after_retries(scorecard_path: Path) -> int:
     return len(failed_questions)
 
 
+def _component_columns(overall: dict[str, Any], *, path: Path) -> dict[str, str]:
+    components = _mapping(
+        overall.get("components"), field="overall.components", path=path
+    )
+    columns: dict[str, str] = {}
+    for component in COMPONENT_IDS:
+        tally = _mapping(
+            components.get(component),
+            field=f"overall.components.{component}",
+            path=path,
+        )
+        for metric in COMPONENT_METRICS:
+            columns[f"{component}_{metric}_pct"] = _percentage(
+                tally.get(metric),
+                field=f"overall.components.{component}.{metric}",
+                path=path,
+            )
+    return columns
+
+
 def read_scorecard(scorecard_path: Path, runs_dir: Path) -> dict[str, str | int]:
-    """Read one structured scorecard and return a flat CSV row."""
+    """Read one structured scorecard and return a flat CSV row.
+
+    Raises ``IncompatibleScorecard`` for a readable scorecard written by an
+    older scorer, and ``ValueError`` for a malformed one.
+    """
     try:
         payload = json.loads(scorecard_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"could not read scorecard {scorecard_path}: {exc}") from exc
 
     root = _mapping(payload, field="scorecard", path=scorecard_path)
+    scorer = root.get("scorer")
+    if scorer != SCORER:
+        raise IncompatibleScorecard(
+            f"{scorecard_path}: scorer {scorer!r} is not {SCORER!r}; "
+            "pre-component scorecards are not comparable"
+        )
     overall = _mapping(root.get("overall"), field="overall", path=scorecard_path)
     subtask_scores = _mapping(
         overall.get("subtask_scores"),
@@ -189,14 +238,9 @@ def read_scorecard(scorecard_path: Path, runs_dir: Path) -> dict[str, str | int]
             field="overall.overall_score",
             path=scorecard_path,
         ),
-        "classify_score_pct": _percentage(
-            subtask_scores.get("classify"),
-            field="overall.subtask_scores.classify",
-            path=scorecard_path,
-        ),
-        "disambiguate_score_pct": _percentage(
-            subtask_scores.get("disambiguate"),
-            field="overall.subtask_scores.disambiguate",
+        "assess_score_pct": _percentage(
+            subtask_scores.get("assess"),
+            field="overall.subtask_scores.assess",
             path=scorecard_path,
         ),
         "analyze_score_pct": _percentage(
@@ -204,24 +248,49 @@ def read_scorecard(scorecard_path: Path, runs_dir: Path) -> dict[str, str | int]
             field="overall.subtask_scores.analyze",
             path=scorecard_path,
         ),
+        "question_level_accuracy_pct": _percentage(
+            overall.get("classify_accuracy"),
+            field="overall.classify_accuracy",
+            path=scorecard_path,
+        ),
+        **_component_columns(overall, path=scorecard_path),
         "scorecard": relative_scorecard.as_posix(),
     }
 
 
+def _sort_key(row: dict[str, str | int]) -> tuple[float, str, str]:
+    score = row["overall_score_pct"]
+    return (
+        -float(score) if score != "" else math.inf,
+        str(row["agent"]),
+        str(row["run_id"]),
+    )
+
+
 def aggregate_runs(runs_dir: Path, output_path: Path) -> int:
-    """Write active scored runs to ``output_path`` and return the row count."""
+    """Write active scored runs to ``output_path`` and return the row count.
+
+    Scorecards from older scorers are skipped with a note on stderr.
+    """
     if not runs_dir.is_dir():
         raise ValueError(f"runs directory does not exist: {runs_dir}")
 
     scorecard_paths = sorted(runs_dir.glob("*/*/scorecard.json"))
-    rows = [read_scorecard(path, runs_dir) for path in scorecard_paths]
-    rows.sort(
-        key=lambda row: (
-            -float(row["overall_score_pct"]),
-            str(row["agent"]),
-            str(row["run_id"]),
+    rows: list[dict[str, str | int]] = []
+    skipped: list[str] = []
+    for path in scorecard_paths:
+        try:
+            rows.append(read_scorecard(path, runs_dir))
+        except IncompatibleScorecard as exc:
+            skipped.append(str(exc))
+    rows.sort(key=_sort_key)
+    if skipped:
+        print(
+            f"Skipped {len(skipped)} scorecard(s) from an older scorer:",
+            file=sys.stderr,
         )
-    )
+        for note in skipped:
+            print(f"  - {note}", file=sys.stderr)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8", newline="") as handle:

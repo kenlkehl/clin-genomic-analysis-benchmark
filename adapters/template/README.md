@@ -13,44 +13,52 @@ $ ./run.sh --question-file <abs question.json> --output <abs result.json>
 - Exit 0 = success. A nonzero exit, timeout, missing/invalid JSON, or schema
   violation is retried by the harness (three attempts by default). If every
   attempt fails, the stage fails and downstream stages are not attempted.
-- Per-stage default timeouts: 1800s (classify) / 1800s (disambiguate) / 3600s (analyze).
+- Per-stage default timeouts: 3600s (assess) / 3600s (analyze). Analyze runs
+  only when the agent judged every component clear in assess.
 - Stdout + stderr are captured to `<stage>.agent.log` in the per-question run directory.
 
 ### `question.json`
 
 ```jsonc
 {
-  "contract_version": "2",
+  "contract_version": "3",
   "question_id": "bladder_1.2-Qabc12345",
   "question_text": "What proportion of patients ...",
   "cohort": "bladder_1.2",
   "category": 3,
-  "stage": "classify" | "disambiguate" | "analyze",
+  "stage": "assess" | "analyze",
   "cohort_dir": "/abs/path/.../bpc_from_synapse/bladder_1.2",
   "data_dictionary_path": "/abs/path/.../simple_variable_synopsis.xlsx",
   "scratch_dir": "/abs/path/.../scratch",
   "instructions": "Stage-specific instructions from the harness",
-  "disambiguation_concept_menu": [
-    {"id": "ANATOMIC_HISTOLOGIC_SCOPE", "label": "...", "description": "..."},
-    {"id": "DISEASE_EXTENT_SCOPE", "label": "...", "description": "..."}
-    // ...the complete canonical menu...
+  "assessment_components": [
+    {"id": "denominator", "label": "Cohort denominator", "description": "..."},
+    {"id": "outcome", "label": "Outcome", "description": "..."},
+    {"id": "covariates", "label": "Independent variables and covariates", "description": "..."},
+    {"id": "analysis_plan", "label": "Statistical analysis plan", "description": "..."}
   ],
-  "prior_classification": "ambiguous"     // present on disambiguate / analyze stages
+  "prior_classification": "unambiguous"   // present on the analyze stage
 }
 ```
 
 ### `result.json` per stage
 
-- `classify`     → `{ "classification": "ambiguous"|"unambiguous", "rationale": "..." }`
-- `disambiguate` → `{ "concept_ids": ["OUTCOME_METRIC", "TIME_ORIGIN"] }`
-  using only IDs from `question["disambiguation_concept_menu"]`
-- `analyze`      → `{ "answer_type": "...", "answer": {...typed fields...}, "methods": "...", "supporting_evidence": {...} }`
+- `assess`  → one verdict per component, keyed by the IDs in
+  `question["assessment_components"]`:
+  ```json
+  { "denominator":   {"needs_clarification": false, "rationale": "..."},
+    "outcome":       {"needs_clarification": true,  "rationale": "..."},
+    "covariates":    {"needs_clarification": false, "rationale": "..."},
+    "analysis_plan": {"needs_clarification": false, "rationale": "..."} }
+  ```
+  The question counts as ambiguous when any component needs clarification.
+- `analyze` → `{ "answer_type": "...", "answer": {...typed fields...}, "methods": "...", "supporting_evidence": {...} }`
 
 See `clin_genomic_analysis_benchmark/agent/contract.py` for full JSON schemas.
 
 ## Wiring up your adapter
 
-1. Edit `adapter.py` and implement `answer_classify`, `answer_disambiguate`, `answer_analyze`.
+1. Edit `adapter.py` and implement `answer_assess` and `answer_analyze`.
 2. Put every model-controlled CLI subprocess through
    `clin_genomic_analysis_benchmark.agent.isolation.sandboxed_agent_command`.
    Do not pass host paths into its prompt; use `sandbox_question_view`.

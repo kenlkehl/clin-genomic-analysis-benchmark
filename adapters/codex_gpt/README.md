@@ -45,8 +45,7 @@ Codex history, or gold root.
 | `CODEX_RETRY_BASE_SECONDS` | `15` | linear backoff base for Codex retries |
 | `CODEX_SAVE_ATTEMPT_LOGS` | `1` | save full per-attempt Codex stdout/stderr in scratch |
 | `CODEX_EPHEMERAL` | `1` | pass `--ephemeral` to avoid saving many sessions |
-| `CODEX_SANDBOX_MODE_CLASSIFY` | `read-only` | classify sandbox |
-| `CODEX_SANDBOX_MODE_DISAMBIGUATE` | `read-only` | disambiguate sandbox |
+| `CODEX_SANDBOX_MODE_ASSESS` | `workspace-write` | assess sandbox |
 | `CODEX_SANDBOX_MODE_ANALYZE` | `workspace-write` | analyze sandbox |
 | `CODEX_SANDBOX_MODE` | unset | fallback sandbox for all stages |
 | `CODEX_PROFILE` | unset | optional Codex profile override |

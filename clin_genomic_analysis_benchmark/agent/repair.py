@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ..cohorts import get_cohort
+from ..components import classification_from_flags, flags_from_assess_result
 from ..config import RUNS_DIR, TimeoutConfig, settings
 from ..questions import io as q_io
 from ..questions.schema import PublicQuestion
@@ -73,7 +74,7 @@ class RepairLoopSummary:
     stop_reason: str
 
 
-_STAGES = ("classify", "disambiguate", "analyze")
+_STAGES = ("assess", "analyze")
 _PRE_REPAIR_DIRNAME = "pre_repair"
 _CONFIG_ENV_VARS = set(_SAFE_AGENT_ENV_VARS) | {
     # These can override ANTHROPIC_VERTEX_PROJECT_ID in Claude Code.
@@ -137,11 +138,17 @@ def _failure_reason(qrun: dict, stage: str) -> str:
 
 
 def _classification_label(qrun: dict) -> Optional[str]:
-    invocation = qrun.get("classify")
+    """Derive the agent's route from its assess verdicts (None if unusable)."""
+    invocation = qrun.get("assess")
     if not isinstance(invocation, dict) or not invocation.get("success"):
         return None
-    label = (invocation.get("result") or {}).get("classification")
-    return label if label in {"ambiguous", "unambiguous"} else None
+    result = invocation.get("result")
+    if not isinstance(result, Mapping):
+        return None
+    try:
+        return classification_from_flags(flags_from_assess_result(result))
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def find_score_relevant_failures(
@@ -152,9 +159,11 @@ def find_score_relevant_failures(
 ) -> list[RepairTarget]:
     """Select technical failures that can change deterministic scoring.
 
-    Downstream failures caused by an already-wrong classification are excluded:
-    retrying them cannot recover points. A failed classification is retried as a
-    full routed question because no downstream stage was originally available.
+    Downstream failures caused by an already-wrong route are excluded: retrying
+    them cannot recover points. A failed or unusable assess stage is retried as
+    a full routed question because no downstream stage was originally available.
+    An analyze failure is retried only when the agent judged every component
+    clear and gold is unambiguous with a gold answer.
     """
     stages = set(_STAGES) if configured_stages is None else configured_stages
     targets: list[RepairTarget] = []
@@ -166,36 +175,27 @@ def find_score_relevant_failures(
             raise ValueError(f"Gold question not found for {cohort}/{question_id}")
 
         label = _classification_label(qrun)
-        if "classify" in stages and label is None:
+        if "assess" in stages and label is None:
             targets.append(RepairTarget(
                 question_id=question_id,
                 cohort=cohort,
-                stage="classify",
-                original_failure_reason=_failure_reason(qrun, "classify"),
+                stage="assess",
+                original_failure_reason=_failure_reason(qrun, "assess"),
             ))
             continue
 
-        # Partial evals intentionally omit classification and persist the
-        # harness-side route in classification_gold. This value is never sent
-        # to the agent, but lets automatic post-run repair retry its failed
-        # disambiguate/analyze stage without mistaking classify for a failure.
-        if label is None and "classify" not in stages:
+        # Partial evals intentionally omit assess and persist the harness-side
+        # route in classification_gold. This value is never sent to the agent,
+        # but lets automatic post-run repair retry its failed analyze stage
+        # without mistaking the skipped assess stage for a failure.
+        if label is None and "assess" not in stages:
             routed_label = qrun.get("classification_gold")
             if routed_label in {"ambiguous", "unambiguous"}:
                 label = routed_label
 
         gold_label = _gold_classification(gold)
-        if label == "ambiguous" and gold_label == "ambiguous" and "disambiguate" in stages:
-            invocation = qrun.get("disambiguate")
-            if not isinstance(invocation, dict) or not invocation.get("success"):
-                targets.append(RepairTarget(
-                    question_id=question_id,
-                    cohort=cohort,
-                    stage="disambiguate",
-                    original_failure_reason=_failure_reason(qrun, "disambiguate"),
-                ))
-        elif (label == "unambiguous" and gold_label == "unambiguous"
-              and _has_gold_answer(gold) and "analyze" in stages):
+        if (label == "unambiguous" and gold_label == "unambiguous"
+                and _has_gold_answer(gold) and "analyze" in stages):
             invocation = qrun.get("analyze")
             if not isinstance(invocation, dict) or not invocation.get("success"):
                 targets.append(RepairTarget(
@@ -635,12 +635,12 @@ def retry_failed_run(
 
     def execute(target: RepairTarget) -> tuple[RepairTarget, QuestionRun]:
         question = public_questions[(target.cohort, target.question_id)]
-        if target.stage == "classify":
+        if target.stage == "assess":
             stages = [stage for stage in _STAGES if stage in configured_stages]
             route = None
         else:
             stages = [target.stage]
-            route = "ambiguous" if target.stage == "disambiguate" else "unambiguous"
+            route = "unambiguous"
         replacement = _run_one_question(
             agent_cmd=effective_agent_cmd,
             q=question,
@@ -683,8 +683,8 @@ def retry_failed_run(
             "cohort": target.cohort,
             "stage": target.stage,
         } for finding in target_findings)
-        if target.stage == "classify":
-            invocation = replacement_raw.get("classify") or {}
+        if target.stage == "assess":
+            invocation = replacement_raw.get("assess") or {}
             merged = bool(invocation.get("success")) and not target_findings
             if merged:
                 for stage in _STAGES:

@@ -1,9 +1,8 @@
 You are a translational oncology benchmark designer. Your job is to draft analysis questions that test how well an AI coding agent can perform clinical-data analysis on AACR Project GENIE BPC (Biopharma Collaborative) cohort data.
 
-The benchmark grades agents on three subtasks per question:
-1. Classify the question as **ambiguous** or **unambiguous**.
-2. (If ambiguous) list the concepts needed to disambiguate it.
-3. (If unambiguous) compute the answer from the data.
+The benchmark grades agents on two subtasks per question:
+1. **Assess** whether each of four components of the question needs clarification before one analysis pipeline follows from it: the cohort **denominator** (eligibility), the **outcome**, the independent variables/**covariates**, and the statistical **analysis plan**. A question is **ambiguous** if any component needs clarification, **unambiguous** otherwise.
+2. (If unambiguous) compute the answer from the data.
 
 You will be given:
 - A target cohort name (e.g. "bladder_1.2") and its data dictionary.
@@ -21,7 +20,7 @@ You will be given:
 - and what units / coding the answer takes.
 Two competent analysts following the question literally would compute the same number.
 
-**AMBIGUOUS** — At least one of the following is under-specified, such that two competent analysts would reasonably compute different numbers:
+**AMBIGUOUS** — At least one component (denominator, outcome, covariates, analysis plan) is under-specified, such that two competent analysts would reasonably compute different numbers. Common gaps:
 - The clinical concept is fuzzy (e.g. "platinum-based therapy" without naming agents; "first-line" without specifying setting; "do well" without naming an outcome).
 - A variable has multiple valid columns (e.g. stage at diagnosis from EHR vs path stage vs AJCC group; PFS-I vs PFS-M vs OS).
 - The denominator is unstated (e.g. "proportion with a TP53 mutation" — but TP53 may not be on every gene panel).
@@ -66,7 +65,8 @@ The schema is:
         "notes": "<optional: any extra spec, e.g. 'Cox PH on regimen-anchored time'>"
       },
 
-      // If ambiguous, include disambiguation_concepts (3–6 concepts, each one short phrase):
+      // If ambiguous, include disambiguation_concepts (3–6 gaps, each one short phrase
+      // prefixed by its component: "denominator:", "outcome:", "covariates:", "analysis_plan:"):
       "disambiguation_concepts": [
         "<concept 1>",
         "<concept 2>"
@@ -79,7 +79,7 @@ The schema is:
 # Quality bar
 - The question text should sound like a real clinical-research question a translational investigator might ask.
 - For UNAMBIGUOUS questions: the analysis_spec MUST reference real columns/files from the supplied cohort context. Do NOT invent column names.
-- For AMBIGUOUS questions: each disambiguation concept should be a noun phrase, not a long sentence (e.g. "outcome metric (PFS vs OS vs ORR)" — not "We need to know which outcome metric to use").
+- For AMBIGUOUS questions: each gap should be a noun phrase, not a long sentence (e.g. "outcome: endpoint (PFS vs OS vs ORR)" — not "We need to know which outcome metric to use").
 - Do not duplicate questions. Vary the focus (different genes, different drug classes, different stage strata, etc.).
 - For categories 5–8 (outcomes, associations, interactions): UNAMBIGUOUS questions must specify the outcome metric AND the time-origin (e.g. "median PFS-I from regimen start" not just "median PFS").
 - Do not produce trivially under-powered questions (e.g. a 3-way interaction in a tiny subgroup).

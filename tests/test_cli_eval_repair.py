@@ -15,7 +15,7 @@ def test_eval_automatically_repairs_score_relevant_failures(tmp_path, monkeypatc
 
     run_dir = tmp_path / "runs" / "agent" / "raw-run"
     repaired_dir = run_dir.parent / "repaired-run"
-    target = RepairTarget("q", "c", "disambiguate", "timeout")
+    target = RepairTarget("q", "c", "analyze", "timeout")
     monkeypatch.setattr(orchestrator, "run_eval", lambda **kwargs: run_dir)
     monkeypatch.setattr(repair, "plan_failed_run", lambda path: (run_dir, [target]))
     calls = []
@@ -113,3 +113,70 @@ def test_eval_can_explicitly_disable_post_run_repair(tmp_path, monkeypatch):
     assert "Post-run repair" not in result.output
     assert f"Scorecard: {run_dir / 'scorecard.md'}" in result.output
     assert score_calls[0]["run_path"] == str(run_dir)
+
+
+def test_eval_passes_assess_repair_timeout_and_rejects_retired_flags(tmp_path, monkeypatch):
+    from clin_genomic_analysis_benchmark.agent import orchestrator, repair
+
+    run_dir = tmp_path / "runs" / "agent" / "raw-run"
+    target = RepairTarget("q", "c", "assess", "timeout")
+    eval_calls = []
+    monkeypatch.setattr(orchestrator, "run_eval",
+                        lambda **kwargs: eval_calls.append(kwargs) or run_dir)
+    monkeypatch.setattr(repair, "plan_failed_run", lambda path: (run_dir, [target]))
+    calls = []
+
+    def fake_retry_loop(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            final_run_dir=run_dir, stop_reason="complete", remaining_targets=(),
+            passes=(),
+        )
+
+    monkeypatch.setattr(repair, "retry_failed_run_until_stable", fake_retry_loop)
+
+    result = CliRunner().invoke(cli, [
+        "eval", "--agent", "fake-agent", "--agent-name", "agent",
+        "--repair-assess-timeout", "120", "--repair-analyze-timeout", "240",
+    ])
+
+    assert result.exit_code == 0, result.output
+    assert eval_calls[0]["stages"] == ["assess", "analyze"]
+    assert calls[0]["timeout_overrides"] == {"assess": 120, "analyze": 240}
+
+    for flag in ("--repair-classify-timeout", "--repair-disambiguate-timeout"):
+        retired = CliRunner().invoke(cli, [
+            "eval", "--agent", "fake-agent", "--agent-name", "agent", flag, "5",
+        ])
+        assert retired.exit_code != 0
+        assert "No such option" in retired.output
+
+
+def test_retry_failures_passes_assess_timeout(tmp_path, monkeypatch):
+    from clin_genomic_analysis_benchmark.agent import repair
+
+    run_dir = tmp_path / "runs" / "agent" / "raw-run"
+    target = RepairTarget("q", "c", "assess", "timeout")
+    monkeypatch.setattr(repair, "plan_failed_run", lambda path: (run_dir, [target]))
+    calls = []
+
+    def fake_retry_loop(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            final_run_dir=run_dir, stop_reason="complete", remaining_targets=(),
+            passes=(),
+        )
+
+    monkeypatch.setattr(repair, "retry_failed_run_until_stable", fake_retry_loop)
+
+    result = CliRunner().invoke(cli, [
+        "retry-failures", "--run", str(run_dir), "--assess-timeout", "300",
+    ])
+
+    assert result.exit_code == 0, result.output
+    assert "q: assess (timeout)" in result.output
+    assert calls[0]["timeout_overrides"] == {"assess": 300}
+    retired = CliRunner().invoke(cli, [
+        "retry-failures", "--run", str(run_dir), "--classify-timeout", "5",
+    ])
+    assert retired.exit_code != 0

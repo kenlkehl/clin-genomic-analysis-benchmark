@@ -36,12 +36,12 @@ def test_final_text_uses_last_opencode_assistant_step():
         _event("text", type="text", text="I will inspect the data."),
         _event("step_finish", type="step-finish", reason="tool-calls"),
         _event("step_start", type="step-start"),
-        _event("text", type="text", text='{"classification":'),
-        _event("text", type="text", text='"ambiguous"}'),
+        _event("text", type="text", text='{"outcome":{"needs_clarification":'),
+        _event("text", type="text", text='true}}'),
         _event("step_finish", type="step-finish", reason="stop"),
     ])
 
-    assert adapter._final_text_from_events(stdout) == '{"classification":"ambiguous"}'
+    assert adapter._final_text_from_events(stdout) == '{"outcome":{"needs_clarification":true}}'
     assert adapter._final_text_from_events("plain fallback") == "plain fallback"
 
 
@@ -82,7 +82,7 @@ def test_opencode_call_uses_disposable_config_and_bridge(tmp_path, monkeypatch):
 
     stdout = "\n".join([
         _event("step_start", type="step-start"),
-        _event("text", type="text", text='{"classification":"ambiguous"}'),
+        _event("text", type="text", text='{"outcome":{"needs_clarification":true}}'),
         _event("step_finish", type="step-finish", reason="stop"),
     ])
 
@@ -98,7 +98,7 @@ def test_opencode_call_uses_disposable_config_and_bridge(tmp_path, monkeypatch):
         prompt="benchmark prompt",
         question={
             "question_id": "cohort-Q1",
-            "stage": "classify",
+            "stage": "assess",
             "scratch_dir": str(scratch),
             "cohort_dir": str(cohort),
             "data_dictionary_path": str(dictionary),
@@ -108,7 +108,7 @@ def test_opencode_call_uses_disposable_config_and_bridge(tmp_path, monkeypatch):
     command = captured["cmd"]
     inline_config = json.loads(captured["env"][adapter.CONFIG_ENV])
     provider = inline_config["provider"][adapter.PROVIDER_NAME]
-    assert result == '{"classification":"ambiguous"}'
+    assert result == '{"outcome":{"needs_clarification":true}}'
     assert command[:2] == ["opencode", "run"]
     assert "--pure" in command
     assert command[command.index("--format") + 1] == "json"

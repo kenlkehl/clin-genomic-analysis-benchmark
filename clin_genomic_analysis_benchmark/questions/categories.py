@@ -23,17 +23,18 @@ class CategorySpec:
     guidance: str
 
 
-# Outcome variables that are stable across all BPC cohorts. The LLM should treat
-# selecting among these as a key disambiguation step for outcome questions.
+# Outcome variables that are stable across all BPC cohorts. An outcome question
+# must name one of these (or an equally specific endpoint) for its outcome
+# component to be clear.
 DIAGNOSIS_BASED_OUTCOMES = [
     "os_dx (overall survival from diagnosis, in cancer_level_dataset_index.csv → tt_os_dx_mos / os_dx_status)",
-    "pfs_i_adv (PFS until investigator-determined progression, from advanced/metastatic diagnosis)",
-    "pfs_m_adv (PFS until progression OR death, from advanced/metastatic diagnosis)",
+    "pfs_i_adv (PFS-I: progression on radiologist (imaging) assessment, or death, from advanced/metastatic diagnosis → tt_pfs_i_adv_mos / pfs_i_adv_status)",
+    "pfs_m_adv (PFS-M: progression on medical oncologist assessment, or death, from advanced/metastatic diagnosis → tt_pfs_m_adv_mos / pfs_m_adv_status)",
 ]
 REGIMEN_BASED_OUTCOMES = [
-    "os_d (overall survival from regimen start, in regimen_cancer_level_dataset.csv → tt_os_d1_mos / os_d_status)",
-    "pfs_i_g (PFS investigator-determined, from regimen start)",
-    "pfs_m_g (PFS until progression OR death, from regimen start)",
+    "os_g (overall survival from regimen start, in regimen_cancer_level_dataset.csv → tt_os_g_mos / os_g_status)",
+    "pfs_i_g (PFS-I: progression on radiologist (imaging) assessment, or death, from regimen start → tt_pfs_i_g_mos / pfs_i_g_status)",
+    "pfs_m_g (PFS-M: progression on medical oncologist assessment, or death, from regimen start → tt_pfs_m_g_mos / pfs_m_g_status)",
 ]
 
 
@@ -171,8 +172,8 @@ CATEGORIES: list[CategorySpec] = [
             "Direction of association (HR > 1 means worse for biomarker-positive group)",
         ],
         guidance=(
-            "An UNAMBIGUOUS association question must fully specify the biomarker (Cat 3 disambig) "
-            "AND the outcome (Cat 5 disambig) AND the population/treatment context."
+            "An UNAMBIGUOUS association question must fully specify the biomarker (as in Cat 3) "
+            "AND the outcome (as in Cat 5) AND the population/treatment context."
         ),
     ),
     CategorySpec(

@@ -6,22 +6,27 @@ import json
 import subprocess
 
 from clin_genomic_analysis_benchmark.agent import runner
-from clin_genomic_analysis_benchmark.concepts import concept_menu_payload
+from clin_genomic_analysis_benchmark.components import COMPONENT_IDS, components_payload
+
+_VALID_ASSESS = {
+    cid: {"needs_clarification": cid == "outcome", "rationale": "Endpoint unstated."}
+    for cid in COMPONENT_IDS
+}
 
 
 def _question() -> dict:
     return {
-        "contract_version": "2",
+        "contract_version": "3",
         "question_id": "bladder_1.2-Qabc12345",
         "question_text": "What is the most common race?",
         "cohort": "bladder_1.2",
         "category": 1,
-        "stage": "classify",
+        "stage": "assess",
         "cohort_dir": "/abs/cohort",
         "data_dictionary_path": "/abs/dictionary.xlsx",
         "scratch_dir": "/abs/scratch",
-        "instructions": "Classify the question.",
-        "disambiguation_concept_menu": concept_menu_payload(),
+        "instructions": "Assess the question.",
+        "assessment_components": components_payload(),
     }
 
 
@@ -33,12 +38,9 @@ def test_invoke_retries_invalid_response_then_succeeds(tmp_path, monkeypatch):
         nonlocal calls
         calls += 1
         if calls == 1:
-            result_path.write_text(json.dumps({"classification": "maybe"}))
+            result_path.write_text(json.dumps({"classification": "ambiguous"}))
         else:
-            result_path.write_text(json.dumps({
-                "classification": "ambiguous",
-                "rationale": "Material choices remain.",
-            }))
+            result_path.write_text(json.dumps(_VALID_ASSESS))
         return subprocess.CompletedProcess(
             args=args[0], returncode=0, stdout=f"attempt {calls}", stderr=""
         )
@@ -59,10 +61,7 @@ def test_invoke_retries_invalid_response_then_succeeds(tmp_path, monkeypatch):
     assert invocation.attempt_count == 2
     assert [attempt.success for attempt in invocation.attempts] == [False, True]
     assert invocation.attempts[0].failure_reason == "schema_violation"
-    assert invocation.result == {
-        "classification": "ambiguous",
-        "rationale": "Material choices remain.",
-    }
+    assert invocation.result == _VALID_ASSESS
     log = (tmp_path / "agent.log").read_text()
     assert "=== ATTEMPT 1/3 ===" in log
     assert "=== ATTEMPT 2/3 ===" in log

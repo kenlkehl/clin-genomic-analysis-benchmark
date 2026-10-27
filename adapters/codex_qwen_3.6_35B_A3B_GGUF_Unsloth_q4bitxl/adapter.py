@@ -42,6 +42,7 @@ from clin_genomic_analysis_benchmark.agent.isolation import (  # noqa: E402
     sandboxed_agent_command,
 )
 from clin_genomic_analysis_benchmark.agent.contract import validate_result  # noqa: E402
+from clin_genomic_analysis_benchmark.components import COMPONENT_IDS  # noqa: E402
 
 
 PROVIDER_NAME = "local_unsloth_qwen3_6_35b_a3b"
@@ -72,16 +73,15 @@ def _build_unsloth_prompt(question: dict) -> str:
             "final message. A best contract-valid result is preferable to an "
             "unfinished exhaustive analysis.\n"
         )
-    if stage not in {"classify", "disambiguate"}:
+    if stage != "assess":
         return prompt
-    shell_limit = 4 if stage == "classify" else 2
     return (
         f"{prompt}\n\n"
         "## Local-model completion guard\n"
-        f"Complete this {stage} stage in at most 8 assistant turns and "
-        f"{shell_limit} shell commands. Do not enumerate full tables, print full "
-        "column lists, or dump large files. Inspect only the smallest evidence "
-        "needed for the decision. Never end a turn by merely announcing another "
+        "Complete this assess stage in at most 16 assistant turns and 8 shell "
+        "commands. Run only the data checks the benchmark rules require for a "
+        "component verdict. Do not enumerate full tables, print full column "
+        "lists, or dump large files. Never end a turn by merely announcing another "
         "inspection or saying what you will do next: either execute the necessary "
         "tool now or return the required JSON. If further inspection would only "
         "refine confidence, stop and return your best contract-compliant answer "
@@ -118,41 +118,21 @@ def _build_analyze_continuation_prompt(
 
 def _stage_output_schema(question: dict) -> dict | None:
     stage = question["stage"]
-    if stage == "classify":
-        return {
+    if stage == "assess":
+        # Strict structured output requires every property to be required.
+        verdict = {
             "type": "object",
             "properties": {
-                "classification": {
-                    "type": "string",
-                    "enum": ["ambiguous", "unambiguous"],
-                },
+                "needs_clarification": {"type": "boolean"},
                 "rationale": {"type": "string", "minLength": 1},
             },
-            "required": ["classification", "rationale"],
+            "required": ["needs_clarification", "rationale"],
             "additionalProperties": False,
         }
-    if stage == "disambiguate":
-        concept_ids = [
-            entry["id"]
-            for entry in question.get("disambiguation_concept_menu") or []
-            if isinstance(entry, dict)
-            and isinstance(entry.get("id"), str)
-            and entry["id"]
-        ]
-        item_schema: dict = {"type": "string"}
-        if concept_ids:
-            item_schema["enum"] = concept_ids
         return {
             "type": "object",
-            "properties": {
-                "concept_ids": {
-                    "type": "array",
-                    "items": item_schema,
-                    "minItems": 1,
-                    "uniqueItems": True,
-                },
-            },
-            "required": ["concept_ids"],
+            "properties": {cid: verdict for cid in COMPONENT_IDS},
+            "required": list(COMPONENT_IDS),
             "additionalProperties": False,
         }
     if stage == "analyze":
@@ -276,9 +256,9 @@ def _response_output_text(response: Mapping[str, Any]) -> str:
 
 
 def _contract_fallback_prompt(question: dict, previous_text: str = "") -> str:
-    menu = "\n".join(
+    components = "\n".join(
         f"- {entry['id']}: {entry.get('label', '')} — {entry.get('description', '')}"
-        for entry in question.get("disambiguation_concept_menu") or []
+        for entry in question.get("assessment_components") or []
         if isinstance(entry, dict) and isinstance(entry.get("id"), str)
     )
     prior = ""
@@ -290,23 +270,23 @@ def _contract_fallback_prompt(question: dict, previous_text: str = "") -> str:
     return (
         "You are the contract-finalization step for a cancer-data benchmark. "
         "You have no tools and must decide from the public question, stage "
-        "instructions, and concept menu below. Never announce a plan or request "
-        "more data. Apply conventional defaults; mark ambiguity only for a material "
-        "choice represented by the menu.\n\n"
+        "instructions, and component list below. Never announce a plan or request "
+        "more data. Apply conventional defaults; mark a component as needing "
+        "clarification only when the question leaves it open.\n\n"
         f"Stage: {question['stage']}\n"
         f"Question: {question['question_text']}\n"
         f"Stage instructions: {question['instructions']}\n\n"
-        f"Concept menu:\n{menu}\n"
+        f"Components:\n{components}\n"
         f"{prior}\n"
         "Return only the required JSON object, with no Markdown or prose."
     )
 
 
 def _direct_contract_result(question: dict) -> dict:
-    """Recover a malformed read-only-stage final with the same local model."""
+    """Recover a malformed assess-stage final with the same local model."""
+    if question["stage"] != "assess":
+        raise RuntimeError("contract fallback is only available for the assess stage")
     schema = _stage_output_schema(question)
-    if schema is None:
-        raise RuntimeError("contract fallback is only available for read-only stages")
     config = _bridge_config()
     stage = question["stage"]
     audit_path = (
@@ -484,19 +464,19 @@ def _codex_call(
     max_attempts = _env_int("CODEX_MAX_ATTEMPTS", 1)
     retry_sleep = _env_float("CODEX_RETRY_BASE_SECONDS", 15.0)
     config = _bridge_config()
-    if stage in {"classify", "disambiguate"}:
+    if stage == "assess":
         config = replace(
             config,
             max_retries=min(
                 config.max_retries,
-                _env_int("UNSLOTH_READ_ONLY_MAX_RETRIES", 1),
+                _env_int("UNSLOTH_ASSESS_MAX_RETRIES", 1),
             ),
             max_requests=min(
                 config.max_requests,
-                _env_int("UNSLOTH_READ_ONLY_MAX_REQUESTS", 8),
+                _env_int("UNSLOTH_ASSESS_MAX_REQUESTS", 24),
             ),
             max_output_tokens=_env_int(
-                "UNSLOTH_READ_ONLY_MAX_OUTPUT_TOKENS", 8_192
+                "UNSLOTH_ASSESS_MAX_OUTPUT_TOKENS", 8_192
             ),
         )
     output_schema = _stage_output_schema(question)
@@ -672,7 +652,7 @@ def main() -> int:
             )
         except Exception as exc:
             sys.stderr.write(f"adapter: Codex/Unsloth invocation failed: {exc}\n")
-            if stage not in {"classify", "disambiguate"}:
+            if stage != "assess":
                 return 3
             break
         obj = _normalize_analyze_result(_extract_json(text))
@@ -687,10 +667,10 @@ def main() -> int:
 
     contract_errors = (
         validate_result(obj, stage)
-        if obj is not None and stage in {"classify", "disambiguate"}
+        if obj is not None and stage == "assess"
         else []
     )
-    if stage in {"classify", "disambiguate"} and (
+    if stage == "assess" and (
         obj is None or contract_errors
     ):
         sys.stderr.write(

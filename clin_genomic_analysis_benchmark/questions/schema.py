@@ -5,11 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from ..concepts import validate_concept_ids
-
-Classification = Literal["ambiguous", "unambiguous"]
+from ..components import COMPONENT_IDS, Classification, classification_from_flags
 AnswerType = Literal[
     "count",
     "proportion",
@@ -60,6 +58,33 @@ class SupportingEvidence(BaseModel):
     table_filters_applied: Optional[list[str]] = None
 
 
+class ComponentVerdict(BaseModel):
+    """Gold verdict for one question component."""
+    model_config = ConfigDict(extra="forbid")
+
+    needs_clarification: bool
+    # What is unclear, or how the question specifies the component. Audit
+    # context for reviewers; never scored.
+    notes: Optional[str] = None
+
+
+class ComponentAssessment(BaseModel):
+    """Gold verdicts for the four components judged in the assess stage."""
+    model_config = ConfigDict(extra="forbid")
+
+    denominator: ComponentVerdict
+    outcome: ComponentVerdict
+    covariates: ComponentVerdict
+    analysis_plan: ComponentVerdict
+
+    def flags(self) -> dict[str, bool]:
+        return {cid: getattr(self, cid).needs_clarification for cid in COMPONENT_IDS}
+
+    @property
+    def classification(self) -> Classification:
+        return classification_from_flags(self.flags())
+
+
 class Question(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -69,15 +94,19 @@ class Question(BaseModel):
     classification: Classification
     rationale: Optional[str] = None
 
+    # Gold for the assess stage. None until the question has been reviewed
+    # under the four-component rubric; scoring refuses unreviewed questions.
+    component_assessment: Optional[ComponentAssessment] = None
+
     # If unambiguous:
     analysis_spec: Optional[AnalysisSpec] = None
     gold_answer: Optional[GoldAnswer] = None
     gold_supporting_evidence: Optional[SupportingEvidence] = None
 
-    # If ambiguous:
+    # Legacy (pre-2026-10-25) concept-menu labels. Kept only as reviewer
+    # context until the component review relabels the bank; never scored or
+    # validated against a menu.
     disambiguation_concept_ids: Optional[list[str]] = None
-    # Retained in the out-of-repo gold bank as human-readable audit context.
-    # Scoring uses only ``disambiguation_concept_ids``.
     disambiguation_concepts: Optional[list[str]] = None
 
     # Provenance:
@@ -90,15 +119,15 @@ class Question(BaseModel):
     def _strip_text(cls, v: str) -> str:
         return v.strip()
 
-    @field_validator("disambiguation_concept_ids")
-    @classmethod
-    def _valid_concept_ids(cls, values: Optional[list[str]]) -> Optional[list[str]]:
-        if values is None:
-            return values
-        errors = validate_concept_ids(values)
-        if errors:
-            raise ValueError("; ".join(errors))
-        return values
+    @model_validator(mode="after")
+    def _classification_matches_components(self) -> "Question":
+        if (self.component_assessment is not None
+                and self.component_assessment.classification != self.classification):
+            raise ValueError(
+                f"{self.id}: classification {self.classification!r} disagrees with the "
+                f"component verdicts ({self.component_assessment.classification!r})"
+            )
+        return self
 
 
 class CohortQuestionFile(BaseModel):

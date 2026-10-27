@@ -1,4 +1,4 @@
-"""Azure OpenAI client (BAA-covered) used for the OpenAI-side reviewer/judge.
+"""Azure OpenAI client (BAA-covered) used for the OpenAI-side gold-script reviewer.
 
 Uses the openai SDK's plain `OpenAI()` client pointed at the Azure v1 endpoint
 (matches the user's existing setup at
@@ -103,8 +103,8 @@ class AzureResponse:
 class AzureClient:
     """Azure OpenAI wrapper.
 
-    Tasks: gold-script reviewer (sees script + spec, no cohort rows) and
-    disambiguation judge (sees question text + gold concepts + agent concepts).
+    Task: gold-script reviewer (sees script + spec, no cohort rows). Benchmark
+    scoring itself is deterministic and makes no model calls.
     """
 
     def __init__(self, config: AzureConfig):

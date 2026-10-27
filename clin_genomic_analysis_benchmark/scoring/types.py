@@ -1,52 +1,43 @@
-"""Result types for deterministic disambiguation scoring."""
+"""Result types for deterministic assess-stage scoring."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional
 
-
-DEFAULT_CORRECT_CONCEPT_POINTS = 1.0
-DEFAULT_INCORRECT_CONCEPT_PENALTY = 0.25
-
-
-@dataclass
-class ConceptDecision:
-    concept_id: str
-    selected: bool
-    gold: bool
-    points: float
-    outcome: str  # "correct" | "incorrect" | "missed"
+# Outcomes per component. A missing agent verdict (failed or invalid assess
+# stage) is wrong for either gold class: "fn" when gold needs clarification,
+# "fp" when it does not.
+OUTCOMES = ("tp", "fn", "tn", "fp")
 
 
 @dataclass
-class DisambiguationScoreResult:
+class ComponentOutcome:
+    component: str
+    gold_needs_clarification: bool
+    agent_needs_clarification: Optional[bool]  # None: no valid verdict
+    outcome: str                               # one of OUTCOMES
+
+    @property
+    def correct(self) -> bool:
+        return self.outcome in ("tp", "tn")
+
+
+@dataclass
+class AssessmentResult:
     question_id: str
     cohort: str
-    n_gold: int
-    points: float
-    decisions: list[ConceptDecision]
-    points_per_concept: float = DEFAULT_CORRECT_CONCEPT_POINTS
-    incorrect_concept_penalty: float = DEFAULT_INCORRECT_CONCEPT_PENALTY
-    gold_concept_ids: list[str] = field(default_factory=list)
-    agent_concept_ids: list[str] = field(default_factory=list)
-    correct_concept_ids: list[str] = field(default_factory=list)
-    incorrect_concept_ids: list[str] = field(default_factory=list)
-    missed_concept_ids: list[str] = field(default_factory=list)
-    raw_points_before_floor: float = 0.0
-    scorer: str = "exact_concept_ids"
+    gold_classification: str                   # derived from the gold verdicts
+    agent_classification: Optional[str]        # derived from the agent verdicts
+    components: list[ComponentOutcome]
+    agent_rationales: dict[str, str] = field(default_factory=dict)
+    failure_reason: Optional[str] = None
+    scorer: str = "exact_component_verdicts"
 
     @property
-    def points_possible(self) -> float:
-        return self.n_gold * self.points_per_concept
+    def n_correct(self) -> int:
+        return sum(1 for c in self.components if c.correct)
 
     @property
-    def precision(self) -> float | None:
-        if not self.agent_concept_ids:
-            return None
-        return len(self.correct_concept_ids) / len(self.agent_concept_ids)
-
-    @property
-    def recall(self) -> float | None:
-        if not self.gold_concept_ids:
-            return None
-        return len(self.correct_concept_ids) / len(self.gold_concept_ids)
+    def classification_correct(self) -> bool:
+        return self.agent_classification == self.gold_classification

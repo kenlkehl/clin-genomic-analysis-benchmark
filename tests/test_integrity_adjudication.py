@@ -15,7 +15,7 @@ def _quarantined_run(tmp_path: Path, monkeypatch, *, prior_run: bool = False) ->
     run_dir = runs_root / "antigravity" / "run-current"
     session = (
         run_dir / "per_question/panc_1.2/panc_1.2-Q1/adapter_audit"
-        / "agy.disambiguate.1.session"
+        / "agy.assess.1.session"
     )
     transcript = session / "brain/session/.system_generated/logs/transcript.jsonl"
     transcript.parent.mkdir(parents=True)

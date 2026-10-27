@@ -82,6 +82,8 @@ def _candidates_to_questions(cohort: Cohort, category_id: int, items: list[dict]
                 logger.warning("Skipping unambiguous question with bad analysis_spec for %s: %s", qid, e)
                 continue
 
+        # Draft prose for the reviewer (legacy `disambiguation_concepts` field);
+        # component gold is assigned during human review, not by the generator.
         concepts = None
         if classification == "ambiguous":
             concepts = [c.strip() for c in (raw.get("disambiguation_concepts") or []) if c and c.strip()]

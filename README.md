@@ -2,7 +2,7 @@
 
 A benchmark for AI agents and coding assistants on **translational clinical cancer-data analysis**, built on AACR Project GENIE BPC (Biopharma Collaborative) cohort data.
 
-Real analyses of clinico-genomic data fail in two different ways. Sometimes the question is clear and the agent computes the wrong number. More often the question *sounds* clear but isn't — "how did patients on first-line chemotherapy do?" hides a dozen choices about what counts as first line, what counts as chemotherapy, and what "did" means. A competent analyst notices and asks. This benchmark measures both: whether an agent can tell those two situations apart, what it asks for when a question is underspecified, and whether it gets the number right when the question is sound.
+Real analyses of clinico-genomic data fail in two different ways. Sometimes the question is clear and the agent computes the wrong number. More often the question *sounds* clear but isn't — "how did patients on first-line chemotherapy do?" hides a dozen choices about what counts as first line, what counts as chemotherapy, and what "did" means. A competent analyst notices and asks. This benchmark measures both: whether an agent can tell which parts of a question are underspecified — who is analysed, what is measured, which variables are compared or adjusted for, and how the estimate is computed — and whether it gets the number right when the question is sound.
 
 > Not a developer? **`README.txt`** is a plain-language tour of the task, the review workbook, and the gold answers. This file is the operator's guide.
 
@@ -12,10 +12,10 @@ All six cohorts are wired end to end. The reference adapter drives Claude Code o
 
 | Component | Status |
 |---|---|
-| Question bank | **211 questions — 96 unambiguous, 115 ambiguous**, after 14 rounds of iteration: 11 rounds with spot checks and 3 full manual review rounds. Curated in `bpc_benchmark_review_6-19-26.xlsx` under `$CLINGEN_GOLD_ROOT` |
-| Gold answers | 96 / 96 unambiguous questions have a computed, re-runnable gold answer; 1 is marked `unanswerable` (see below) |
+| Question bank | **205 questions across six cohorts, being re-reviewed under the four-component rubric** (started 2026-10-25). Every question is reviewed and may be edited; component gold labels are pending, and scoring refuses a question until it has them. Curated in `bpc_benchmark_review_6-19-26.xlsx` under `$CLINGEN_GOLD_ROOT` |
+| Gold answers | Every unambiguous question has a computed, re-runnable gold answer. Answers are recomputed as questions are edited during the re-review. Questions that are well specified but not estimable are marked `unanswerable` (see below) |
 | Agent-facing bank | `questions/<cohort>.yaml` — `id`, `category`, `text` only. This is everything the agent under test ever sees |
-| Gold bank | `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` — answers, canonical concept IDs, classifications, and audit prose. Read by the scorer, never by the agent |
+| Gold bank | `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` — answers, per-component verdicts with reviewer notes, classifications, and legacy concept prose kept as unscored history. Read by the scorer, never by the agent |
 | Agent guidance | `AGENT_INSTRUCTIONS.md` — served verbatim to the agent by the reference adapter |
 | Adapters | `adapters/claude_code/` (Claude Code on Vertex), `adapters/claude_code_vllm_gemma4/` (Claude Code with any Gemma 4 model on local vLLM), `adapters/claude_code_vertex_gemini/` (Claude Code with Gemini on Vertex Agent Platform), `adapters/claude_code_vertex_gemma4/` (Claude Code with Gemma 4 MaaS on Vertex Agent Platform), `adapters/codex_gpt/` (Codex CLI with configurable provider/model), `adapters/codex_vllm_gemma4/` (Codex with any Gemma 4 model on local vLLM), `adapters/opencode_vllm_gemma4/` (OpenCode with any Gemma 4 model on local vLLM), `adapters/opencode_azure_gpt/` (OpenCode with a GPT deployment on Azure OpenAI), `adapters/codex_vertex_gemma4_26b/` (Codex with Gemma 4 26B on Vertex Agent Platform), `adapters/codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl/` and `adapters/codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl/` (Codex CLI against Unsloth Studio), `adapters/antigravity_gemini/` (Gemini through Antigravity CLI), `adapters/template/` to write your own |
 
@@ -36,7 +36,7 @@ filesystem namespace is the confidentiality boundary.
 
 The repo's `questions/<cohort>.yaml` is a projection with the answers stripped
 out—it is a different Pydantic model with no fields for classification,
-concepts, or gold answers. Evaluation reads the public bank; only the trusted
+component verdicts, or gold answers. Evaluation reads the public bank; only the trusted
 harness/scorer reads the gold bank.
 
 Every run performs a namespace preflight and scans agent artifacts afterward.
@@ -50,56 +50,59 @@ filesystem outside the explicit mounts are absent.
 
 ## How scoring works
 
-Every question is graded on **classify**, and then on **either disambiguate or analyze** depending on what the gold says the question is. No single question is graded on all three.
+Every question is served to the agent in up to two stages: **assess**, then **analyze** if the agent judged the question fully specified.
 
-The headline score is the **equal-weighted mean of the three subtasks**, each first expressed as a fraction of its own available points:
-
-```
-SCORE = (classify% + disambiguate% + analyze%) / 3
-```
-
-It is deliberately not a sum of raw points. The three subtasks sit on different scales — 211 raw points for classify, 420 gold concept points for disambiguate before false-positive penalties, and 192 for analyze. Normalising each subtask first keeps the balance stable as the bank gains or loses questions. Weights live in `scoring_configs/default.yaml` if you want something other than thirds.
-
-A scorecard looks like this:
+The headline score is the weighted mean of the two subtasks, each first expressed as a fraction in [0, 1]:
 
 ```
-- SCORE: 68.2% — weighted mean of the three subtasks
-
-| subtask      | earned | possible | score | weight |
-| classify     |  172.0 |    211.0 | 81.5% |    33% |
-| disambiguate |  189.0 |    420.0 | 45.0% |    33% |
-| analyze      |  150.0 |    192.0 | 78.1% |    33% |
+SCORE = ½ · assess + ½ · analyze
 ```
 
-**Denominators come from the gold, not from the route the agent took.** If an agent calls an ambiguous question unambiguous, it loses the classify point *and* still owes the disambiguation points it never attempted. Misrouting costs twice, which is the intent.
+Weights live in `scoring_configs/default.yaml` if you want something other than halves. A scorecard looks like this:
 
-### 1. Classify
+```
+- SCORE: 68.2% — weighted mean of the two subtasks
 
-Is this question answerable as written, or does it leave a material analytic choice open? One point for the right label, zero for the wrong one. `AGENT_INSTRUCTIONS.md` sets out the standard in detail; the short version is that a question is unambiguous when a competent BPC analyst would reach for one column, one filter, and one method without asking.
+| subtask | score | weight | basis                                                  |
+| assess  | 71.4% |    50% | mean of per-component balanced accuracy                |
+| analyze | 65.0% |    50% | 130.0 / 200.0 pts over gold-unambiguous questions      |
+```
 
-### 2. Disambiguate
+followed by a per-component table (sensitivity, specificity, balanced accuracy, accuracy, missing verdicts), per-cohort and per-category breakdowns, and one row per question.
 
-Only asked when the agent said the question was ambiguous. The task payload contains a fixed menu of canonical concept IDs (for example `OUTCOME_METRIC`, `LINE_OF_THERAPY`, and `PANEL_COVERAGE`), and the agent returns JSON such as:
+**Denominators come from the gold, not from the route the agent took.** If an agent flags a component of a question whose gold is fully specified, it never reaches analyze and still owes those analysis points. Misrouting costs twice, which is the intent.
+
+### 1. Assess
+
+The agent judges four components of the question and says, for each, whether it **needs clarification** before one analysis pipeline follows from it, given the BPC data dictionary and the rulebook's conventions. This is judged from the wording, not from what the cohort data contain:
+
+| component | covers |
+|---|---|
+| `denominator` | who or what is analysed: cancer type and histology, disease burden (de novo vs recurrent), line of therapy, qualifying treatment, genomic-testing timing (genomic questions), unit of analysis |
+| `outcome` | what is measured, and missing values; for time-to-event outcomes, the index date, how progression or response is ascertained, censoring and competing events |
+| `covariates` | exposures, comparison groups, stratifiers, adjustment covariates — each defined so every analysed record falls in exactly one category or takes one value, including records with unknown values |
+| `analysis_plan` | the statistical estimand, the model architecture, the variables in any multivariable model, left truncation, exposures ascertained after the index date |
+
+The agent returns one verdict per component with a short rationale:
 
 ```json
-{"concept_ids": ["OUTCOME_METRIC", "TIME_ORIGIN"]}
+{
+  "denominator":   {"needs_clarification": false, "rationale": "..."},
+  "outcome":       {"needs_clarification": true,  "rationale": "..."},
+  "covariates":    {"needs_clarification": false, "rationale": "..."},
+  "analysis_plan": {"needs_clarification": true,  "rationale": "..."}
+}
 ```
 
-Scoring is an exact set comparison—there is no semantic matcher and no LLM call:
+A question is **ambiguous** if any component needs clarification and **unambiguous** if none does. `AGENT_INSTRUCTIONS.md` gives examples of what each component must pin down to be clear.
 
-| selection | default points |
-|---|---:|
-| ID is in the question's gold set | +1.00 |
-| ID is not in the gold set | −0.25 |
-| gold ID was omitted | 0 |
+Scoring is exact and deterministic — no semantic matcher, no LLM call. Each verdict is compared with the gold verdict for that component; the rationale is recorded for auditing but never scored. The assess score is the **mean over the four components of balanced accuracy**: the average of the hit rate on gold "needs clarification" verdicts and the hit rate on gold "clear" verdicts. Most gold verdicts are "clear", so plain accuracy would reward an agent that calls every component clear; balanced accuracy scores that strategy (and its opposite) at 50%. A failed or invalid assess stage counts as wrong on every component. Where a slice of the bank has only one gold class for a component (e.g. a cohort where no question leaves covariates unclear), that component's balanced accuracy is the one defined rate, and the scorecard marks it single-class.
 
-Per-question points are floored at zero and capped at the number of gold IDs. The false-positive penalty discourages selecting the whole menu: four incorrect selections cancel one correct selection. Both the reward and penalty are configurable in `scoring_configs/default.yaml`.
+The scorecard also reports question-level ambiguous/unambiguous accuracy derived from the verdicts. It is diagnostic only: it is implied by the component verdicts and is not part of the headline.
 
-The scorecard JSON records the selected, correct, incorrect, and missed IDs for every question. The reviewed prose concepts remain in the out-of-repo workbook for auditability, while the adjacent `disambiguation_concept_ids` column is the machine-scored gold.
+### 2. Analyze
 
-### 3. Analyze
-
-Only asked when the agent said the question was unambiguous. The agent computes the answer from the cohort files and returns typed JSON — an `answer_type` plus an `answer` object, described in `AGENT_INSTRUCTIONS.md`.
+Only asked when the agent judged every component clear. The agent computes the answer from the cohort files and returns typed JSON — an `answer_type` plus an `answer` object, described in `AGENT_INSTRUCTIONS.md`.
 
 Scoring compares the agent's **point estimate** against the gold and lands in one of three bands:
 
@@ -108,6 +111,8 @@ Scoring compares the agent's **point estimate** against the gold and lands in on
 | ACCURATE | 2 | within 5% of gold (or the right bucket / exact category) |
 | MINOR | 1 | 5–15% off (or one bucket away) |
 | MAJOR | 0 | more than 15% off, or wrong bucket, wrong category, wrong type |
+
+The analyze score is points earned over 2 points per gold-unambiguous question.
 
 How "off" is measured depends on the answer type:
 
@@ -138,11 +143,11 @@ Thresholds are configurable per answer type and per question in `scoring_configs
 
 #### Unanswerable questions
 
-Occasionally a question is perfectly well specified but the data cannot identify the estimand — for example `prostate_1.2-Qf17acd7c`, a Cox interaction between docetaxel and PTEN homozygous deletion where one cell of the 2×2 is nearly empty and the model separates.
+Occasionally a question is perfectly well specified but the data cannot identify the estimand — for example, a Cox interaction where one cell of the 2×2 is nearly empty and the model separates.
 
-These stay `classification: unambiguous`, and the gold carries `unanswerable: true` along with the cell counts and an explanation. An agent that recognises the problem and flags `unanswerable: true` itself is scored ACCURATE (2 points). Any other answer is scored MAJOR (0 points), including a numeric value that matches the gold placeholder with an omitted or false `unanswerable` flag. The agent's `answer_type` is not checked for these questions: agents are not told the expected type, and with no estimate to compare the type carries no signal.
+These stay unambiguous (every component clear), and the gold carries `unanswerable: true` along with the cell counts and an explanation. An agent that recognises the problem and flags `unanswerable: true` itself is scored ACCURATE (2 points). Any other answer is scored MAJOR (0 points), including a numeric value that matches the gold placeholder with an omitted or false `unanswerable` flag. The agent's `answer_type` is not checked for these questions: agents are not told the expected type, and with no estimate to compare the type carries no signal.
 
-**Do not reclassify these as ambiguous.** The question is fine — the data are insufficient, which is a different finding and one the benchmark deliberately tests for.
+**Do not relabel these as needing clarification.** The question is fine — the data are insufficient, which is a different finding and one the benchmark deliberately tests for.
 
 ## Cohorts
 
@@ -150,7 +155,9 @@ These stay `classification: unambiguous`, and the gold carries `unanswerable: tr
 
 ## The question bank and how to change it
 
-The source of truth is the **review workbook**, `$CLINGEN_GOLD_ROOT/bpc_benchmark_review_6-19-26.xlsx`: one row per question, holding the classification, question text, reviewed prose concepts, canonical disambiguation concept IDs, analysis plan, expected answer type, gold answer, gold script, and the per-round review columns that record how the bank got here. In this workspace the default resolves to `~/Partners HealthCare Dropbox/Kenneth Kehl/chatbpc/chatbpc_benchmark_gold/bpc_benchmark_review_6-19-26.xlsx`.
+The source of truth is the **review workbook**, `$CLINGEN_GOLD_ROOT/bpc_benchmark_review_6-19-26.xlsx`: one row per question, holding the classification, question text, the four component verdict columns (`denominator_needs_clarification`, `outcome_needs_clarification`, `covariates_needs_clarification`, `analysis_plan_needs_clarification`, each Y/N) with a `<component>_notes` column beside each, analysis plan, expected answer type, gold answer, gold script, and the per-round review columns that record how the bank got here. The retired concept-menu columns (`disambiguation_concepts`, `disambiguation_concept_ids`) stay as history and are carried into the gold bank unscored. In this workspace the default resolves to `~/Partners HealthCare Dropbox/Kenneth Kehl/chatbpc/chatbpc_benchmark_gold/bpc_benchmark_review_6-19-26.xlsx`.
+
+A row with all four verdicts filled is reviewed under the four-component rubric; the `classification` column must agree with them (ambiguous exactly when some component needs clarification). A row with none filled is unreviewed: it syncs without component gold, and scoring refuses it. A partly filled row is an error.
 
 The harness never reads the workbook. After any edit, regenerate both YAML banks:
 
@@ -158,9 +165,7 @@ The harness never reads the workbook. After any edit, regenerate both YAML banks
 .venv/bin/python scripts/sync_yaml_from_review.py
 ```
 
-That validates the workbook against the `Question` schema and writes the gold bank to `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` and the stripped public bank to `questions/<cohort>.yaml`. **Skip it and the agent and scorer are working from a stale bank.**
-
-For an older workbook that has reviewed prose concepts but no canonical-ID column, run `scripts/migrate_workbook_concepts.py` once. It adds `disambiguation_concept_ids`, creates a `concept_menu` sheet, and preserves a `.pre_rules_backup.xlsx` copy before saving.
+That validates the workbook against the `Question` schema and writes the gold bank to `$CLINGEN_GOLD_ROOT/questions/<cohort>.yaml` and the stripped public bank to `questions/<cohort>.yaml`, then prints how many questions have component gold. **Skip it and the agent and scorer are working from a stale bank.**
 
 ## Quickstart
 
@@ -173,8 +178,8 @@ export CLINGEN_DATA_ROOT=/path/to/cohort/data   # required: directory containing
 # Make sure the YAML banks match the workbook
 .venv/bin/python scripts/sync_yaml_from_review.py
 
-# Run an agent over one cohort. Each analyze question spawns an agent that runs
-# Python against the cohort files, so a full run takes real time and real spend.
+# Run an agent over one cohort. Each stage spawns an agent that may run Python
+# against the cohort files, so a full run takes real time and real spend.
 # Initial-evaluation stages are attempted up to 3 times with exponential
 # backoff; override with --agent-max-attempts and --agent-retry-base-seconds.
 # Automatic repair uses up to 10 attempts per failed stage and up to 10 passes;
@@ -215,8 +220,7 @@ uv run clingen-bench retry-failures \
   --run claude_code/<run_id> \
   --max-parallel 2 \
   --max-repair-passes 10 \
-  --classify-timeout 3600 \
-  --disambiguate-timeout 3600
+  --assess-timeout 3600
 
 # One question, for a smoke test
 uv run clingen-bench eval --agent "bash adapters/claude_code/run.sh" \
@@ -246,7 +250,7 @@ never included.
 
 ## Writing an agent
 
-Agents are **CLI executables**, called once per (question, stage):
+Agents are **CLI executables**, called once per (question, stage), where the stage is `assess` or `analyze`:
 
 ```bash
 $ <your_agent> --question-file question.json --output result.json
@@ -270,12 +274,11 @@ Start from `adapters/template/`.
 ## Repo layout
 
 - `clin_genomic_analysis_benchmark/` — the Python package: CLI `clingen-bench`, evaluation pipeline, scoring
-- `clin_genomic_analysis_benchmark/concepts.py` — canonical concept menu and one-time legacy migration rules
+- `clin_genomic_analysis_benchmark/components.py` — the four assessed components (IDs, labels, descriptions)
 - `AGENT_INSTRUCTIONS.md` — the rules the agent under test follows; the authoritative statement of the conventions below
 - `questions/<cohort>.yaml` — public, answer-free question banks
 - `adapters/` — agent adapters
 - `scripts/sync_yaml_from_review.py` — workbook → both YAML banks
-- `scripts/migrate_workbook_concepts.py` — one-time prose-concept → canonical-ID workbook migration
 - `scoring_configs/default.yaml` — subtask weights, discrepancy thresholds, per-question overrides
 - `runs/<agent>/<run_id>/` — evaluation output and `scorecard.{md,json}` (not in git)
 
@@ -290,13 +293,12 @@ Under `$CLINGEN_GOLD_ROOT`, away from the agent:
 
 `AGENT_INSTRUCTIONS.md` is authoritative. The ones an operator most needs to know:
 
-- **Key index cancer.** Unless a question says otherwise, each patient is represented by one *key index cancer* — their earliest-diagnosed genomically profiled index cancer. Question stems generally do not contain the word "index"; "patients with `<cohort>` cancer" already means this. Multiple index cancers, and which specimens and regimens belong to which, are resolved by this convention rather than flagged as ambiguous.
+- **Key index cancer.** Unless a question says otherwise, each patient is represented by one *key index cancer* — their earliest-diagnosed genomically profiled index cancer that meets the question's cancer-level criteria. A later, separate primary that meets them counts, unless the question excludes patients with prior primary cancers. Question stems generally do not contain the word "index"; "patients with `<cohort>` cancer" already means this. Multiple index cancers, and which specimens and regimens belong to which, are resolved by this convention rather than flagged.
 - **Genomic-specimen scope.** Genomic facts come from specimens of the cohort's cancer. Patient-level genomic questions use the key index cancer's specimen; sample-level counts use all of that patient's cohort-cancer specimens.
 - **Patient-level attributes** — sex, race, ethnicity, vital status — come from `patient_level_dataset.csv`, and anatomic scope does not apply to them.
-- **Anatomic and histologic scope** *is* a real ambiguity for cancer-level questions in heterogeneous cohorts (colon vs rectal, bladder vs upper tract) unless the question says which subtypes count.
-- **Line of therapy** with no analytic anchor is ambiguous. **"Chemotherapy"** unqualified — cytotoxic only, or any systemic therapy — is ambiguous. So is a **biomarker-frequency denominator** when the question doesn't say whether it's all sequenced patients or only those on gene-covering panels.
-- **Delayed cohort entry** (left-truncate at the sequencing date) and **immortal time bias** (use a landmark) have to be addressed on the time-to-event questions where they bite.
-- **`dmets_<site>`** is an ever-indicator; at-diagnosis questions use `dx_to_dmets_<site>_days <= 30`. **cBioPortal CNA** values run −2 to 2, where 2 is high-level amplification and −2 a deep deletion. **Clinical-trial regimens** (`drugs_ct_yn == 'Yes'`) have unannotated drug composition and no default rule: a question that depends on them either states one (e.g. "assume any clinical-trial regimen did not contain X") or carries `CLINICAL_TRIAL_HANDLING`.
+- **What counts as a gap.** A component needs clarification when the question leaves a choice open and no convention settles it. This is judged from the wording, not the data: a choice left open needs clarification even if every reading would give the same result in this cohort. The rulebook lists, for each component, example concepts a question often has to pin down — whether a stage term means stage at diagnosis; whether "advanced" or "metastatic" includes recurrent disease; the disease state of a line of therapy; the index date of a time-to-event outcome; how progression or response is ascertained (PFS-I, PFS-M, PFS-I-and-M, PFS-I-or-M); left truncation; the estimand; the model architecture; histology scope; a covariate's coding; missing values — and says the lists are not exhaustive.
+- **Defaults that still settle a component.** Outcomes of treated cohorts are measured from regimen start unless the question says otherwise. A hazard ratio means an unadjusted lifelines Cox model unless the question names covariates, says "adjusted", or specifies another model structure. Canonical BPC endpoint variables carry their own event and censoring definitions.
+- **`dmets_<site>`** is an ever-indicator; at-diagnosis questions use `dx_to_dmets_<site>_days <= 30`. **cBioPortal CNA** values run −2 to 2, where 2 is high-level amplification and −2 a deep deletion.
 - **`analysis_plan_summary`** in the workbook is a self-contained prose method spec for each unambiguous question.
 
 ## Pointers

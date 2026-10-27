@@ -60,20 +60,20 @@ single long agent request more predictably than concurrent requests.
 | `UNSLOTH_MODEL` | `unsloth/Qwen3.6-27B-MTP-GGUF` | exact served model ID |
 | `CODEX_MODEL` | unset | secondary model override if `UNSLOTH_MODEL` is unset |
 | `CODEX_BIN` | `codex` | Codex executable |
-| `CODEX_SANDBOX_MODE` | `workspace-write` | analyze-stage Codex sandbox |
+| `CODEX_SANDBOX_MODE` | `workspace-write` | Codex sandbox for both stages |
 | `CODEX_EPHEMERAL` | `1` | disable persistent Codex session state |
 | `CODEX_MAX_ATTEMPTS` | `1` | whole-Codex-process attempts inside one harness attempt |
 | `CODEX_RETRY_BASE_SECONDS` | `15` | delay multiplier between Codex-process attempts |
 | `UNSLOTH_REQUEST_TIMEOUT_SECONDS` | `1200` | timeout for one Studio Responses request |
 | `UNSLOTH_MAX_RETRIES` | `3` | retryable upstream attempts per Responses request |
-| `UNSLOTH_READ_ONLY_MAX_RETRIES` | `1` | upstream attempts for classify/disambiguate |
+| `UNSLOTH_ASSESS_MAX_RETRIES` | `1` | upstream attempts for assess |
 | `UNSLOTH_RETRY_BASE_SECONDS` | `2` | exponential upstream retry base |
 | `UNSLOTH_MAX_RETRY_SLEEP_SECONDS` | `30` | upstream retry sleep cap |
 | `UNSLOTH_MAX_REQUESTS` | `256` | request cap per Codex invocation |
-| `UNSLOTH_READ_ONLY_MAX_REQUESTS` | `8` | request cap for classify/disambiguate |
-| `UNSLOTH_READ_ONLY_MAX_OUTPUT_TOKENS` | `8192` | output cap for classify/disambiguate |
+| `UNSLOTH_ASSESS_MAX_REQUESTS` | `24` | request cap for assess |
+| `UNSLOTH_ASSESS_MAX_OUTPUT_TOKENS` | `8192` | output cap for assess |
 
-The benchmark uses longer per-stage defaults for this local adapter: 3600
-seconds for classify, 3600 for disambiguate, and 7200 for analyze. Adapter logs
+The benchmark uses longer per-stage defaults for this local adapter: 7200
+seconds for assess and 7200 for analyze. Adapter logs
 and non-sensitive bridge metadata are written under each question's
 `adapter_audit/` directory.

@@ -1,7 +1,6 @@
-"""3-stage flow per question:
-  1. classify
-  2. if classified ambiguous   → disambiguate
-     if classified unambiguous → analyze
+"""2-stage flow per question:
+  1. assess  — a needs-clarification verdict for each of the four components
+  2. analyze — only when every component was judged clear
 
 Writes per-question artifacts under runs/<agent_name>/<run_id>/per_question/<cohort>/<qid>/.
 Builds a per-run manifest.json with agent_cmd, run start/end, env (no secrets).
@@ -25,7 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 from ..cohorts import Cohort, resolve_cohorts
-from ..concepts import concept_menu_payload
+from ..components import classification_from_flags, components_payload, flags_from_assess_result
 from ..config import RUNS_DIR, TimeoutConfig, settings
 from ..questions import io as q_io
 from ..questions.schema import PublicQuestion
@@ -42,25 +41,20 @@ logger = logging.getLogger(__name__)
 
 
 _DEFAULT_INSTRUCTIONS = {
-    "classify": (
+    "assess": (
         "You are evaluating one analysis question against AACR Project GENIE BPC cohort data. "
-        "The cohort folder and a data dictionary are provided. Your task is to decide whether "
-        "the question is ANSWERABLE deterministically given the data, or whether it is "
-        "AMBIGUOUS such that two competent analysts could reasonably compute different numbers. "
-        "A question is ambiguous when one or more items from the supplied concept menu must be "
-        "specified before a deterministic analysis can be chosen. "
-        "Read enough of the data dictionary and file inventory to make an informed call. "
-        "Return strictly: {\"classification\": \"ambiguous\"|\"unambiguous\", \"rationale\": \"...\"}."
-    ),
-    "disambiguate": (
-        "You previously classified this question as AMBIGUOUS. Select every material concept the "
-        "questioner must specify to make the analysis deterministic, using only IDs from "
-        "disambiguation_concept_menu. Select an ID only when that choice is genuinely unresolved "
-        "after applying the benchmark conventions; incorrect selections are penalized. "
-        "Return strictly: {\"concept_ids\": [\"MENU_ID\", \"...\"]}."
+        "The cohort folder and a data dictionary are provided. For each of the four components "
+        "in assessment_components (denominator, outcome, covariates, analysis_plan), decide "
+        "whether the question needs clarification before one analysis pipeline follows from it, "
+        "applying the rules in the benchmark instructions. Judge from the question wording, the "
+        "benchmark conventions, the data dictionary and the Analytic Data Guide, not from "
+        "whether competing readings change the result in this cohort. "
+        "Return strictly: {\"denominator\": {\"needs_clarification\": true|false, "
+        "\"rationale\": \"...\"}, \"outcome\": {...}, \"covariates\": {...}, "
+        "\"analysis_plan\": {...}}."
     ),
     "analyze": (
-        "You previously classified this question as UNAMBIGUOUS. Compute the answer using the "
+        "You previously judged every component of this question clear. Compute the answer using the "
         "cohort data files. Use Python (pandas/numpy/scipy/statsmodels/lifelines as needed). "
         "Return strictly: "
         "{\"answer_type\": \"count|proportion|median_with_ci|hazard_ratio_with_ci|odds_ratio_with_ci|pvalue|categorical|categorical_distribution\", "
@@ -75,8 +69,7 @@ class QuestionRun:
     cohort: str
     category: int
     classification_gold: str
-    classify: Optional[dict] = None        # serialised StageInvocation
-    disambiguate: Optional[dict] = None
+    assess: Optional[dict] = None          # serialised StageInvocation
     analyze: Optional[dict] = None
     error: Optional[str] = None
 
@@ -140,6 +133,9 @@ _SAFE_AGENT_ENV_VARS = (
     "UNSLOTH_RETRY_BASE_SECONDS",
     "UNSLOTH_MAX_RETRY_SLEEP_SECONDS",
     "UNSLOTH_MAX_REQUESTS",
+    "UNSLOTH_ASSESS_MAX_OUTPUT_TOKENS",
+    "UNSLOTH_ASSESS_MAX_REQUESTS",
+    "UNSLOTH_ASSESS_MAX_RETRIES",
     "VERTEX_GEMMA_PROJECT_ID",
     "VERTEX_GEMMA_LOCATION",
     "VERTEX_GEMMA_MODEL",
@@ -168,8 +164,7 @@ _SAFE_AGENT_ENV_VARS = (
     "AGY_USE_SANDBOX",
     "AGY_SKIP_PERMISSIONS",
     "AGY_PRINT_TIMEOUT",
-    "AGY_PRINT_TIMEOUT_CLASSIFY",
-    "AGY_PRINT_TIMEOUT_DISAMBIGUATE",
+    "AGY_PRINT_TIMEOUT_ASSESS",
     "AGY_PRINT_TIMEOUT_ANALYZE",
 )
 
@@ -178,13 +173,11 @@ _ADAPTER_TIMEOUTS = {
     # This local model can spend several minutes on one generation and may make
     # multiple tool-calling turns before returning the stage contract.
     "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl": TimeoutConfig(
-        classify=3_600,
-        disambiguate=3_600,
+        assess=7_200,
         analyze=7_200,
     ),
     "codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl": TimeoutConfig(
-        classify=3_600,
-        disambiguate=3_600,
+        assess=7_200,
         analyze=7_200,
     ),
 }
@@ -966,7 +959,7 @@ def _build_question_payload(*, q: PublicQuestion, cohort: Cohort, stage: str, sc
                             prior_classification: Optional[str] = None,
                             max_runtime_seconds: Optional[int] = None) -> dict:
     payload = {
-        "contract_version": "2",
+        "contract_version": "3",
         "question_id": q.id,
         "question_text": q.text,
         "cohort": cohort.name,
@@ -976,7 +969,7 @@ def _build_question_payload(*, q: PublicQuestion, cohort: Cohort, stage: str, sc
         "data_dictionary_path": str(data_dictionary_path.resolve()),
         "scratch_dir": str(scratch_dir.resolve()),
         "instructions": _DEFAULT_INSTRUCTIONS[stage],
-        "disambiguation_concept_menu": concept_menu_payload(),
+        "assessment_components": components_payload(),
     }
     if prior_classification is not None:
         payload["prior_classification"] = prior_classification
@@ -1001,53 +994,36 @@ def _run_one_question(*, agent_cmd: str, q: PublicQuestion, cohort: Cohort, run_
     qrun = QuestionRun(
         question_id=q.id, cohort=cohort.name, category=q.category,
         # runs/ lives in the agent-reachable repo, so keep it gold-free: only
-        # populated for partial reruns that skip classify (harness-side gold).
+        # populated for partial reruns that skip assess (harness-side gold).
         classification_gold=gold_classification or "",
     )
 
     classification: Optional[str] = None
     try:
-        if "classify" in stages:
+        if "assess" in stages:
             payload = _build_question_payload(
-                q=q, cohort=cohort, stage="classify", scratch_dir=scratch,
-                data_dictionary_path=dict_path, max_runtime_seconds=timeouts.classify,
+                q=q, cohort=cohort, stage="assess", scratch_dir=scratch,
+                data_dictionary_path=dict_path, max_runtime_seconds=timeouts.assess,
             )
             inv = invoke(
                 agent_cmd=agent_cmd,
                 question_payload=payload,
-                question_path=qdir / "classify.question.json",
-                result_path=qdir / "classify.json",
-                stderr_log_path=qdir / "classify.agent.log",
-                timeout_s=timeouts.classify,
+                question_path=qdir / "assess.question.json",
+                result_path=qdir / "assess.json",
+                stderr_log_path=qdir / "assess.agent.log",
+                timeout_s=timeouts.assess,
                 max_attempts=agent_max_attempts,
                 retry_base_seconds=agent_retry_base_seconds,
                 agent_env=agent_env,
             )
-            qrun.classify = _serialise(inv)
+            qrun.assess = _serialise(inv)
             if inv.success and isinstance(inv.result, dict):
-                classification = inv.result.get("classification")
+                classification = classification_from_flags(
+                    flags_from_assess_result(inv.result))
         else:
             classification = gold_classification  # follow gold, useful for partial reruns
 
-        if classification == "ambiguous" and "disambiguate" in stages:
-            payload = _build_question_payload(
-                q=q, cohort=cohort, stage="disambiguate", scratch_dir=scratch,
-                data_dictionary_path=dict_path, prior_classification="ambiguous",
-                max_runtime_seconds=timeouts.disambiguate,
-            )
-            inv = invoke(
-                agent_cmd=agent_cmd,
-                question_payload=payload,
-                question_path=qdir / "disambiguate.question.json",
-                result_path=qdir / "disambiguate.json",
-                stderr_log_path=qdir / "disambiguate.agent.log",
-                timeout_s=timeouts.disambiguate,
-                max_attempts=agent_max_attempts,
-                retry_base_seconds=agent_retry_base_seconds,
-                agent_env=agent_env,
-            )
-            qrun.disambiguate = _serialise(inv)
-        elif classification == "unambiguous" and "analyze" in stages:
+        if classification == "unambiguous" and "analyze" in stages:
             payload = _build_question_payload(
                 q=q, cohort=cohort, stage="analyze", scratch_dir=scratch,
                 data_dictionary_path=dict_path, prior_classification="unambiguous",
@@ -1088,7 +1064,11 @@ def run_eval(
     timeout_config = _timeout_config_for_adapter(adapter_name)
     sandbox = sandbox_backend_provenance()
     preflight = run_isolation_preflight()
-    stages = stages or ["classify", "disambiguate", "analyze"]
+    stages = stages or ["assess", "analyze"]
+    unknown_stages = sorted(set(stages) - {"assess", "analyze"})
+    if unknown_stages:
+        raise click_exception(
+            f"unknown stage(s): {', '.join(unknown_stages)}; expected assess, analyze")
     if agent_max_attempts < 1:
         raise click_exception("agent_max_attempts must be >= 1")
     if agent_retry_base_seconds < 0:
@@ -1117,16 +1097,16 @@ def run_eval(
     if n_total == 0:
         raise click_exception("No questions matched the requested cohort/question filter.")
 
-    # Partial reruns that skip the classify stage need the gold classification to
-    # decide disambiguate-vs-analyze. Read it harness-side from the gold bank
+    # Partial reruns that skip the assess stage need the gold classification to
+    # decide whether to analyze. Read it harness-side from the gold bank
     # (never exposed to the agent); normal full runs stay entirely gold-free.
     gold_cls: dict[tuple[str, str], str] = {}
-    if "classify" not in stages:
+    if "assess" not in stages:
         for c in cohorts:
             gcqf = q_io.load_gold(c.name)
             if gcqf is None:
                 raise click_exception(
-                    f"--stages omits 'classify' but no gold bank found for {c.name} "
+                    f"--stages omits 'assess' but no gold bank found for {c.name} "
                     f"(set CLINGEN_GOLD_ROOT / run sync)."
                 )
             for q in gcqf.questions:

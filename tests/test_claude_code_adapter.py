@@ -154,3 +154,8 @@ def test_claude_adapter_cannot_read_sibling_gold_file(tmp_path, monkeypatch):
     )
 
     assert json.loads(text)["rationale"] == "hidden"
+
+
+def test_assess_stage_can_run_code_for_data_checks():
+    assert adapter._allowed_tools_for("assess") == "Read,Glob,Grep,Bash"
+    assert adapter._allowed_tools_for("analyze") == "Read,Glob,Grep,Bash"

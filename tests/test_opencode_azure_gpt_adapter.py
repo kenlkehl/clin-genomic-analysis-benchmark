@@ -95,7 +95,7 @@ def test_opencode_call_uses_bridge_and_forces_reasoning(tmp_path, monkeypatch):
 
     stdout = "\n".join([
         _event("step_start", type="step-start"),
-        _event("text", type="text", text='{"classification":"ambiguous"}'),
+        _event("text", type="text", text='{"outcome":{"needs_clarification":true}}'),
         _event("step_finish", type="step-finish", reason="stop"),
     ])
 
@@ -111,7 +111,7 @@ def test_opencode_call_uses_bridge_and_forces_reasoning(tmp_path, monkeypatch):
         prompt="benchmark prompt",
         question={
             "question_id": "cohort-Q1",
-            "stage": "classify",
+            "stage": "assess",
             "scratch_dir": str(scratch),
             "cohort_dir": str(cohort),
             "data_dictionary_path": str(dictionary),
@@ -123,7 +123,7 @@ def test_opencode_call_uses_bridge_and_forces_reasoning(tmp_path, monkeypatch):
     inline_config = json.loads(env[adapter.CONFIG_ENV])
     provider = inline_config["provider"][adapter.PROVIDER_NAME]
     model = provider["models"]["gpt-6-luna"]
-    assert result == '{"classification":"ambiguous"}'
+    assert result == '{"outcome":{"needs_clarification":true}}'
     assert command[command.index("--model") + 1] == (
         f"{adapter.PROVIDER_NAME}/gpt-6-luna"
     )

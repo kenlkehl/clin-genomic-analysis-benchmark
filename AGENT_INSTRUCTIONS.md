@@ -1,149 +1,149 @@
 # Instructions for agents evaluated on the clin-genomic-analysis-benchmark
 
-You are an LLM agent being evaluated on the Clinical Genomic Analysis Benchmark, which measures performance on clinico-genomic data analyses in oncology. Core tasks include classifying questions as ambiguous or unambiguously specified, given definitions of those concepts; disambiguating ambiguous questions by identifying the issues that made them ambiguous, given a menu of options; and performing data analysis to answer unambiguous questions. The dataset to be analyzed comes from the AACR GENIE Biopharma Collaborative (BPC) dataset, which includes longitudinal, granular clinical annotations of cancer diagnosis, treatments, outcomes, and cancer panel (NGS) test specimens and results.
+You are an LLM agent being evaluated on the Clinical Genomic Analysis Benchmark, which measures performance on clinico-genomic data analyses in oncology. The core tasks are (1) judging whether each of four components of a research question — the cohort denominator, the outcome, the independent variables and covariates, and the statistical analysis plan — is specified clearly enough, given the BPC data dictionary directives and the structure of the dataset, to yield one unambiguous analysis pipeline; and (2) performing the analysis when every component is clear. The dataset comes from the AACR GENIE Biopharma Collaborative (BPC), which includes longitudinal, granular clinical annotations of cancer diagnosis, treatments, outcomes, and cancer panel (NGS) test specimens and results.
 
-This document describes what the benchmark expects an agent under evaluation to do, and the conventions it should follow when computing answers. 
+This document describes what the benchmark expects an agent under evaluation to do, and the conventions it should follow when judging questions and computing answers.
 
-The benchmark serves each clinical question to the agent in three stages: **classify**, **disambiguate**, and **analyze**. The agent receives the question text, the cohort directory (read-only), a data dictionary, and a scratch directory for intermediate files. Outputs are JSON objects with the fixed schemas below; the harness validates them and discards anything extra.
+The benchmark serves each clinical question in two stages: **assess** and **analyze**. The agent receives the question text, the cohort directory (read-only), a data dictionary, and a scratch directory for intermediate files. The task message also gives a category number (1–8), which groups questions by topic for reporting and has no bearing on how to judge or answer the question. The cohort directory also holds the BPC Analytic Data Guide, a PDF whose file name contains "Analytic Data Guide"; it defines the derived variables, including the event and censoring rules of the canonical endpoints. Outputs are JSON objects with the fixed schemas below; the harness rejects output that does not match them.
 
 ---
 
 ## How to score highly (quick checklist)
 
-The benchmark rewards three things: (a) correctly distinguishing a genuinely ambiguous question from a conventionally answerable one, (b) naming the *material* gaps when a question is ambiguous, and (c) computing the conventional answer exactly when it is unambiguous. To maximize your score:
+1. **Judge each component separately.** For the denominator, the outcome, the covariates, and the analysis plan, ask: could two careful analysts who follow this document make different choices in building this component? If so, it needs clarification.
+2. **Look for every choice the question leaves open.** Each component below lists concepts that a question often has to pin down. They are examples, not an exhaustive checklist.
+3. **Judge from the wording, not the data.** A choice the question leaves open needs clarification even if every reading would give the same result in this cohort (see "What counts as a gap").
+4. **Apply the conventional defaults first.** A choice a default settles is not a gap. Never flag anything listed under "Avoid flagging on these grounds alone".
+5. **Flag each gap once**, in the component where the construct plays its role in the question.
+6. **When every component is clear, compute deterministically** to perform analysis, follow every rule the question states, and return only the typed JSON (see "Answer-type schemas" and "Output discipline").
 
-1. **Default to UNAMBIGUOUS** when a competent BPC analyst would reach for one column, one filter, and one method without asking (see "Default rule for classification"). Flag **AMBIGUOUS** only for a *material* choice that competent analysts using the conventions below would still resolve differently — and would *materially* change the result. Check each candidate choice against the data (see "What counts as material").
-2. **Apply every "Conventional default" before deciding.** Most apparent gaps are already resolved there. Never flag anything listed under "Avoid flagging … on these grounds alone".
-3. **The key index cancer is assumed.** A question that says "patients with <cohort> cancer" means each patient's key index cancer; stems will usually NOT contain the word "index". Genomic and treatment facts come from that cancer (see "Genomic-specimen scope").
-4. **Flag AMBIGUOUS only for a trigger in "What still counts as AMBIGUOUS"** . Then select only the applicable IDs from the supplied concept menu. Correct IDs earn credit and incorrect IDs lose credit.
-5. **When unambiguous, compute deterministically and return only the typed JSON** (see "Answer-type schemas" and "Output discipline"): use the conventional statistic, exclude unsequenced patients for mutation exposures, and adjust for left truncation whenever the time-origin precedes sequencing.
+Each component is scored on its own with balanced accuracy, so flagging a component that is clear costs as much as missing one that is not.
 
 ---
 
-## The three stages
+## The two stages
 
-### 1. classify
+### 1. assess
 
-Decide whether the question is **UNAMBIGUOUS** (two careful analysts working from this dataset and standard oncology biostatistics conventions would compute the same answer) or **AMBIGUOUS** (the question leaves a material analytic choice underspecified that two competent analysts could reasonably resolve in different ways, materially changing the result).
+For each of the four components, decide whether the question needs clarification before one analysis pipeline follows from it. The question is ambiguous if any component needs clarification, in which case it goes no further. If every component is clear, the harness moves on to analyze.
 
-It is fine to inspect the data dictionary and look at data file headers to make an informed decision, but do not attempt to search for an answer key; such attempts will be monitored and will result in a zero score.
+You may read the data dictionary and the Analytic Data Guide, and you may inspect the data files to learn which variables exist and how they are coded. Whether a component needs clarification does not depend on whether competing readings give different results in this cohort. Do not search for an answer key; such attempts are monitored and will result in a zero score.
 
-**Output:**
-
-```json
-{ "classification": "ambiguous" | "unambiguous",
-  "rationale": "<one or two sentences>" }
-```
-
-### 2. disambiguate
-
-Only invoked if the agent classified the question as AMBIGUOUS. Select the concrete concepts a questioner would need to specify to make the question deterministically answerable from the cohort data. Use only IDs from the disambiguation concept menu below (`disambiguation_concept_menu`). Select every material unresolved concept, but do not select merely related concepts: exact gold IDs earn points and non-gold IDs incur a false-positive penalty.
-
-**Output:**
+**Output** (all four keys are required):
 
 ```json
-{ "concept_ids": ["OUTCOME_METRIC", "TIME_ORIGIN"] }
+{ "denominator":   { "needs_clarification": false, "rationale": "<one sentence>" },
+  "outcome":       { "needs_clarification": true,  "rationale": "<one sentence>" },
+  "covariates":    { "needs_clarification": false, "rationale": "<one sentence>" },
+  "analysis_plan": { "needs_clarification": false, "rationale": "<one sentence>" } }
 ```
 
-### Disambiguation concept menu
+A component the question does not involve (for example, covariates in a single-group count) does not need clarification. Each `rationale` says what is unclear, or how the question or a convention specifies the component. Rationales are recorded but not scored.
 
-| ID | Select when the question needs clarification about... |
-|---|---|
-| `ANATOMIC_HISTOLOGIC_SCOPE` | eligible cancer sites, `ca_type` values, histologies, or sidedness groups |
-| `DISEASE_EXTENT_SCOPE` | a stage or extent restriction, such as all stages versus Stage IV |
-| `DISEASE_STATE_DEFINITION` | a definition of advanced, metastatic, early, resectable, or another disease state |
-| `CLINICAL_SUBGROUP_DEFINITION` | a clinical/molecular subgroup, subtype, age cutoff, population stratum, source variable, coding system, grouping, or demographic dimension |
-| `MISSING_DATA_HANDLING` | a rule for unknown, missing, or not-applicable values |
-| `TREATMENT_DEFINITION` | drugs, classes, backbones, combinations, or procedures that count as treatment |
-| `COMPARATOR_DEFINITION` | a reference or control group |
-| `LINE_OF_THERAPY` | the line or setting of qualifying treatment, such as first regimen ever versus first for metastatic disease, or adjuvant versus metastatic versus any setting |
-| `REGIMEN_SELECTION` | which qualifying regimen per patient, or whether mono/combination therapy qualifies |
-| `CLINICAL_TRIAL_HANDLING` | a rule for clinical-trial regimens with unannotated composition |
-| `PROCEDURE_OR_TIMING_DEFINITION` | an operational definition of surgery/adjuvant/neoadjuvant timing |
-| `GENE_OR_GENE_SET` | the genes or pathway members that define a biomarker |
-| `ALTERATION_TYPE` | alteration classes such as SNV/indel, CNA, fusion, or structural variant |
-| `VARIANT_INCLUSION_CRITERIA` | consequence, pathogenicity, hotspot, or call-confidence filters |
-| `CNA_THRESHOLD` | a copy-number threshold for gain/amplification/loss/deletion |
-| `GERMLINE_SOMATIC_SCOPE` | whether germline, somatic, or both alterations count |
-| `PANEL_COVERAGE` | eligibility based on an assay's ability to detect the gene/event |
-| `SPECIMEN_SELECTION` | which specimen or sequencing event to use |
-| `BIOMARKER_TEST_DEFINITION` | the assay/result defining a biomarker |
-| `OUTCOME_METRIC` | the endpoint/version, such as OS, PFS-I, PFS-M, response, or TTNT |
-| `RESPONSE_DEFINITION` | how response is measured or categorized |
-| `TIME_ORIGIN` | the date/event from which follow-up begins |
-| `TIME_HORIZON` | a follow-up horizon or summary time point |
-| `SUMMARY_MEASURE` | mean, median, count, proportion, or survival probability |
-| `STATISTICAL_ESTIMAND` | the target contrast/statistic, such as subgroup HRs or an interaction |
-| `MODEL_SPECIFICATION` | the model, test, covariates, or interaction terms |
-| `CENSORING_RULE` | handling of ongoing follow-up or competing events |
-| `DELAYED_ENTRY` | risk-set entry after the outcome time origin / left truncation |
-| `IMMORTAL_TIME_BIAS` | temporal handling of post-origin exposure or biomarker ascertainment |
-| `ASCERTAINMENT_WINDOW` | when a characteristic is measured, such as at diagnosis versus ever |
-| `REPEATED_OBSERVATIONS` | multiple regimens, samples, treatments, or observations per patient |
-| `DENOMINATOR_DEFINITION` | a non-panel-related eligible or tested denominator |
-| `DATA_AVAILABILITY` | whether a required variable/measurement exists and is populated |
+### 2. analyze
 
-### 3. analyze
-
-Only invoked if the agent classified the question as UNAMBIGUOUS. Compute
-the answer using the cohort data files. Use Python (pandas, numpy, scipy,
-statsmodels, lifelines as needed). The cohort directory is read-only;
-write any intermediate files into the scratch directory.
+Only invoked if every component was judged clear. Compute the answer using the cohort data files. Use Python (pandas, numpy, scipy, statsmodels, lifelines as needed). The cohort directory is read-only; write any intermediate files into the scratch directory.
 
 **Output:** see [Answer-type schemas](#answer-type-schemas) below.
 
 ---
 
-## Default rule for classification
+## Judging clarity
 
-If a competent BPC analyst would reach for one specific column, one
-specific filter, and one specific statistical method without needing to
-ask, label **UNAMBIGUOUS** — even if a meta-analyst could imagine
-alternative interpretations. Assume the question wants the *conventional*
-answer, not the most defensible-under-cross-examination answer. A
-question can be unambiguous even if computing it requires multiple
-deterministic steps.
+The standard for every component is the same: given this document's conventions and the BPC data dictionary and Analytic Data Guide, does the question fix every choice needed to build this part of the analysis? Imagine writing the analysis code with access to the data dictionary and directives but before seeing any data: every choice that code would have to make must be fixed by the question or by a conventional default. A component can be clear even if building it takes several deterministic steps.
 
-Only label **AMBIGUOUS** when the question genuinely leaves a *material*
-analytic choice open — one that competent analysts using standard
-conventions would still resolve differently.
+### What counts as a gap
 
-**What counts as material.** A choice is material when plausible
-alternatives would yield a different denominator, cohort, regimen set,
-measurement set, method, exposure, or outcome, judged with the same 5%
-relative tolerance used to grade numeric answers:
+Each component below lists concepts that a question often has to pin down for that component to be clear. They are examples of what an unambiguous research question specifies, not an exhaustive checklist: any other choice an analyst would have to make in building the component is judged the same way. A listed concept that cannot arise in the question (for example, left truncation when there is no time-to-event outcome) is not a gap.
 
-- A choice that changes which records are analysed — the patients in a
-  cohort or denominator, the regimens, the specimens or measurements, or
-  the members of an exposure or comparison group — is material when, for
-  any analysed group, the records added plus the records removed between
-  plausible alternatives exceed 5% of that group. Measure against the
-  smaller of the two versions of the group, counted as actually analysed
-  (after filters the analysis requires, such as a non-missing outcome).
-  Swaps count even when the group's size barely changes.
-- A choice of method, statistic, or outcome (e.g. OS vs PFS, an
-  interaction p-value vs subgroup hazard ratios) is material when the
-  alternatives estimate different quantities.
-- A choice that changes the analysed records by 5% or less, or that
-  cannot affect the requested answer by construction, is not material.
+Judge gaps from the question's wording, this document's conventions, and the data dictionary, not from what the cohort data happen to contain. If the question leaves a choice open and no conventional default settles it, the component needs clarification, even if every reading would give the same result in this cohort. For example, a question that groups or measures records by a variable that can be unknown or missing must say how those values are handled, whether or not any analysed record in this cohort has one (see "Missing values" under each component).
 
-**Check each candidate ambiguity against the data.** Do not judge
-materiality from the wording alone. For each candidate source of
-ambiguity, list the interpretations a competent analyst could plausibly
-adopt, then use the cohort data to build every analysed group under each
-interpretation and compare them with the threshold above. Flag the
-concept only if the alternatives cross that threshold (or estimate
-different quantities). A choice that sounds open but moves 5% or less of
-the records in this cohort is not a reason for ambiguity, and a question
-whose candidate choices are all immaterial is UNAMBIGUOUS.
+### Where a gap belongs
+
+Assign each gap to the component where the construct plays its role in the question:
+
+- it decides who or what is eligible → **denominator**;
+- it is what is measured or counted → **outcome**;
+- it defines an exposure, comparison group, stratifier, or adjustment variable → **covariates**;
+- it decides how the estimate is computed → **analysis plan**.
+
+The same term can sit in different components in different questions. For example, the term "Metastatic" restricts the denominator in "among patients with metastatic disease, …", is the outcome in "what proportion had metastatic disease", and is a covariate in "compare survival between patients with and without metastatic disease". The rules for a construct apply wherever it appears.
+
+Flag a gap once, in the component that defines the construct. Do not also flag a component that only inherits it: an outcome measured "from the start of first-line therapy" is not unclear just because the denominator's definition of first-line therapy is. Genomic testing timing (denominator) and left truncation (analysis plan) are two different gaps, not one gap seen twice; see those concepts.
+
+---
+
+## The four components
+
+### 1. Cohort denominator
+
+Which patients, or which regimens, specimens, or cancers, are analysed. The overriding question is whether the denominator is specified clearly enough to yield one analysis pipeline.
+
+**Concepts to pin down** (examples, not an exhaustive list):
+
+- **Disease burden.**
+  - Whether a stage term such as "Stage IV", "Stage I–III", "early stage", "localized", or "locally advanced" means stage at initial diagnosis (de novo, newly diagnosed), or also covers patients who reached that stage later.
+  - Whether "advanced" or "metastatic" includes only de novo advanced disease (Stage IV at diagnosis), or also relapsed or recurrent advanced disease after an earlier-stage diagnosis.
+- **Line of therapy.** For terms such as "first-line", "second-line", "later-line", "previously treated", or "treatment-naive":
+  - the disease state the line refers to, for example the first regimen for the cancer in any setting versus the first regimen given for advanced or metastatic disease; and
+  - when the line refers to advanced disease that is not exclusively de novo, how treatment given earlier in the early-stage setting (neoadjuvant, adjuvant, or other curative-intent therapy) counts. Some line definitions settle this: "the first regimen started on or after the date of advanced disease" does not count earlier regimens, and "the first regimen for the cancer in any setting" counts them all. A bare "first-line for metastatic disease" that includes recurrent disease does not settle it.
+
+  A line term qualified by a stage (for example, "first-line therapy for Stage IV disease") also raises the disease-burden concept above; both belong to the denominator.
+- **Genomic testing timing.** For a question that touches genomics (a biomarker in the eligibility criteria, an exposure, or the outcome), what to do about patients whose index genomic test (the NGS report for the key index cancer) had not yet happened at a time point that defines eligibility. Such time points include the start of a qualifying regimen, the date of advanced or metastatic disease, the diagnosis date when patients are followed from diagnosis, and any landmark. Acceptable rules include requiring testing before that time point, including patients whatever the testing date, or a stated delayed-entry rule. A stated delayed-entry rule for the outcome's index date (for example, left truncation at the NGS report date) settles this for that time point. The concept applies whenever such a time point is not defined to follow testing, whether or not any patient in this cohort was tested after it. When the time point is also the index date of a time-to-event outcome, this concept and left truncation under the analysis plan are separate gaps: if the question states neither, flag both components. Requiring testing before the index date, or a stated delayed-entry rule, settles both. Including patients whatever the testing date settles eligibility but leaves risk-set entry open.
+- **Biomarker definitions for inclusion.** For a denominator that requires the presence or absence of a biomarker, the genes or gene set, panel coverage, alteration types (SNV/indel, copy number, fusion, structural variant), variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, and which specimen counts.
+- **Cancer type and histology.** The eligible cancer types and histologies (`ca_type`, histology, primary site, sidedness), and how the question's terms map to their codes. A bare reference to the cohort's own cancer, by name or abbreviation, is settled by the key-index-cancer convention. Note that `ca_type` is largely missing in some cohorts (see the Analytic Data Guide).
+- **Unit of analysis.** The unit analysed, and which observation qualifies when a patient can contribute several regimens, specimens, or cancers.
+- **Qualifying treatment.** The drugs or regimens that qualify a patient for a treatment-defined cohort, including whether monotherapy or combinations qualify and how clinical-trial regimens with masked drug names are handled.
+- **Surgery and treatment timing.** The procedure or timing rule when eligibility depends on surgery, or on adjuvant or neoadjuvant timing.
+- **Eligibility subgroups.** Clinical or molecular subgroups used for eligibility (receptor status, biomarker groups, age bands, demographic categories) and their source variables.
+- **Missing values.** Eligibility criteria apply only to records known to meet them. A criterion that requires a value (for example, "Stage IV at diagnosis" or "with a mutation in gene X") excludes records whose value is unknown, and a criterion that excludes a value (for example, "excluding patients with brain metastases") keeps them. Unknown values in a variable used only for eligibility are therefore not, by themselves, a gap.
+
+### 2. Outcome
+
+What is measured or counted for each analysed unit.
+
+**Concepts to pin down** (examples, not an exhaustive list):
+
+- **Endpoint.** The endpoint itself, when the wording admits more than one (for example, a "benefit" or "outcome" that could be survival, response, or time to next treatment).
+- **Index date.** The time zero of a time-to-event outcome, such as diagnosis, advanced or metastatic disease, regimen start, surgery, sequencing, or another landmark, unless the treated-patient default applies (see "Conventional defaults").
+- **Event ascertainment.** How progression, response, recurrence, or relapse is ascertained. BPC curates these from imaging reports (radiologist assessment) and from medical oncologist notes (clinician assessment), and combines them. For progression-free survival, the BPC endpoints are PFS-I (imaging), PFS-M (medical oncologist), PFS-I-or-M (either), and PFS-I-and-M (both). An unqualified "PFS", "progression", "response", "recurrence", or "relapse" leaves the source open.
+- **Censoring and competing events.** When the stated endpoint and index date have no canonical BPC variable, the censoring date and whether death or another event counts as an event, a censoring event, or a competing event. For an endpoint with a competing event (for example, time to next treatment when death can come first, or a cumulative incidence), how that event is handled. The canonical BPC endpoint variables carry their own event and censoring rules, so using one settles this; see "Conventional defaults".
+- **Outcome categories.** What counts as a response or another categorical outcome, when categories could be grouped differently.
+- **Measurement time.** For a characteristic that is measured or counted, when it is measured (at diagnosis, before the index date, within a window, or ever during follow-up).
+- **Biomarker definition.** For a biomarker outcome, the genes or gene set, alteration types (SNV/indel, copy number, fusion, structural variant), variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, and which specimen counts.
+- **Source variable.** The source variable or coding when the data dictionary records the outcome in more than one place.
+- **Missing values.** How analysed units with an unknown or missing outcome value are handled: for example, whether patients with unknown status are dropped from a proportion's denominator or counted as not having the outcome. Canonical endpoint variables settle this through their own population and censoring rules.
+
+### 3. Independent variables and covariates
+
+Every exposure, comparison group, stratifier, and adjustment covariate must be defined precisely enough that each analysed record falls in exactly one category, or takes exactly one value. The disease-burden, line-of-therapy, and genomic-testing concepts under the denominator apply here too when the construct is a covariate.
+
+**Concepts to pin down** (examples, not an exhaustive list):
+
+- **Biomarker exposures.** The genes or gene set, alteration types, variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, which specimen counts when there are several, and the assay and result that define a non-NGS biomarker (for example, receptor status and how equivocal results count).
+- **Treatment exposures.** The drugs or classes that count (for example, whether "chemotherapy" means cytotoxic therapy only), whether monotherapy or combinations count, how clinical-trial regimens with masked drug names are handled, and the window in which treatment counts (before the index date, or ever).
+- **Clinical covariates.** The variable and its time point (for example, age at diagnosis, at sequencing, or at regimen start), the source variable when the data dictionary has several (for example, separate race and ethnicity fields), and category groupings or cutoffs.
+- **Comparison groups.** The reference group for any contrast, and whether there is a comparison group at all when the stated population makes the exposure constant.
+- **Measurement time.** When a characteristic is measured (at diagnosis, before the index date, within a window, or ever during follow-up).
+- **Missing values.** How records with an unknown or missing value of an exposure, comparison group, stratifier, or covariate are handled: for example, a separate category, exclusion, or another stated rule.
+
+### 4. Statistical analysis plan
+
+How the estimate is computed from the denominator, outcome, and covariates.
+
+**Concepts to pin down** (examples, not an exhaustive list):
+
+- **Statistical estimand.** The quantity to report, such as a hazard ratio, a median, a difference in medians, a survival probability at a stated time, a proportion, an odds ratio, a p-value, or subgroup-specific estimates versus an interaction. "Compare survival between A and B" leaves the estimand open.
+- **Model architecture.** Which model or test produces the estimand when more than one could: for example, Cox proportional hazards, a stratified Cox model, a time-varying exposure, a landmark analysis, logistic regression, a log-rank test, or a chi-square versus Fisher's exact test. The conventions below fix some of these, including the unadjusted Cox model for a hazard ratio and the Kaplan–Meier median.
+- **Variables in a multivariable model.** Which variables to include when the question asks for adjustment ("adjusted", "controlling for", "multivariable"). Their definitions are judged under covariates.
+- **Left truncation (delayed entry).** BPC includes only patients whose tumors were sequenced, so time before sequencing is selectively observed. For a time-to-event outcome whose index date can precede the NGS report (any index date other than sequencing itself or a date defined to follow it), how patients enter the risk set: for example, left truncation at the NGS report date, restriction to patients sequenced before the index date, or an explicit choice to ignore delayed entry. This applies to every time-to-event question, genomic or not, and whether or not any analysed patient in this cohort was sequenced after the index date. Using a canonical endpoint variable does not settle it. For a question that touches genomics, it is a separate gap from genomic testing timing under the denominator (see that concept).
+- **Exposure ascertained after the index date.** When an exposure or biomarker status can be ascertained after the index date (for example, ever receiving a drug, or a biomarker from a test that can follow the index date), how that time is handled: a landmark, a time-varying exposure, an exposure defined before the index date, or left truncation at the testing date. A stated rule of left truncation at the testing date settles this for biomarker status from that test.
 
 ---
 
 ## Conventional defaults
 
-When a question uses any of these terms without further qualification,
-assume the convention listed; do **not** treat the term as ambiguous on
-these grounds alone.
+When a question uses any of these terms without further qualification, assume the convention listed. A choice these defaults settle is not a gap.
 
 - **"non-synonymous mutation"** → MAF `Variant_Classification` ∈
   {Missense_Mutation, Nonsense_Mutation, Frame_Shift_Del, Frame_Shift_Ins,
@@ -160,7 +160,8 @@ these grounds alone.
 
 - **"panel covers gene X"** → use `data_gene_matrix.txt` (or the panel
   column in `data_clinical_sample.txt`) to identify which patients/
-  samples were tested on a panel including gene X.
+  samples were tested on a panel including gene X. Patients without sequencing of a given gene are excluded (not treated as
+  wild-type) when the exposure is a mutation.
 
 - **Copy-number profiling** → a sample is copy-number profiled only if it
   has a column in `data_CNA.txt`; some assays report no copy-number data
@@ -173,11 +174,20 @@ these grounds alone.
   `regimen_cancer_level_dataset` whose `regimen_drugs` string contains
   drug X (case-insensitive substring), including regimens with additional
   concomitant drugs. Treat biosimilars as identical to the reference
-  molecule, but treat antibody-drug conjugates with the same antibody but different payloads as distinct drugs. Biosimilar / prodrug / drug-class granularity is not, by
-  itself, a source of ambiguity.
+  molecule, but treat antibody-drug conjugates with the same antibody but
+  different payloads as distinct drugs. Biosimilar / prodrug / drug-class
+  granularity is not, by itself, a gap. The same substring rule applies to
+  "regimen containing X and Y" (both drugs present, other drugs allowed).
+  A combination named without "containing", such as "X plus Y" or "X with
+  Y", leaves open whether regimens with additional drugs qualify. Naming an
+  optional drug ("X plus Y, with or without Z") settles only Z; whether
+  regimens that add any other drug qualify stays open. Only wording that
+  excludes other drugs ("only", "exactly", "and no other drugs") or allows
+  them ("containing", "with or without other drugs") settles it.
 
-- **"Assume any clinical-trial regimen did not contain drug X"** → treat
-  every regimen with `drugs_ct_yn == 'Yes'` as not containing X, even when
+- **"Assume any clinical-trial regimen did not contain drug X"** (or drugs
+  X, Y, …) → treat every regimen with `drugs_ct_yn == 'Yes'` as not
+  containing X (or any of the named drugs), even when
   its `regimen_drugs` string names X. Trial rows often list some drugs and
   mask others (e.g. "Investigational Drug").
 
@@ -186,63 +196,91 @@ these grounds alone.
   (see below); do not count regimens given for a non-index cancer or for a
   different (non-key) index cancer. Which index cancer a regimen/specimen
   belongs to is resolved by the key-index-cancer convention and is not, by
-  itself, a source of ambiguity.
+  itself, a gap.
 
-- **Hazard ratio / Cox model** → univariable Cox proportional-hazards
-  model from `lifelines`, no covariate adjustment, unless the question
-  specifies adjustment. Patients without sequencing are excluded (not
-  treated as wild-type) when the exposure is a mutation.
+- **Hazard ratio / Cox model** → a hazard ratio means an unadjusted
+  (univariable) Cox proportional-hazards model from `lifelines`, unless the
+  question names covariates, says "adjusted", or specifies another model
+  structure. 
 
 - **"NGS testing date"** → the patient's earliest sequencing report date
   for the relevant cancer (`dx_cpt_rep_days` in
-  `cancer_panel_test_level_dataset.csv`). When left-truncating, a patient
-  enters the risk set at that date on the outcome's time scale, or at the
-  time origin if sequencing came first.
+  `cancer_panel_test_level_dataset.csv`). `dx_cpt_rep_days` counts days
+  from diagnosis of the cancer; to place it on another time scale, subtract
+  that origin's days from diagnosis (for regimen start,
+  `dx_reg_start_int` in `regimen_cancer_level_dataset.csv`). When
+  left-truncating, a patient enters the risk set at that date on the
+  outcome's time scale, or at the time origin if sequencing came first.
 
 - **Outcomes of treated patients** → when every patient analysed has a
   qualifying regimen (one regimen group, regimens compared with each
-  other, or groups compared among recipients of a regimen), outcomes are
-  measured from the start of that regimen unless the question says
-  otherwise.
+  other, or groups compared among recipients of a regimen), time-to-event
+  outcomes are measured from the start of that regimen unless the question
+  says otherwise.
 
-- **Median with 95% CI for time-to-event** → Kaplan–Meier median with
-  Brookmeyer–Crowley CI (lifelines default).
+- **Median with 95% CI for time-to-event** → Kaplan–Meier median from
+  lifelines `KaplanMeierFitter` (default `alpha=0.05`), with the CI from
+  `median_survival_times(kmf.confidence_interval_)`: the Brookmeyer–Crowley
+  method applied to lifelines' default log(-log) pointwise band.
 
 - **Median with 95% CI for non-survival continuous variable (e.g., age)**
   → exact distribution-free CI (binomial order-statistic), or equivalently
   the lifelines/scipy default.
 
-- **"OS"** → use the canonical OS variable for the time-origin in
-  question (`tt_os_g_*` from regimen start, `tt_os_dx_*` from diagnosis,
-  `tt_os_adv_*` from advanced-disease diagnosis, etc.) — pick the one matching
-  the question's stated origin. If there is no canonical variable for a given anchor date, OS will need to be calculated as a derived entity.
+- **Stage at diagnosis** → `stage_dx`, BPC's stage at diagnosis, when a
+  question restricts or groups by stage at diagnosis. A stage term that
+  does not say "at diagnosis", "de novo", or "newly diagnosed" leaves the
+  disease-burden concept open (see "Disease burden").
 
-- **"Stage IV"** → `stage_dx == 'Stage IV'` (stage at diagnosis), unless
-  the question explicitly says "ever metastatic" or similar.
+- **"Survival"** → overall survival, when the question does not name
+  another endpoint.
+
+- **"OS"** → use the canonical OS variable for the stated index date when relevant
+  (`tt_os_g_*` from regimen start, `tt_os_dx_*` from diagnosis,
+  `tt_os_adv_*` from advanced-disease diagnosis, etc.). If there is no
+  canonical variable for the index date, derive OS from the same death and
+  last-known-alive dates, censoring at last known alive.
+
+- **Canonical endpoint variables** → the BPC OS and PFS variables carry
+  their own event and censoring rules, set out in the Analytic Data Guide.
+  Death is an event for OS and for every PFS variant. OS, and PFS from
+  advanced-disease diagnosis (`*_adv_*`), censor at the last known alive
+  date. PFS from regimen start (`*_g_*`) censors at the start of the next
+  cancer-directed regimen, or at the last known alive date if there is
+  none. PFS variables are populated only for cancers that were stage IV at
+  diagnosis or that later developed distant metastasis. Using the canonical
+  variable for the stated endpoint and index date settles censoring, but
+  not how patients enter the risk set (see "Left truncation").
 
 - **Key index cancer** → restrict analyses to index cancers in
   `cancer_level_dataset_index.csv` (`redcap_ca_index == 'Yes'`). Unless a
   question *explicitly* asks about multiple index cancers, derive a single
-  **key index cancer** per patient = the **first (earliest-diagnosed)
-  genomically profiled index cancer** — i.e., the earliest qualifying index
-  cancer that has an associated panel test in
-  `cancer_panel_test_level_dataset.csv` (joined on `record_id` + `ca_seq`;
-  order by `dob_ca_dx_days` where present, otherwise `ca_seq`). In these
-  cohorts every patient's earliest index cancer is genomically profiled, so
-  this is just the earliest index cancer, but state it this way for
-  determinism. All per-patient analyses — population counts, treatment
+  **key index cancer** per patient = the **earliest-diagnosed genomically
+  profiled index cancer that meets the question's cancer-level eligibility
+  criteria** (for example stage at diagnosis, histology, or a qualifying
+  regimen given for that cancer). A genomically profiled index cancer is one
+  with an associated panel test in `cancer_panel_test_level_dataset.csv`
+  (joined on `record_id` + `ca_seq`); order by `dob_ca_dx_days` where
+  present, otherwise `ca_seq`. A later, separate primary that meets the
+  criteria therefore makes the patient eligible even when an earlier index
+  cancer does not, unless the question excludes patients with prior primary
+  cancers. When the question has no cancer-level criteria, the key index
+  cancer is the earliest genomically profiled index cancer; in these cohorts
+  every patient's earliest index cancer is genomically profiled, so this is
+  just the earliest index cancer. All per-patient analyses — population counts, treatment
   questions, and genomic questions (mutations / CNAs / fusions are read from
   the genomic specimen(s) belonging to the key index cancer, i.e. the
   `cpt_genie_sample_id`(s) for that `record_id` + `ca_seq`) — focus on the
   key index cancer. The existence of multiple index cancers, and the
   attribution of a regimen or specimen to an index cancer, are resolved by
-  this convention and are **not**, by themselves, sources of ambiguity.
-  (Histologic / anatomic scope — *which* `ca_type` counts as an eligible
-  index cancer — is a separate matter and can still be ambiguous; see "What
-  still counts as AMBIGUOUS".) Question stems will generally NOT contain the
-  word "index"; a bare reference to "<cohort> cancer" (e.g. "patients in the
-  prostate cancer cohort", "patients with colorectal cancer") still means
-  each patient's key index cancer.
+  this convention and are **not**, by themselves, gaps. (Which `ca_type` or
+  histology counts as an eligible index cancer is a separate matter and can
+  still be a denominator gap.) Question stems will generally NOT contain the
+  word "index"; a bare reference to "<cohort> cancer", by the cohort's name
+  or its usual abbreviation (e.g. "patients in the prostate cancer cohort",
+  "patients with colorectal cancer", "patients with NSCLC" in the NSCLC
+  cohort), still means each patient's key index cancer. It is not a filter
+  on `ca_type`, histology, or OncoTree code.
 
 - **Genomic-specimen scope** → genomic facts (mutations / CNAs / fusions)
   must come from specimens that belong to the cohort's cancer type (an index
@@ -260,234 +298,54 @@ these grounds alone.
   (sex, race, ethnicity, vital status) are computed over
   `patient_level_dataset.csv`, one row per patient. For such patient-level
   questions, anatomic / histologic cohort scope (`ca_type`, histology,
-  behavior code, sub-type inclusion) does not apply and is not a source of
-  ambiguity. (Anatomic scope can still matter for *cancer-level* questions —
-  see "What still counts as AMBIGUOUS".)
+  behavior code, sub-type inclusion) does not apply and is not a gap.
 
 ---
 
-## Avoid flagging questions as ambiguous on these grounds alone
+## Avoid flagging on these grounds alone
 
-- Choice of CI method for a median (use the convention).
+- Choice of CI method for a median or proportion (use the convention).
 - `Variant_Classification` subset (use the convention).
-- Univariable vs. adjusted Cox (use univariable unless the question says
-  "adjusted").
+- Unadjusted vs. adjusted Cox (use unadjusted unless the question names
+  covariates, says "adjusted", or specifies another model structure).
 - Multi-sample patient aggregation (use any-positive).
-- "Contains" drug match (use substring).
+- "Contains" drug match (use substring). This does not settle "X plus Y"
+  wording (see "regimen containing drug X").
 - Multiple index cancers per patient (use the key index cancer).
 - Whether a regimen or genomic specimen "belongs to an index cancer"
   (resolved by the key-index-cancer convention).
 - Biosimilar / prodrug / drug-class granularity (treat biosimilars as the
   reference molecule; exclude distinct-INN ADCs).
+- Unknown values of a variable used only for eligibility (criteria apply
+  only to records known to meet them; see "Missing values" under the
+  denominator).
 - Anatomic / histologic cohort scope for patient-level demographic
   questions (they are answered at the patient level).
+- Which canonical BPC variable to use for a stated endpoint and index date,
+  or censoring for that variable (use the canonical variable). This does
+  not cover left truncation.
 
----
+## Data that cannot support the question
 
-## What still counts as AMBIGUOUS
-
-A question is AMBIGUOUS when it leaves at least one of the concepts below
-materially underspecified, either in the question text or in light of the
-actual cohort data, and none of the conventional defaults above resolves it.
-The bullets correspond one-to-one with the IDs in the disambiguation concept
-menu. Select the named ID when its condition applies.
-
-- **`ANATOMIC_HISTOLOGIC_SCOPE`** — The eligible cancer sites, `ca_type`
-  values, histologies, or sidedness groups are not specified and materially
-  different choices would change the analysis population. This commonly
-  applies to cancer-level questions in heterogeneous cohorts. Patient-level
-  demographic questions remain exempt under the convention above. Judge
-  this by which cancers the researcher could mean (for example, one primary
-  site versus the whole cohort), not by which column records cancer type;
-  when the intended cancers are clear but the data record them in more than
-  one place, use `DATA_AVAILABILITY` instead.
-
-- **`DISEASE_EXTENT_SCOPE`** — The question does not specify a required stage
-  or extent restriction, such as all stages versus Stage IV, and more than one
-  materially different restriction is clinically plausible. Use this for a
-  direct stage/extent eligibility choice; use `DISEASE_STATE_DEFINITION` when
-  the unresolved issue is how to construct a clinical disease state.
-
-- **`DISEASE_STATE_DEFINITION`** — A state such as advanced, metastatic,
-  early, or resectable is used without an operational definition. For
-  example, "metastatic" may mean de novo Stage IV only or may also include
-  recurrent/relapsed metastatic disease.
-
-- **`CLINICAL_SUBGROUP_DEFINITION`** — A clinical or molecular subgroup,
-  subtype, age group, population stratum, source variable, coding system,
-  category grouping, or demographic dimension lacks a deterministic
-  definition. Examples include an undefined age threshold, an incompletely
-  specified receptor subgroup, race versus ethnicity, alternative category
-  groupings, or how multi-category records should be represented.
-
-- **`MISSING_DATA_HANDLING`** — The result materially depends on whether
-  unknown, missing, or not-applicable values are excluded, included in the
-  denominator, treated as negative, or reported as a separate category, and
-  the question does not supply a rule.
-
-- **`TREATMENT_DEFINITION`** — The drugs, classes, backbones, combinations, or
-  procedures that count as the treatment are not deterministic under the
-  conventions above. This includes unresolved drug-class boundaries and an
-  unqualified term such as "chemotherapy" that could mean cytotoxic treatment
-  only or systemic therapy more broadly.
-
-- **`COMPARATOR_DEFINITION`** — A reference or control group is required but
-  is not specified or derivable. For example, a requested hazard ratio may
-  have several plausible reference groups, or the stated population may make
-  the proposed exposure constant and leave no comparator.
-
-- **`LINE_OF_THERAPY`** — The line or setting that determines which treatment
-  qualifies is not fixed, and the choice changes which treatments or patients
-  qualify. This covers a "first-line," "second-line," or other line that lacks
-  an analytic anchor, and an unstated setting such as adjuvant, neoadjuvant,
-  metastatic, or any setting. Plausible anchors include the first regimen for
-  the index cancer, the first regimen after metastatic diagnosis, the first
-  systemic or cytotoxic regimen, or the first regimen after a landmark. An
-  unqualified line is ambiguous unless the population and setting plus a
-  corresponding dataset field make the anchor deterministic. Use
-  `DISEASE_STATE_DEFINITION` instead when the open question is which patients
-  are in a disease state, and `PROCEDURE_OR_TIMING_DEFINITION` when a named
-  setting such as adjuvant lacks a surgery-relative timing window.
-
-- **`REGIMEN_SELECTION`** — The question does not say which qualifying regimen
-  to use when a patient has multiple candidates, or whether monotherapy,
-  combination therapy, or regimens containing additional agents qualify.
-  Select this for the regimen-selection rule, not for the definition of a
-  drug or class itself.
-
-- **`CLINICAL_TRIAL_HANDLING`** — Clinical-trial regimen rows
-  (`drugs_ct_yn == 'Yes'`) may mask some or all of their drugs, so their
-  composition is uncertain and could materially affect treatment eligibility
-  or assignment, but the question gives no rule. Plausible rules include assuming the drug of
-  interest is absent, excluding trial regimens, or treating trial regimens as a
-  separate group.
-
-- **`PROCEDURE_OR_TIMING_DEFINITION`** — A procedure or a treatment relative
-  to a procedure needs an operational timing rule, such as the window defining
-  surgery, adjuvant therapy, or neoadjuvant therapy, and no deterministic
-  window or ordering rule is supplied.
-
-- **`GENE_OR_GENE_SET`** — A biomarker refers to a pathway, repair process,
-  signature, or gene family without specifying which genes are members.
-
-- **`ALTERATION_TYPE`** — The genomic alteration classes that count are not
-  specified, such as SNV/indel mutations, copy-number alterations, fusions, or
-  structural variants.
-
-- **`VARIANT_INCLUSION_CRITERIA`** — The question requires consequence,
-  pathogenicity, hotspot, or call-confidence filters that are not resolved by
-  the mutation defaults above. Do not select this merely to revisit the
-  conventional non-synonymous definition when that default directly applies.
-
-- **`CNA_THRESHOLD`** — A copy-number state such as gain, amplification, loss,
-  or deletion is requested without a threshold, and multiple materially
-  different thresholds are compatible with the wording.
-
-- **`GERMLINE_SOMATIC_SCOPE`** — The question does not establish whether
-  germline alterations, somatic alterations, or both count, and the applicable
-  data contain more than one plausible source.
-
-- **`PANEL_COVERAGE`** — Eligibility depends on whether an assay could detect
-  the gene or event, but the question does not specify a coverage rule. For a
-  biomarker frequency, this commonly means choosing between all sequenced
-  patients/samples and only those tested on a panel covering the gene. A plain
-  alteration count with no denominator is not ambiguous on this ground alone,
-  and neither is a gene listed on every gene panel used in the cohort (the
-  `data_gene_panel_*.txt` files).
-
-- **`SPECIMEN_SELECTION`** — More than one specimen or sequencing event could
-  be used and the defaults above do not determine which one qualifies, such as
-  the first, latest, pre-treatment, or disease-state-specific specimen.
-
-- **`BIOMARKER_TEST_DEFINITION`** — The assay or result defining a biomarker is
-  unspecified. Examples include which receptor-status test and threshold
-  applies, or how equivocal results count.
-
-- **`OUTCOME_METRIC`** — The endpoint or endpoint version is not fixed, such as
-  OS, response, TTNT, PFS-I, PFS-M, PFS-I-or-M, or PFS-I-and-M. In BPC, these
-  PFS variants use imaging assessment, oncologist assessment, the earlier of
-  the two, or both assessments, respectively.
-
-- **`RESPONSE_DEFINITION`** — "Response" is requested without saying how it is
-  measured or categorized, such as RECIST/imaging response, clinical response,
-  best response, objective response, or disease-control categories.
-
-- **`TIME_ORIGIN`** — Follow-up could plausibly begin at more than one event
-  and the question does not choose among them, such as diagnosis, advanced-
-  disease onset, regimen start, surgery, or another landmark. Not ambiguous
-  when the treated-patient default above (regimen start) applies.
-
-- **`TIME_HORIZON`** — A follow-up horizon, filter cutoff, or summary time
-  point is required but missing. Examples include "long-term survivor" without
-  a year threshold or survival probability without a requested time point.
-
-- **`SUMMARY_MEASURE`** — The question does not specify whether to report a
-  mean, median, count, proportion, survival probability, or another summary,
-  and more than one would reasonably answer the wording.
-
-- **`STATISTICAL_ESTIMAND`** — The target contrast or statistic is unclear,
-  such as subgroup-specific hazard ratios versus a treatment-by-biomarker
-  interaction, a difference versus a ratio, or an overall versus conditional
-  effect.
-
-- **`MODEL_SPECIFICATION`** — The required model, test, covariates, adjustment
-  set, or interaction terms are not fixed and materially different choices
-  remain after applying the defaults. Do not select this solely to question
-  the conventional univariable Cox model when that default directly applies.
-
-- **`CENSORING_RULE`** — Handling of ongoing follow-up, competing events, or
-  treatment changes is required but not specified, and plausible censoring
-  choices materially change the time-to-event analysis.
-
-- **`DELAYED_ENTRY`** — The outcome origin can precede genomic testing, but
-  the question does not say how patients enter the risk set. BPC inclusion
-  requires a genomically tested tumor, so time before testing is selectively
-  observed. Plausible rules include left truncation at testing, restriction to
-  patients tested before the origin, or an explicit alternative. A vulnerable
-  time-to-event question must state its rule to be unambiguous.
-
-- **`IMMORTAL_TIME_BIAS`** — An exposure is defined or ascertained after
-  follow-up begins, but the question does not specify a landmark,
-  time-varying exposure, pre-origin ascertainment, or another temporal
-  strategy. This covers treatment exposures, such as ever receiving a drug,
-  and biomarker status from sequencing that can occur after the outcome
-  origin, even when the alteration itself was present earlier. A comparison
-  from a common earlier origin otherwise grants the exposed group guaranteed
-  event-free time before exposure or ascertainment. A stated rule of left
-  truncation at the testing date resolves this for biomarker status from that
-  testing.
-
-- **`ASCERTAINMENT_WINDOW`** — A characteristic or exposure could be measured
-  at diagnosis, before the outcome origin, within a fixed window, or ever
-  during follow-up, and the question does not say which window applies. This
-  identifies *when status is determined*; use `IMMORTAL_TIME_BIAS` as well only
-  when the unresolved timing creates that specific bias.
-
-- **`REPEATED_OBSERVATIONS`** — Patients can contribute multiple regimens,
-  samples, treatments, or measurements, but the question does not specify the
-  analysis unit or how repeated observations are selected or aggregated.
-
-- **`DENOMINATOR_DEFINITION`** — A non-panel-related eligible or tested
-  denominator is not specified, and materially different populations could
-  serve as the denominator. Use `PANEL_COVERAGE` instead when the unresolved
-  denominator is specifically eligibility based on assay coverage.
-
-- **`DATA_AVAILABILITY`** — The requested construct lacks a clearly identified
-  and sufficiently populated variable or measurement, leaving multiple
-  plausible data sources, proxies, or availability requirements. A completely
-  well-specified but unestimable analysis is not ambiguous on this ground; use
-  the structured `unanswerable` result described below instead.
-
+When the construct a component needs has no clearly identified variable in the data, or several plausible proxies, that component needs clarification. A question whose components are all clear but whose estimand cannot be estimated from the data is not a clarity problem: judge every component clear and return the structured `unanswerable` result described under "Answer-type schemas".
 
 ---
 
 ## File-format reminders
 
-- **`data_clinical_*.txt`** and **`data_timeline_*.txt`** — TAB-DELIMITED,
-  with FIVE leading `#`-prefixed metadata rows. Use
+- **`data_clinical_*.txt`** — TAB-DELIMITED, with leading `#`-prefixed
+  metadata rows (four in the patient and sample files, five in the
+  supplementary survival files). Use
   `pd.read_csv(..., sep='\t', comment='#', low_memory=False)`. The first
   non-`#` row carries machine-name column IDs (PATIENT_ID, CA_GRADE,
   etc.).
+
+- **`data_timeline_*.txt`** — TAB-DELIMITED, no `#` rows.
+
+- **Derived endpoints** — use the analytic datasets (`*_dataset*.csv`) and
+  the variables the data dictionary and Analytic Data Guide define. The
+  cBioPortal `data_clinical_supp_survival*.txt` files repeat some endpoints
+  in another format and are not the canonical source.
 
 - **`data_mutations_extended.txt`**, **`data_CNA.txt`**,
   **`data_fusions.txt`**, **`data_sv.txt`** — TAB-DELIMITED, no `#` rows.
@@ -498,12 +356,13 @@ menu. Select the named ID when its condition applies.
 
 ## Answer-type schemas
 
-Return one matching the question's expected answer type. All numeric
+Return the answer type the question calls for. All numeric
 fields are JSON numbers; integer counts are JSON integers.
 
-If the question is well specified but the requested estimand cannot be
-estimated from the supplied data, keep it `unambiguous` and return its
-expected `answer_type` with an `answer` of this form:
+If every component is clear but the requested estimand cannot be
+estimated from the supplied data, judge every component clear in assess,
+then in analyze return the `answer_type` the question calls for, with an `answer` of this
+form:
 
 ```json
 { "unanswerable": true,

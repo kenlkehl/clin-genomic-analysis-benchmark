@@ -11,6 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from clin_genomic_analysis_benchmark.components import COMPONENT_IDS
+
 
 _ADAPTER_PATH = (
     Path(__file__).resolve().parents[1]
@@ -22,6 +24,11 @@ _SPEC = importlib.util.spec_from_file_location("antigravity_adapter", _ADAPTER_P
 assert _SPEC is not None and _SPEC.loader is not None
 adapter = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(adapter)
+
+_ASSESS_RESULT = {
+    cid: {"needs_clarification": cid == "outcome", "rationale": "reason"}
+    for cid in COMPONENT_IDS
+}
 
 
 def _question(tmp_path: Path) -> dict:
@@ -35,12 +42,12 @@ def _question(tmp_path: Path) -> dict:
         "question_id": "cohort-Q1",
         "cohort": "cohort",
         "category": 1,
-        "stage": "classify",
+        "stage": "assess",
         "cohort_dir": str(cohort),
         "data_dictionary_path": str(dictionary),
         "scratch_dir": str(scratch),
         "question_text": "Question?",
-        "instructions": "Return the classification.",
+        "instructions": "Return the component verdicts.",
     }
 
 
@@ -74,7 +81,7 @@ def test_antigravity_passes_model_and_canonical_paths(
 ):
     captured = {}
     completed = subprocess.CompletedProcess(
-        args=["agy"], returncode=0, stdout='{"classification":"ambiguous"}', stderr=""
+        args=["agy"], returncode=0, stdout=json.dumps(_ASSESS_RESULT), stderr=""
     )
     monkeypatch.setenv("AGY_MODEL", "gemini-3.6-flash-high")
     monkeypatch.setenv("AGY_AGENT", "benchmark-agent")
@@ -87,9 +94,7 @@ def test_antigravity_passes_model_and_canonical_paths(
     monkeypatch.setattr(adapter.subprocess, "run", fake_run)
     question = _question(tmp_path)
 
-    assert json.loads(adapter._agy_call(prompt="prompt", question=question)) == {
-        "classification": "ambiguous"
-    }
+    assert json.loads(adapter._agy_call(prompt="prompt", question=question)) == _ASSESS_RESULT
     command = captured["cmd"]
     assert command[command.index("--model") + 1] == "gemini-3.6-flash-high"
     assert command[command.index("--agent") + 1] == "benchmark-agent"
@@ -98,8 +103,10 @@ def test_antigravity_passes_model_and_canonical_paths(
     assert add_dirs == ["/data/cohort", "/work"]
     assert command[command.index("--output-format") + 1] == "json"
     schema = json.loads(command[command.index("--json-schema") + 1])
-    assert schema["required"] == ["classification"]
-    assert schema["properties"]["classification"]["type"] == "string"
+    assert schema["required"] == list(COMPONENT_IDS)
+    assert schema["properties"]["outcome"]["properties"]["needs_clarification"] == {
+        "type": "boolean"
+    }
     assert "--disable-slash-commands" in command
     assert "--dangerously-skip-permissions" not in command
     assert captured["env"]["AGY_CLI_DISABLE_AUTO_UPDATE"] == "true"
@@ -108,7 +115,7 @@ def test_antigravity_passes_model_and_canonical_paths(
 
 def test_antigravity_passes_explicit_effort(monkeypatch, tmp_path, _stub_outer_sandbox):
     completed = subprocess.CompletedProcess(
-        args=["agy"], returncode=0, stdout='{"classification":"ambiguous"}', stderr=""
+        args=["agy"], returncode=0, stdout=json.dumps(_ASSESS_RESULT), stderr=""
     )
     monkeypatch.setenv("AGY_MODEL", "gemini-3.5-flash")
     monkeypatch.setenv("AGY_EFFORT", "low")
@@ -126,18 +133,18 @@ def test_antigravity_passes_explicit_effort(monkeypatch, tmp_path, _stub_outer_s
 
 def test_antigravity_unwraps_structured_json_response():
     output = json.dumps({
-        "response": {
-            "structured_output": {
-                "classification": "unambiguous",
-                "rationale": "clear",
-            },
-        },
+        "response": {"structured_output": _ASSESS_RESULT},
         "usage": {"input_tokens": 10, "output_tokens": 4},
     })
-    assert adapter._extract_cli_result(output) == {
-        "classification": "unambiguous",
-        "rationale": "clear",
-    }
+    assert adapter._extract_cli_result(output) == _ASSESS_RESULT
+
+
+def test_antigravity_assess_print_timeout_matches_stage_budget(monkeypatch):
+    monkeypatch.delenv("AGY_PRINT_TIMEOUT", raising=False)
+    monkeypatch.delenv("AGY_PRINT_TIMEOUT_ASSESS", raising=False)
+    assert adapter._print_timeout("assess") == "59m30s"
+    monkeypatch.setenv("AGY_PRINT_TIMEOUT_ASSESS", "10m")
+    assert adapter._print_timeout("assess") == "10m"
 
 
 def test_antigravity_failure_preserves_both_streams(
@@ -196,8 +203,8 @@ def test_antigravity_adapter_cannot_read_sibling_gold_file(tmp_path, monkeypatch
         "log = args[args.index('--log-file') + 1]\n"
         "open(log, 'w').write('fake Antigravity log')\n"
         f"forbidden = {str(forbidden.resolve())!r}\n"
-        "answer = {'classification': 'ambiguous', "
-        "'rationale': 'visible' if os.path.exists(forbidden) else 'hidden'}\n"
+        "answer = {'denominator': {'needs_clarification': False, "
+        "'rationale': 'visible' if os.path.exists(forbidden) else 'hidden'}}\n"
         "print(json.dumps(answer))\n"
     )
     fake_agy.chmod(0o755)
@@ -207,7 +214,7 @@ def test_antigravity_adapter_cannot_read_sibling_gold_file(tmp_path, monkeypatch
 
     text = adapter._agy_call(prompt="prompt", question=question)
 
-    assert json.loads(text)["rationale"] == "hidden"
+    assert json.loads(text)["denominator"]["rationale"] == "hidden"
     audit_files = list((Path(question["scratch_dir"]).parent / "adapter_audit").glob("*"))
     assert any(path.name.endswith(".cli.log") for path in audit_files)
-    assert not (Path(question["scratch_dir"]) / "agy.classify.log").exists()
+    assert not (Path(question["scratch_dir"]) / "agy.assess.log").exists()

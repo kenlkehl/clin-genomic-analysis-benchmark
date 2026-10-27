@@ -59,7 +59,7 @@ def _build_prompt(question: dict) -> str:
         f"`{question['scratch_dir']}`. Write any intermediate files there. The "
         f"cohort directory is READ-ONLY -- read from it, never write to it. Use "
         f"Python (pandas/numpy/scipy/statsmodels/lifelines as needed) for "
-        f"analysis stages.\n\n"
+        f"data checks in assess and for analyze.\n\n"
         f"Output ONLY the final JSON object as your very last message, with no "
         f"surrounding prose and no Markdown fences."
     )
@@ -268,7 +268,8 @@ def _sandbox_for(stage: str) -> str:
         return os.environ[stage_key]
     if os.environ.get("CODEX_SANDBOX_MODE"):
         return os.environ["CODEX_SANDBOX_MODE"]
-    return "workspace-write" if stage == "analyze" else "read-only"
+    # Both stages run Python over the cohort and may write scratch files.
+    return "workspace-write"
 
 
 def _refresh_azure_token(env: dict[str, str]) -> None:

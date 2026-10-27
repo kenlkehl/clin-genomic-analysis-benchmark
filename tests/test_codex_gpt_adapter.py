@@ -29,7 +29,7 @@ def test_codex_call_passes_explicit_provider_model_and_effort(tmp_path, monkeypa
     dictionary = tmp_path / "dictionary.xlsx"
     dictionary.write_text("dictionary")
     completed = subprocess.CompletedProcess(
-        args=["codex"], returncode=0, stdout='{"classification":"ambiguous"}', stderr=""
+        args=["codex"], returncode=0, stdout='{"outcome":{"needs_clarification":true}}', stderr=""
     )
     monkeypatch.setenv("CODEX_MODEL", "gpt-5.6-sol")
     monkeypatch.setenv("CODEX_MODEL_PROVIDER", "azure")
@@ -55,7 +55,7 @@ def test_codex_call_passes_explicit_provider_model_and_effort(tmp_path, monkeypa
     result = adapter._codex_call(
         prompt="prompt",
         question={
-            "stage": "classify",
+            "stage": "assess",
             "scratch_dir": str(scratch_dir),
             "cohort_dir": str(cohort_dir),
             "data_dictionary_path": str(dictionary),
@@ -90,8 +90,8 @@ def test_codex_adapter_cannot_read_sibling_gold_file(tmp_path, monkeypatch):
         "import json, os, sys\n"
         f"forbidden = {str(forbidden.resolve())!r}\n"
         "out = sys.argv[sys.argv.index('-o') + 1]\n"
-        "result = {'classification': 'ambiguous', "
-        "'rationale': 'visible' if os.path.exists(forbidden) else 'hidden'}\n"
+        "result = {'denominator': {'needs_clarification': False, "
+        "'rationale': 'visible' if os.path.exists(forbidden) else 'hidden'}}\n"
         "open(out, 'w').write(json.dumps(result))\n"
     )
     fake_codex.chmod(0o755)
@@ -105,7 +105,7 @@ def test_codex_adapter_cannot_read_sibling_gold_file(tmp_path, monkeypatch):
     text = adapter._codex_call(
         prompt="prompt",
         question={
-            "stage": "classify",
+            "stage": "assess",
             "scratch_dir": str(scratch),
             "cohort_dir": str(cohort),
             "data_dictionary_path": str(dictionary),
@@ -113,4 +113,31 @@ def test_codex_adapter_cannot_read_sibling_gold_file(tmp_path, monkeypatch):
         last_message_file=scratch / "last-message.txt",
     )
 
-    assert json.loads(text)["rationale"] == "hidden"
+    assert json.loads(text)["denominator"]["rationale"] == "hidden"
+
+
+def test_assess_and_analyze_share_the_writable_sandbox(monkeypatch):
+    for name in ("CODEX_SANDBOX_MODE", "CODEX_SANDBOX_MODE_ASSESS",
+                 "CODEX_SANDBOX_MODE_ANALYZE"):
+        monkeypatch.delenv(name, raising=False)
+    assert adapter._sandbox_for("assess") == "workspace-write"
+    assert adapter._sandbox_for("analyze") == "workspace-write"
+    monkeypatch.setenv("CODEX_SANDBOX_MODE_ASSESS", "read-only")
+    assert adapter._sandbox_for("assess") == "read-only"
+    assert adapter._sandbox_for("analyze") == "workspace-write"
+
+
+def test_prompt_allows_python_for_assess_data_checks(tmp_path):
+    prompt = adapter._build_prompt({
+        "question_id": "cohort-Q1",
+        "cohort": "cohort",
+        "category": 1,
+        "stage": "assess",
+        "cohort_dir": str(tmp_path / "cohort"),
+        "data_dictionary_path": str(tmp_path / "dictionary.xlsx"),
+        "scratch_dir": str(tmp_path / "question" / "scratch"),
+        "question_text": "Question?",
+        "instructions": "Return the component verdicts.",
+    })
+    assert "- Stage: assess" in prompt
+    assert "data checks in assess and for analyze" in prompt

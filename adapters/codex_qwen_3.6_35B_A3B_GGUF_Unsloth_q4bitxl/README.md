@@ -65,26 +65,27 @@ one long agent request more predictably than several concurrent requests.
 | `UNSLOTH_MODEL` | `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` | exact served model ID |
 | `CODEX_MODEL` | unset | secondary model override if `UNSLOTH_MODEL` is unset |
 | `CODEX_BIN` | `codex` | Codex executable |
-| `CODEX_SANDBOX_MODE` | `workspace-write` | analyze-stage Codex sandbox |
+| `CODEX_SANDBOX_MODE` | `workspace-write` | Codex sandbox for both stages |
 | `CODEX_EPHEMERAL` | `1` | disable persistent Codex session state |
 | `CODEX_MAX_ATTEMPTS` | `1` | whole-Codex-process attempts inside one harness attempt |
 | `CODEX_ANALYZE_CONTINUATIONS` | `2` | same-model continuations from existing scratch work when analyze ends without valid JSON |
 | `CODEX_RETRY_BASE_SECONDS` | `15` | delay multiplier between Codex-process attempts |
 | `UNSLOTH_REQUEST_TIMEOUT_SECONDS` | `1200` | timeout for one Studio Responses request |
 | `UNSLOTH_MAX_RETRIES` | `3` | retryable upstream attempts per Responses request |
-| `UNSLOTH_READ_ONLY_MAX_RETRIES` | `1` | upstream attempts for classify/disambiguate before process/finalizer recovery |
+| `UNSLOTH_ASSESS_MAX_RETRIES` | `1` | upstream attempts for assess before process/finalizer recovery |
 | `UNSLOTH_RETRY_BASE_SECONDS` | `2` | exponential upstream retry base |
 | `UNSLOTH_MAX_RETRY_SLEEP_SECONDS` | `30` | upstream retry sleep cap |
 | `UNSLOTH_MAX_REQUESTS` | `256` | request cap per Codex invocation |
-| `UNSLOTH_READ_ONLY_MAX_REQUESTS` | `8` | enforced request cap for classify/disambiguate before finalization fallback |
-| `UNSLOTH_READ_ONLY_MAX_OUTPUT_TOKENS` | `8192` | per-generation output cap for classify/disambiguate; analyze is uncapped |
+| `UNSLOTH_ASSESS_MAX_REQUESTS` | `24` | enforced request cap for assess before finalization fallback |
+| `UNSLOTH_ASSESS_MAX_OUTPUT_TOKENS` | `8192` | per-generation output cap for assess; analyze is uncapped |
 
 The bridge requests a non-streaming response from Studio, then replays it to
 Codex as Responses SSE. This permits safe retries before any partial stream has
 been exposed and preserves Studio's native structured tool calls.
 
 Every invocation passes an explicit final-response JSON schema to Codex.
-Classify and disambiguate include a bounded-inspection guard. Analyze keeps its
+Assess includes a bounded guard (16 turns, 8 shell commands) that leaves room
+for the data checks the rubric requires. Analyze keeps its
 full request and output budgets, but includes a completion guard that directs
 the local model to execute fixes immediately and not end on planning prose.
 This preserves room for legitimate multi-step computation while making an
@@ -101,9 +102,9 @@ such as `hazard_ratio`/`ci_lower`/`ci_upper` to the benchmark's
 `value`/`ci_low`/`ci_high` names. This is contract repair only: numeric values,
 methods, evidence, and model-selected answer type are otherwise unchanged.
 
-If Codex still ends a classify or disambiguate stage without contract JSON, the
+If Codex still ends an assess stage without contract JSON, the
 trusted adapter makes a bounded no-tools finalization request to the same Qwen
-model using only the public question, stage instructions, and concept menu. It
+model using only the public question, stage instructions, and component list. It
 disables hidden reasoning for this contract-only request so the model cannot
 spend its entire output budget before emitting JSON. It does not use gold data,
 and its audit records contain only timing/status and output-size metadata—not
@@ -111,8 +112,8 @@ prompts, responses, cohort values, or credentials.
 
 Because this local model can take several minutes for one generation and can
 make multiple tool-calling turns, the benchmark harness gives this adapter
-longer per-stage defaults: 3600 seconds for classify, 3600 for disambiguate,
-and 7200 for analyze. Other adapters retain the benchmark-wide defaults.
+longer per-stage defaults: 7200 seconds for assess and 7200 for analyze. Other
+adapters retain the benchmark-wide defaults.
 
 Adapter logs and bridge metadata are written under the question's
 `adapter_audit/` directory. Request bodies, cohort values, and credentials are

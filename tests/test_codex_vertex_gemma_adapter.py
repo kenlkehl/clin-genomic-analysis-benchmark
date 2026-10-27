@@ -287,14 +287,14 @@ def test_adapter_pins_local_provider_without_reasoning(tmp_path, monkeypatch):
         adapter.subprocess,
         "run",
         lambda cmd, **kwargs: subprocess.CompletedProcess(
-            cmd, 0, '{"classification":"ambiguous"}', ""
+            cmd, 0, '{"outcome":{"needs_clarification":true}}', ""
         ),
     )
 
     result = adapter._codex_call(
         prompt="prompt",
         question={
-            "stage": "classify",
+            "stage": "assess",
             "scratch_dir": str(scratch),
             "cohort_dir": str(cohort),
             "data_dictionary_path": str(dictionary),
@@ -303,7 +303,7 @@ def test_adapter_pins_local_provider_without_reasoning(tmp_path, monkeypatch):
     )
 
     command = captured["cmd"]
-    assert result == '{"classification":"ambiguous"}'
+    assert result == '{"outcome":{"needs_clarification":true}}'
     assert command[command.index("--model") + 1] == DEFAULT_MODEL
     assert f"model_context_window={adapter.MODEL_CONTEXT_WINDOW}" in command
     assert f'model_provider="{adapter.PROVIDER_NAME}"' in command

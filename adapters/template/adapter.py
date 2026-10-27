@@ -1,6 +1,6 @@
 """Skeleton adapter for clin-genomic-analysis-benchmark.
 
-Implement `answer_<stage>(question: dict) -> dict` for each of the three stages.
+Implement `answer_<stage>(question: dict) -> dict` for both stages.
 The harness writes question.json and reads result.json. Both follow the JSON
 schemas defined in clin_genomic_analysis_benchmark/agent/contract.py.
 
@@ -16,14 +16,9 @@ import sys
 from pathlib import Path
 
 
-def answer_classify(question: dict) -> dict:
-    """Decide ambiguous vs unambiguous. REPLACE THIS IMPLEMENTATION."""
-    raise NotImplementedError("template adapter — implement classify")
-
-
-def answer_disambiguate(question: dict) -> dict:
-    """List concepts needed to disambiguate. REPLACE THIS IMPLEMENTATION."""
-    raise NotImplementedError("template adapter — implement disambiguate")
+def answer_assess(question: dict) -> dict:
+    """Judge whether each component needs clarification. REPLACE THIS IMPLEMENTATION."""
+    raise NotImplementedError("template adapter — implement assess")
 
 
 def answer_analyze(question: dict) -> dict:
@@ -32,8 +27,7 @@ def answer_analyze(question: dict) -> dict:
 
 
 _DISPATCH = {
-    "classify": answer_classify,
-    "disambiguate": answer_disambiguate,
+    "assess": answer_assess,
     "analyze": answer_analyze,
 }
 

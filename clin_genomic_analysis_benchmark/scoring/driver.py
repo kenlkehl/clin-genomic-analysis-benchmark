@@ -9,20 +9,14 @@ from typing import Optional
 
 import yaml
 
-from ..concepts import infer_legacy_concept_list
+from ..components import COMPONENT_IDS, flags_from_assess_result
 from ..config import RUNS_DIR
 from ..questions import io as q_io
 from ..utils.jsonio import atomic_write_text
-from . import classification as cls_mod
-from . import disambiguation as disambig_mod
 from . import discrepancy as disc_mod
 from . import report as report_mod
 from .aggregator import QuestionScore, aggregate
-from .types import (
-    DEFAULT_CORRECT_CONCEPT_POINTS,
-    DEFAULT_INCORRECT_CONCEPT_PENALTY,
-    DisambiguationScoreResult,
-)
+from .assessment import score_assessment
 
 logger = logging.getLogger(__name__)
 
@@ -74,15 +68,10 @@ def score_run(
         if cqf is not None:
             questions_by_cohort_id[cohort_name] = {q.id: q for q in cqf.questions}
 
-    disambiguation_config = scoring_config.get("disambiguation") or {}
-    correct_concept_points = float(disambiguation_config.get(
-        "correct_concept_points", DEFAULT_CORRECT_CONCEPT_POINTS))
-    incorrect_concept_penalty = float(disambiguation_config.get(
-        "incorrect_concept_penalty", DEFAULT_INCORRECT_CONCEPT_PENALTY))
-    if correct_concept_points <= 0:
-        raise ValueError("disambiguation.correct_concept_points must be > 0")
-    if incorrect_concept_penalty < 0:
-        raise ValueError("disambiguation.incorrect_concept_penalty must be >= 0")
+    if "disambiguation" in scoring_config:
+        raise ValueError(
+            "scoring config has a 'disambiguation' block; concept-ID scoring was retired "
+            "with the four-component assess stage")
 
     question_scores: list[QuestionScore] = []
 
@@ -93,56 +82,51 @@ def score_run(
         if gold_q is None:
             logger.warning("Could not find gold question for %s/%s; skipping", cohort, qid)
             continue
-        gold_concept_ids = list(gold_q.disambiguation_concept_ids or [])
-        if not gold_concept_ids and gold_q.disambiguation_concepts:
-            # Backward-compatible, deterministic migration path for pre-v2 gold
-            # YAML. Newly synced banks store canonical IDs directly.
-            gold_concept_ids = infer_legacy_concept_list(
-                list(gold_q.disambiguation_concepts))
-        if gold_q.classification == "ambiguous" and not gold_concept_ids:
-            raise ValueError(f"ambiguous gold question {qid} has no canonical concept IDs")
+        if gold_q.component_assessment is None:
+            raise ValueError(
+                f"gold question {qid} has no component_assessment; review it under the "
+                "four-component rubric before scoring")
         qs = QuestionScore(
             question_id=qid, cohort=cohort, category=qrun["category"],
             # Source gold classification from the gold bank, not from runs.json
             # (runs/ lives in the agent-reachable repo and is kept gold-free).
             gold_classification=gold_q.classification,
-            gold_disambiguation_n=len(gold_concept_ids),
-            disambig_points_per_concept=correct_concept_points,
         )
 
-        # 1) Classification
-        classify = qrun.get("classify") or {}
-        if classify.get("success"):
-            agent_label = (classify.get("result") or {}).get("classification")
-            qs.classification = cls_mod.score(agent_label=agent_label,
-                                              gold_label=gold_q.classification)
-        else:
-            qs.classification = cls_mod.score(agent_label=None, gold_label=gold_q.classification)
-            qs.failure_reason = classify.get("failure_reason") or "classify failed"
-
-        # 2) Disambiguation OR 3) Analysis
-        agent_label = qs.classification.agent_label if qs.classification else None
-        if agent_label == "ambiguous":
-            disambig = qrun.get("disambiguate") or {}
-            agent_concept_ids = list(((disambig.get("result") or {}).get("concept_ids")) or []) \
-                if disambig.get("success") else []
-            if not gold_concept_ids:
-                # Gold says unambiguous; the agent went down disambig path → 0 pts
-                qs.disambiguation = DisambiguationScoreResult(
-                    question_id=qid, cohort=cohort, n_gold=0, points=0.0,
-                    decisions=[], points_per_concept=correct_concept_points,
-                    incorrect_concept_penalty=incorrect_concept_penalty,
-                    agent_concept_ids=agent_concept_ids,
-                )
+        # 1) Assessment: one verdict per component.
+        assess = qrun.get("assess") or {}
+        agent_flags = None
+        rationales: dict[str, str] = {}
+        assess_failure = None
+        if assess.get("success"):
+            result = assess.get("result") or {}
+            try:
+                agent_flags = flags_from_assess_result(result)
+            except (KeyError, TypeError, ValueError) as exc:
+                assess_failure = f"assess result unreadable: {exc}"
             else:
-                qs.disambiguation = disambig_mod.score_disambiguation(
-                    question_id=qid,
-                    cohort=cohort,
-                    gold_concept_ids=gold_concept_ids,
-                    agent_concept_ids=agent_concept_ids,
-                    correct_concept_points=correct_concept_points,
-                    incorrect_concept_penalty=incorrect_concept_penalty,
-                )
+                rationales = {
+                    cid: str((result.get(cid) or {}).get("rationale") or "")
+                    for cid in COMPONENT_IDS
+                }
+        else:
+            assess_failure = assess.get("failure_reason") or "assess failed"
+        qs.assessment = score_assessment(
+            question_id=qid, cohort=cohort,
+            gold_flags=gold_q.component_assessment.flags(),
+            agent_flags=agent_flags,
+            agent_rationales=rationales,
+            failure_reason=assess_failure,
+        )
+        if assess_failure:
+            qs.failure_reason = assess_failure
+
+        # 2) Analysis, only when the agent found every component clear.
+        agent_label = qs.assessment.agent_classification
+        if agent_label == "ambiguous" and gold_q.classification == "unambiguous":
+            qs.failure_reason = (
+                "agent flagged a component of a gold-unambiguous question, so analysis "
+                "was not attempted")
         elif agent_label == "unambiguous":
             analyze = qrun.get("analyze") or {}
             gold_answer = (gold_q.gold_answer.model_dump(exclude_none=True)
@@ -151,8 +135,8 @@ def score_run(
                 if gold_answer is None:
                     if gold_q.classification == "ambiguous":
                         qs.failure_reason = (
-                            "gold question is ambiguous; agent classified it unambiguous, "
-                            "so analysis was not scored"
+                            "gold question is ambiguous; agent found every component "
+                            "clear, so analysis was not scored"
                         )
                     else:
                         qs.failure_reason = "gold_answer missing — run compute-gold first"
@@ -204,8 +188,6 @@ def score_run(
         agent_name=agent_name, run_id=run_id,
         agent_provenance=manifest.get("agent_provenance"),
         integrity=manifest.get("integrity"),
-        correct_concept_points=correct_concept_points,
-        incorrect_concept_penalty=incorrect_concept_penalty,
     )
     js = report_mod.to_json(
         overall=overall, per_cohort=per_cohort,
@@ -213,8 +195,6 @@ def score_run(
         agent_name=agent_name, run_id=run_id,
         agent_provenance=manifest.get("agent_provenance"),
         integrity=manifest.get("integrity"),
-        correct_concept_points=correct_concept_points,
-        incorrect_concept_penalty=incorrect_concept_penalty,
     )
     atomic_write_text(run_dir / "scorecard.md", md)
     atomic_write_text(run_dir / "scorecard.json", js)

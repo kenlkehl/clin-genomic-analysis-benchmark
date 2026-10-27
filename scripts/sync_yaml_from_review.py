@@ -10,24 +10,33 @@ Writes two banks:
 
 Maps the review columns into the CohortQuestionFile / Question Pydantic schema and validates.
 Keeping the answers out of the in-repo bank is what prevents the agent from reading gold.
+
+Component gold comes from four optional flag columns,
+``<component>_needs_clarification`` (Y/N), with free-text
+``<component>_notes`` alongside. A row with all four flags filled is reviewed
+under the four-component rubric; a row with none is unreviewed and gets no
+``component_assessment`` (scoring refuses it). The legacy concept-menu columns
+are carried into the gold bank as unscored reviewer context.
 """
 from __future__ import annotations
 import json
 import re
 import sys
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 import openpyxl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from clin_genomic_analysis_benchmark import config  # noqa: E402
-from clin_genomic_analysis_benchmark.concepts import (  # noqa: E402
-    infer_legacy_concept_list,
-    validate_concept_ids,
+from clin_genomic_analysis_benchmark.components import (  # noqa: E402
+    COMPONENT_IDS,
 )
 ROOT = config.REPO_ROOT
 from clin_genomic_analysis_benchmark.questions.schema import (  # noqa: E402
-    CohortQuestionFile, Question, AnalysisSpec, GoldAnswer, SupportingEvidence,
+    CohortQuestionFile, ComponentAssessment, ComponentVerdict, Question, AnalysisSpec,
+    GoldAnswer, SupportingEvidence,
 )
 from clin_genomic_analysis_benchmark.questions import io as q_io  # noqa: E402
 
@@ -66,73 +75,138 @@ def build_gold_answer(qid: str, raw: str, atype: str) -> dict:
     return d
 
 
-def parse_concept_ids(raw: object, prose_concepts: list[str]) -> list[str]:
-    """Read canonical IDs, falling back to deterministic legacy migration."""
-    if raw:
-        text = str(raw).strip()
-        try:
-            decoded = json.loads(text)
-        except json.JSONDecodeError:
-            decoded = None
-        if isinstance(decoded, list):
-            ids = [str(value).strip() for value in decoded if str(value).strip()]
-        else:
-            ids = [value.strip() for value in re.split(r"[\n,]", text) if value.strip()]
+FLAG_COLUMNS = {cid: f"{cid}_needs_clarification" for cid in COMPONENT_IDS}
+NOTES_COLUMNS = {cid: f"{cid}_notes" for cid in COMPONENT_IDS}
+_TRUE = {"y", "yes", "true", "1"}
+_FALSE = {"n", "no", "false", "0"}
+
+
+def _blank(value: object) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def parse_flag(value: object, *, qid: str, column: str) -> Optional[bool]:
+    """Read one Y/N flag cell; None when blank."""
+    if _blank(value):
+        return None
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if isinstance(value, (int, float)) and value in (0, 1):
+        text = str(int(value))
+    if text in _TRUE:
+        return True
+    if text in _FALSE:
+        return False
+    raise ValueError(f"{qid}: {column} must be Y or N, got {value!r}")
+
+
+def parse_component_assessment(row: Mapping[str, object], *, qid: str,
+                               classification: str) -> Optional[ComponentAssessment]:
+    """Build the component gold for one row, or None when it is unreviewed."""
+    flags = {cid: parse_flag(row.get(col), qid=qid, column=col)
+             for cid, col in FLAG_COLUMNS.items()}
+    filled = [cid for cid, flag in flags.items() if flag is not None]
+    if not filled:
+        return None
+    if len(filled) != len(COMPONENT_IDS):
+        missing = [FLAG_COLUMNS[cid] for cid in COMPONENT_IDS if flags[cid] is None]
+        raise ValueError(
+            f"{qid}: component flags are partially filled; missing {', '.join(missing)}")
+    assessment = ComponentAssessment(**{
+        cid: ComponentVerdict(
+            needs_clarification=flags[cid],
+            notes=(None if _blank(row.get(NOTES_COLUMNS[cid]))
+                   else str(row.get(NOTES_COLUMNS[cid])).strip()),
+        )
+        for cid in COMPONENT_IDS
+    })
+    if assessment.classification != classification:
+        raise ValueError(
+            f"{qid}: classification column says {classification!r} but the component "
+            f"flags imply {assessment.classification!r}")
+    return assessment
+
+
+def parse_legacy_concepts(raw: object) -> list[str]:
+    """Legacy concept prose, one concept per line."""
+    return [ln.strip() for ln in str(raw or "").split("\n") if ln.strip()]
+
+
+def parse_legacy_concept_ids(raw: object) -> Optional[list[str]]:
+    """Legacy concept-menu IDs as written; not validated against any menu."""
+    if _blank(raw):
+        return None
+    text = str(raw).strip()
+    try:
+        decoded = json.loads(text)
+    except json.JSONDecodeError:
+        decoded = None
+    if isinstance(decoded, list):
+        ids = [str(value).strip() for value in decoded if str(value).strip()]
     else:
-        ids = infer_legacy_concept_list(prose_concepts)
-    errors = validate_concept_ids(ids)
-    if errors:
-        raise ValueError("; ".join(errors))
-    return ids
+        ids = [value.strip() for value in re.split(r"[\n,]", text) if value.strip()]
+    return ids or None
+
+
+def build_question(row: Mapping[str, object]) -> Question:
+    """Map one workbook row (header name -> cell value) to a gold Question."""
+    qid = row.get("qid")
+    cls = row.get("classification")
+    common = dict(
+        id=qid, category=int(row.get("category")), text=row.get("question_text"),
+        classification=cls, source=(row.get("source") or "llm"), review_status="reviewed",
+        component_assessment=parse_component_assessment(
+            row, qid=str(qid), classification=str(cls)),
+    )
+    if cls == "unambiguous":
+        atype = row.get("expected_answer_type")
+        gold_script = row.get("gold_script") or ""
+        return Question(
+            **common,
+            analysis_spec=AnalysisSpec(
+                population_unit=population_unit(row.get("question_text"), atype),
+                tables=parse_tables(gold_script),
+                statistic=(row.get("analysis_plan_summary") or f"{atype} per analysis plan").strip(),
+                expected_answer_type=atype,
+            ),
+            gold_answer=GoldAnswer(**build_gold_answer(qid, row.get("gold_answer"), atype)),
+            gold_supporting_evidence=SupportingEvidence(gold_script=gold_script or None),
+        )
+    return Question(
+        **common,
+        disambiguation_concept_ids=parse_legacy_concept_ids(
+            row.get("disambiguation_concept_ids")),
+        disambiguation_concepts=parse_legacy_concepts(row.get("disambiguation_concepts")),
+    )
+
+
+def read_rows(ws) -> list[dict[str, object]]:
+    """Read the questions sheet as dicts keyed by header; absent columns read as None."""
+    hdr = [c.value for c in ws[1]]
+    rows = []
+    for values in ws.iter_rows(min_row=2, values_only=True):
+        if all(_blank(v) for v in values):
+            continue
+        rows.append({name: value for name, value in zip(hdr, values) if name})
+    return rows
+
 
 def main() -> int:
     wb = openpyxl.load_workbook(SRC)
     ws = wb["questions"]
-    hdr = [c.value for c in ws[1]]
-    ci = {n: i + 1 for i, n in enumerate(hdr)}
-    def g(row: int, name: str):
-        return ws.cell(row, ci[name]).value
 
     by_cohort: dict[str, list[Question]] = {}
-    n_un = n_amb = 0
-    for r in range(2, ws.max_row + 1):
-        qid = g(r, "qid")
-        cohort = g(r, "cohort")
-        cls = g(r, "classification")
-        common = dict(
-            id=qid, category=int(g(r, "category")), text=g(r, "question_text"),
-            classification=cls, source=(g(r, "source") or "llm"), review_status="reviewed",
-        )
-        if cls == "unambiguous":
+    n_un = n_amb = n_reviewed = 0
+    for row in read_rows(ws):
+        q = build_question(row)
+        if q.classification == "unambiguous":
             n_un += 1
-            atype = g(r, "expected_answer_type")
-            gold_script = g(r, "gold_script") or ""
-            q = Question(
-                **common,
-                analysis_spec=AnalysisSpec(
-                    population_unit=population_unit(g(r, "question_text"), atype),
-                    tables=parse_tables(gold_script),
-                    statistic=(g(r, "analysis_plan_summary") or f"{atype} per analysis plan").strip(),
-                    expected_answer_type=atype,
-                ),
-                gold_answer=GoldAnswer(**build_gold_answer(qid, g(r, "gold_answer"), atype)),
-                gold_supporting_evidence=SupportingEvidence(gold_script=gold_script or None),
-            )
         else:
             n_amb += 1
-            concepts = [ln.strip() for ln in str(g(r, "disambiguation_concepts") or "").split("\n") if ln.strip()]
-            raw_ids = (g(r, "disambiguation_concept_ids")
-                       if "disambiguation_concept_ids" in ci else None)
-            try:
-                concept_ids = parse_concept_ids(raw_ids, concepts)
-            except ValueError as exc:
-                raise ValueError(f"{qid}: invalid disambiguation concept IDs: {exc}") from exc
-            q = Question(
-                **common,
-                disambiguation_concept_ids=concept_ids,
-                disambiguation_concepts=concepts,
-            )
-        by_cohort.setdefault(cohort, []).append(q)
+        if q.component_assessment is not None:
+            n_reviewed += 1
+        by_cohort.setdefault(row["cohort"], []).append(q)
 
     now = datetime.now(timezone.utc)
     total = 0
@@ -143,6 +217,8 @@ def main() -> int:
         total += len(qs)
         print(f"  {cohort}: {len(qs)} questions -> gold {gold_path}  |  public {pub_path}")
     print(f"TOTAL: {total} questions ({n_un} unambiguous / {n_amb} ambiguous) across {len(by_cohort)} cohorts")
+    print(f"COMPONENT GOLD: {n_reviewed} reviewed / {total - n_reviewed} unreviewed "
+          "(unreviewed questions cannot be scored)")
     print(f"GOLD ROOT: {config.gold_root()}")
     return 0
 

@@ -76,14 +76,14 @@ def test_codex_call_pins_vllm_responses_provider(tmp_path, monkeypatch):
         adapter.subprocess,
         "run",
         lambda cmd, **kwargs: subprocess.CompletedProcess(
-            cmd, 0, '{"classification":"ambiguous"}', ""
+            cmd, 0, '{"outcome":{"needs_clarification":true}}', ""
         ),
     )
 
     result = adapter._codex_call(
         prompt="prompt",
         question={
-            "stage": "classify",
+            "stage": "assess",
             "scratch_dir": str(scratch),
             "cohort_dir": str(cohort),
             "data_dictionary_path": str(dictionary),
@@ -92,7 +92,7 @@ def test_codex_call_pins_vllm_responses_provider(tmp_path, monkeypatch):
     )
 
     command = captured["cmd"]
-    assert result == '{"classification":"ambiguous"}'
+    assert result == '{"outcome":{"needs_clarification":true}}'
     assert command[command.index("--model") + 1] == "test-gemma"
     assert f'model_provider="{adapter.PROVIDER_NAME}"' in command
     assert "model_context_window=250000" in command
@@ -155,7 +155,7 @@ def test_codex_call_uses_optional_vllm_token(tmp_path, monkeypatch):
     adapter._codex_call(
         prompt="prompt",
         question={
-            "stage": "classify",
+            "stage": "assess",
             "scratch_dir": str(scratch),
             "cohort_dir": str(cohort),
             "data_dictionary_path": str(dictionary),

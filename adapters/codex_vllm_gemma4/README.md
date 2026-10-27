@@ -23,8 +23,8 @@ Check `max_model_len` in the server's `/v1/models` response and set
 
 The adapter does not depend on or modify `~/.codex/config.toml`. Each stage runs
 in the benchmark's mandatory bubblewrap isolation with a disposable Codex home.
-The cohort is read-only and only the per-question scratch directory is writable
-during an analysis stage.
+The cohort is read-only and only the per-question scratch directory is writable;
+both the assess and analyze stages may run Python there.
 
 The Camus server returns Gemma 4's native `<|tool_call>...` markup as ordinary
 response text rather than parsed Responses API tool-call items. For each Codex
@@ -98,7 +98,7 @@ All settings are optional:
 | `CODEX_MODEL` | unset | fallback model override when `VLLM_MODEL` is unset |
 | `VLLM_TOKEN` | unset | optional bearer token; never written to run provenance |
 | `CODEX_BIN` | `codex` | Codex executable |
-| `CODEX_SANDBOX_MODE` | stage-dependent | override Codex's inner sandbox mode |
+| `CODEX_SANDBOX_MODE` | `workspace-write` | override Codex's inner sandbox mode |
 | `CODEX_MAX_ATTEMPTS` | `1` | optional adapter-level retries (the harness already retries stages) |
 | `VLLM_REQUEST_TIMEOUT_SECONDS` | `600` | timeout for each upstream inference request |
 | `VLLM_MAX_RETRIES` | `3` | bridge retries for transient upstream failures |

@@ -41,8 +41,7 @@ def test_27b_adapter_is_registered_with_timeouts_and_provenance():
     command = f"bash adapters/{ADAPTER_NAME}/run.sh"
     assert require_supported_adapter(command) == ADAPTER_NAME
     assert _timeout_config_for_adapter(ADAPTER_NAME) == TimeoutConfig(
-        classify=3_600,
-        disambiguate=3_600,
+        assess=7_200,
         analyze=7_200,
     )
 
