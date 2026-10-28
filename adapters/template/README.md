@@ -21,11 +21,10 @@ $ ./run.sh --question-file <abs question.json> --output <abs result.json>
 
 ```jsonc
 {
-  "contract_version": "3",
+  "contract_version": "4",
   "question_id": "bladder_1.2-Qabc12345",
   "question_text": "What proportion of patients ...",
   "cohort": "bladder_1.2",
-  "category": 3,
   "stage": "assess" | "analyze",
   "cohort_dir": "/abs/path/.../bpc_from_synapse/bladder_1.2",
   "data_dictionary_path": "/abs/path/.../simple_variable_synopsis.xlsx",

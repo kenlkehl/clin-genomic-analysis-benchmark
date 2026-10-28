@@ -50,7 +50,7 @@ def _run(tmp_path, monkeypatch, assess_result: dict | None, stages=("assess", "a
 def test_all_clear_assess_routes_to_analyze(tmp_path, monkeypatch):
     qrun, payloads = _run(tmp_path, monkeypatch, _assess_result())
     assert [p["stage"] for p in payloads] == ["assess", "analyze"]
-    assert payloads[0]["contract_version"] == "3"
+    assert payloads[0]["contract_version"] == "4"
     assert payloads[1]["prior_classification"] == "unambiguous"
     assert qrun.assess["success"] and qrun.analyze["success"]
 

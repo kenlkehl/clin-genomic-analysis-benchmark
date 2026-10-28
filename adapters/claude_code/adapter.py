@@ -72,7 +72,6 @@ def _build_prompt(question: dict) -> tuple[str, str]:
         f"# Question\n"
         f"- ID: {question['question_id']}\n"
         f"- Cohort: {question['cohort']}\n"
-        f"- Category: {question['category']}\n"
         f"- Stage: {stage}\n\n"
         f"## Cohort directory (read-only)\n"
         f"`{question['cohort_dir']}`\n\n"

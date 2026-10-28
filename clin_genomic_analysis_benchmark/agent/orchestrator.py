@@ -959,11 +959,10 @@ def _build_question_payload(*, q: PublicQuestion, cohort: Cohort, stage: str, sc
                             prior_classification: Optional[str] = None,
                             max_runtime_seconds: Optional[int] = None) -> dict:
     payload = {
-        "contract_version": "3",
+        "contract_version": "4",
         "question_id": q.id,
         "question_text": q.text,
         "cohort": cohort.name,
-        "category": q.category,
         "stage": stage,
         "cohort_dir": str(cohort.path.resolve()),
         "data_dictionary_path": str(data_dictionary_path.resolve()),

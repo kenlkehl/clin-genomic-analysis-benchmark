@@ -16,11 +16,10 @@ _VALID_ASSESS = {
 
 def _question() -> dict:
     return {
-        "contract_version": "3",
+        "contract_version": "4",
         "question_id": "bladder_1.2-Qabc12345",
         "question_text": "What is the most common race?",
         "cohort": "bladder_1.2",
-        "category": 1,
         "stage": "assess",
         "cohort_dir": "/abs/cohort",
         "data_dictionary_path": "/abs/dictionary.xlsx",

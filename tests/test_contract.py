@@ -11,11 +11,10 @@ from clin_genomic_analysis_benchmark.components import COMPONENT_IDS, components
 
 def _q(stage: str = "assess") -> dict:
     return {
-        "contract_version": "3",
+        "contract_version": "4",
         "question_id": "bladder_1.2-Qabc12345",
         "question_text": "What is the most common race?",
         "cohort": "bladder_1.2",
-        "category": 1,
         "stage": stage,
         "cohort_dir": "/abs/path",
         "data_dictionary_path": "/abs/dict",
@@ -46,8 +45,11 @@ def test_question_schema_rejects_bad_stage():
 
 def test_question_schema_rejects_old_contract_and_menu():
     old = _q("assess")
-    old["contract_version"] = "2"
+    old["contract_version"] = "3"
     assert validate_question(old)
+    cat = _q("assess")
+    cat["category"] = 1
+    assert validate_question(cat), "category is no longer sent to the agent"
     menu = _q("assess")
     menu["disambiguation_concept_menu"] = []
     assert validate_question(menu), "concept menu is no longer part of the contract"

@@ -4,7 +4,7 @@ You are an LLM agent being evaluated on the Clinical Genomic Analysis Benchmark,
 
 This document describes what the benchmark expects an agent under evaluation to do, and the conventions it should follow when judging questions and computing answers.
 
-The benchmark serves each clinical question in two stages: **assess** and **analyze**. The agent receives the question text, the cohort directory (read-only), a data dictionary, and a scratch directory for intermediate files. The task message also gives a category number (1–8), which groups questions by topic for reporting and has no bearing on how to judge or answer the question. The cohort directory also holds the BPC Analytic Data Guide, a PDF whose file name contains "Analytic Data Guide"; it defines the derived variables, including the event and censoring rules of the canonical endpoints. Outputs are JSON objects with the fixed schemas below; the harness rejects output that does not match them.
+The benchmark serves each clinical question in two stages: **assess** and **analyze**. The agent receives the question text, the cohort directory (read-only), a data dictionary, and a scratch directory for intermediate files. The cohort directory also holds the BPC Analytic Data Guide, a PDF whose file name contains "Analytic Data Guide"; it defines the derived variables, including the event and censoring rules of the canonical endpoints. Outputs are JSON objects with the fixed schemas below; the harness rejects output that does not match them.
 
 ---
 
