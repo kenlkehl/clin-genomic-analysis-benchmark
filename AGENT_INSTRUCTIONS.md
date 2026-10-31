@@ -14,7 +14,7 @@ The benchmark serves each clinical question in two stages: **assess** and **anal
 2. **Look for every choice the question leaves open.** Each component below lists concepts that a question often has to pin down. They are examples, not an exhaustive checklist.
 3. **Judge from the wording, not the data.** A choice the question leaves open needs clarification even if every reading would give the same result in this cohort (see "What counts as a gap").
 4. **Apply the conventional defaults first.** A choice a default settles is not a gap. Never flag anything listed under "Avoid flagging on these grounds alone".
-5. **Flag each gap once**, in the component where the construct plays its role in the question.
+5. **Flag a gap in every component it touches**: every component whose part of the analysis cannot be built until the gap is resolved (see "Where a gap belongs").
 6. **When every component is clear, compute deterministically** to perform analysis, follow every rule the question states, and return only the typed JSON (see "Answer-type schemas" and "Output discipline").
 
 Each component is scored on its own with balanced accuracy, so flagging a component that is clear costs as much as missing one that is not.
@@ -60,16 +60,22 @@ Judge gaps from the question's wording, this document's conventions, the data di
 
 ### Where a gap belongs
 
-Assign each gap to the component where the construct plays its role in the question:
+Flag a gap in every component it touches: every component whose part of the analysis cannot be built until the gap is resolved. A construct touches:
 
-- it decides who or what is eligible → **denominator**;
-- it is what is measured or counted → **outcome**;
-- it defines an exposure, comparison group, stratifier, or adjustment variable → **covariates**;
-- it decides how the estimate is computed → **analysis plan**.
+- the **denominator** if it decides who or what is analysed;
+- the **outcome** if it decides what is measured or counted, or when measurement starts or ends (for example, the index date of a time-to-event outcome);
+- the **covariates** if it defines an exposure, comparison group, stratifier, or adjustment variable;
+- the **analysis plan** if it decides how the estimate is computed.
 
-The same term can sit in different components in different questions. For example, the term "Metastatic" restricts the denominator in "among patients with metastatic disease, …", is the outcome in "what proportion had metastatic disease", and is a covariate in "compare survival between patients with and without metastatic disease". The rules for a construct apply wherever it appears.
+The same term can sit in different components in different questions, and in more than one component of the same question. For example, the term "Metastatic" restricts the denominator in "among patients with metastatic disease, …", is the outcome in "what proportion had metastatic disease", and is a covariate in "compare survival between patients with and without metastatic disease". The rules for a construct apply wherever it appears.
 
-Flag a gap once, in the component that defines the construct. Do not also flag a component that only inherits it: an outcome measured "from the start of first-line therapy" is not unclear just because the denominator's definition of first-line therapy is. Genomic testing timing (denominator) and left truncation (analysis plan) are two different gaps, not one gap seen twice; see those concepts.
+A gap that touches several components is flagged in each of them. For example:
+
+- In "overall survival from the start of first-line therapy among patients who received first-line X", an unclear "first-line" decides both who is analysed and when each patient's clock starts, so the denominator and the outcome both need clarification.
+- When the compared groups do not cover everyone in the stated population (for example, "drug A versus drug B" among all treated patients, where patients who received neither drop out), an unclear group definition decides both which group a patient is in and who is analysed, so the covariates and the denominator both need clarification.
+- An unclear definition that changes only which group a patient is in, and not who is analysed, touches only the covariates. If it also decides who counts as tested (for example, whether copy-number changes count, which limits the analysis to copy-number-profiled patients), it touches the denominator too.
+
+Genomic testing timing (denominator) and left truncation (analysis plan) are two different gaps, not one gap seen twice; see those concepts.
 
 ---
 
@@ -157,10 +163,12 @@ When a question uses any of these terms without further qualification, assume th
   their sequenced samples carries the qualifying variant (any-positive
   aggregation).
 
-- **"panel covers gene X"** → use `data_gene_matrix.txt` (or the panel
-  column in `data_clinical_sample.txt`) to identify which patients/
-  samples were tested on a panel including gene X. Patients without sequencing of a given gene are excluded (not treated as
-  wild-type) when the exposure is a mutation.
+- **Tested for gene X** → a patient or sample was tested for gene X only
+  if its panel covers X: use `data_gene_matrix.txt` (or the panel column
+  in `data_clinical_sample.txt`). This applies whether or not the
+  question says "panel covers gene X". Patients not tested for a gene are
+  excluded (not treated as wild-type) when the exposure is a mutation in
+  that gene.
 
 - **Copy-number profiling** → a sample is copy-number profiled only if it
   has a column in `data_CNA.txt`; some assays report no copy-number data
