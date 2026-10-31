@@ -42,7 +42,7 @@ A component the question does not involve (for example, covariates in a single-g
 
 ### 2. analyze
 
-Only invoked if every component was judged clear. Compute the answer using the cohort data files. Use Python (pandas, numpy, scipy, statsmodels, lifelines as needed). The cohort directory is read-only; write any intermediate files into the scratch directory.
+Only invoked if every component was judged clear. Compute the answer using the cohort data files. Use Python, run through the shell (pandas, numpy, scipy, statsmodels, lifelines as needed). The cohort directory is read-only; write any intermediate files into the scratch directory.
 
 **Output:** see [Answer-type schemas](#answer-type-schemas) below.
 
@@ -97,6 +97,7 @@ Which patients, or which regimens, specimens, or cancers, are analysed. The over
 - **Genomic testing timing.** For a question that touches genomics (a biomarker in the eligibility criteria, an exposure, or the outcome), what to do about patients whose index genomic test (the NGS report for the key index cancer) had not yet happened at a time point that defines eligibility. Such time points include the start of a qualifying regimen, the date of advanced or metastatic disease, the diagnosis date when patients are followed from diagnosis, and any landmark. Acceptable rules include requiring testing before that time point, including patients whatever the testing date, or a stated delayed-entry rule. A stated delayed-entry rule for the outcome's index date (for example, left truncation at the NGS report date) settles this for that time point. The concept applies whenever such a time point is not defined to follow testing, whether or not any patient in this cohort was tested after it. When the time point is also the index date of a time-to-event outcome, this concept and left truncation under the analysis plan are separate gaps: if the question states neither, flag both components. Requiring testing before the index date, or a stated delayed-entry rule, settles both. Including patients whatever the testing date settles eligibility but leaves risk-set entry open.
 - **Biomarker definitions for inclusion.** For a denominator that requires the presence or absence of a biomarker, the genes or gene set, panel coverage, alteration types (SNV/indel, copy number, fusion, structural variant), variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, and which specimen counts.
 - **Cancer type and histology.** The eligible cancer types and histologies (`ca_type`, histology, primary site, sidedness), and how the question's terms map to their codes. A bare reference to the cohort's own cancer, by name or abbreviation, is settled by the key-index-cancer convention. Note that `ca_type` is largely missing in some cohorts (see the Analytic Data Guide).
+- **Implied restrictions.** Wording that presupposes something not every patient in the stated population has (for example, "during their treatment course" when some patients received no treatment) leaves open whether patients without it are analysed.
 - **Unit of analysis.** The unit analysed, and which observation qualifies when a patient can contribute several regimens, specimens, or cancers.
 - **Qualifying treatment.** The drugs or regimens that qualify a patient for a treatment-defined cohort, including which drugs a broad drug class covers (see "Drug classes"), whether monotherapy or combinations qualify, and how clinical-trial regimens with masked drug names are handled.
 - **Surgery and treatment timing.** The procedure or timing rule when eligibility depends on surgery, or on adjuvant or neoadjuvant timing.
@@ -115,6 +116,7 @@ What is measured or counted for each analysed unit.
 - **Censoring and competing events.** When the stated endpoint and index date have no canonical BPC variable, the censoring date and whether death or another event counts as an event, a censoring event, or a competing event. For an endpoint with a competing event (for example, time to next treatment when death can come first, or a cumulative incidence), how that event is handled. The canonical BPC endpoint variables carry their own event and censoring rules, so using one settles this; see "Conventional defaults".
 - **Outcome categories.** What counts as a response or another categorical outcome, when categories could be grouped differently.
 - **Measurement time.** For a characteristic that is measured or counted, when it is measured (at diagnosis, before the index date, within a window, or ever during follow-up).
+- **Treatment received.** When the outcome is receipt of a treatment, the drugs or classes that count (see "Drug classes"), how clinical-trial regimens with masked drug names are handled, and the window in which treatment counts.
 - **Biomarker definition.** For a biomarker outcome, the genes or gene set, alteration types (SNV/indel, copy number, fusion, structural variant), variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, and which specimen counts.
 - **Source variable.** The source variable or coding when the data dictionary records the outcome in more than one place.
 - **Missing values.** How analysed units with an unknown or missing outcome value are handled: for example, whether patients with unknown status are dropped from a proportion's denominator or counted as not having the outcome. Canonical endpoint variables settle this through their own population and censoring rules.
@@ -197,7 +199,11 @@ When a question uses any of these terms without further qualification, assume th
   Excluding a drug or class ("without concurrent immunotherapy") settles
   only that drug or class, as naming an optional drug does. Drugs are
   concurrent, or combined, when they belong to the same BPC regimen (the
-  same row of `regimen_cancer_level_dataset`).
+  same row of `regimen_cancer_level_dataset`). The substring rule does not
+  settle clinical-trial regimens whose drug names are masked: a masked row
+  may or may not contain X. A question that names drugs or a drug class
+  must say how trial regimens are handled (for example, excluding them,
+  or assuming they did not contain the named drugs).
 
 - **Clinical-trial regimen** → a regimen with `drugs_ct_yn == 'Yes'`,
   whether its `regimen_drugs` string masks all, some, or none of its
@@ -206,12 +212,18 @@ When a question uses any of these terms without further qualification, assume th
   a trial regimen.
 
 - **Drug classes** → BPC records drugs by name and has no drug-class
-  field. A narrow drug family with a standard membership (for example,
-  platinum, taxane, or PD-1/PD-L1 inhibitor) means its standard members
-  and is not a gap. A broad term (for example, chemotherapy,
-  immunotherapy, or targeted therapy) must list its drugs or otherwise
-  say which count; if it does not, the component that uses it needs
-  clarification.
+  field. A drug family whose members clinicians agree on (for example,
+  platinum, taxane, PD-1/PD-L1 inhibitor, or immune checkpoint inhibitor)
+  means those members and is not a gap. A family whose membership
+  clinicians commonly read differently must list its drugs: for example,
+  "EGFR inhibitor" is often read as the EGFR tyrosine kinase inhibitors
+  alone, though antibodies such as cetuximab and necitumumab also target
+  EGFR. So must a broad term (for example, chemotherapy, immunotherapy, or
+  targeted therapy). If such a term does not list its drugs or otherwise
+  say which count, the component that uses it needs clarification. The Analytic Data Guide's mentions of drug kinds (for
+  example, "anti-neoplastic drugs, immunotherapies, targeted therapies,
+  and hormone therapies") describe what BPC curated; they do not define
+  class membership.
 
 - **"Assume any clinical-trial regimen did not contain drug X"** (or drugs
   X, Y, …) → treat every regimen with `drugs_ct_yn == 'Yes'` as not
@@ -224,7 +236,20 @@ When a question uses any of these terms without further qualification, assume th
   (see below); do not count regimens given for a non-index cancer or for a
   different (non-key) index cancer. Which index cancer a regimen/specimen
   belongs to is resolved by the key-index-cancer convention and is not, by
-  itself, a gap.
+  itself, a gap. Wording about time ("ever", "at any point") does not widen this; only wording that names other
+  cancers (for example, "for any cancer") does. A regimen not linked to
+  any cancer (`ca_seq` missing, which the Analytic Data Guide allows) is
+  not attributed to the key index cancer and does not count.
+
+- **Patients with no regimen** → BPC curated cancer-directed regimens for
+  every cancer diagnosis, so a patient with no regimen for the key index
+  cancer received no cancer-directed drug for it. Count such patients as
+  untreated, not as missing.
+
+- **Catch-all drug entries** → "Other antineoplastic", "Other hormone",
+  and "Other NOS" in the drug fields never match a named drug or a drug
+  class. A patient whose only regimens use them did not receive any named
+  drug or class.
 
 - **Hazard ratio / Cox model** → a hazard ratio means an unadjusted
   (univariable) Cox proportional-hazards model from `lifelines`, unless the
@@ -256,6 +281,9 @@ When a question uses any of these terms without further qualification, assume th
   lifelines `KaplanMeierFitter` (default `alpha=0.05`), with the CI from
   `median_survival_times(kmf.confidence_interval_)`: the Brookmeyer–Crowley
   method applied to lifelines' default log(-log) pointwise band.
+
+- **Proportion with 95% CI** → Wilson score interval
+  (`statsmodels` `proportion_confint(..., method="wilson")`).
 
 - **Median with 95% CI for non-survival continuous variable (e.g., age)**
   → exact distribution-free CI (binomial order-statistic), or equivalently
@@ -347,7 +375,8 @@ When a question uses any of these terms without further qualification, assume th
   delayed-entry wording such as "risk-set adjustment" does not count).
 - Multi-sample patient aggregation (use any-positive).
 - "Contains" drug match (use substring). This does not settle "X plus Y"
-  wording (see "regimen containing drug X").
+  wording or masked clinical-trial regimens (see "regimen containing drug
+  X").
 - Multiple index cancers per patient (use the key index cancer).
 - Whether a regimen or genomic specimen "belongs to an index cancer"
   (resolved by the key-index-cancer convention).
@@ -385,7 +414,7 @@ When the construct a component needs has no clearly identified variable in the d
   in another format and are not the canonical source.
 
 - **`data_mutations_extended.txt`**, **`data_CNA.txt`**,
-  **`data_fusions.txt`**, **`data_sv.txt`** — TAB-DELIMITED, no `#` rows.
+  **`data_fusions.txt`**, **`data_sv.txt`** (where present) — TAB-DELIMITED, no `#` rows.
 
 - **`*_dataset*.csv`** — comma-delimited, properly quoted.
 
