@@ -44,7 +44,8 @@ _DEFAULT_INSTRUCTIONS = {
     "assess": (
         "You are evaluating one analysis question against AACR Project GENIE BPC cohort data. "
         "The cohort folder and a data dictionary are provided. For each of the four components "
-        "in assessment_components (denominator, outcome, covariates, analysis_plan), decide "
+        "defined in the benchmark instructions (denominator, outcome, covariates, "
+        "analysis_plan), decide "
         "whether the question needs clarification before one analysis pipeline follows from it, "
         "applying the rules in the benchmark instructions. Judge from the question wording, the "
         "benchmark conventions, the data dictionary and the Analytic Data Guide, not from "

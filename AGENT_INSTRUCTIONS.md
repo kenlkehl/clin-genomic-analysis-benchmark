@@ -1,6 +1,6 @@
 # Instructions for agents evaluated on the clin-genomic-analysis-benchmark
 
-You are an LLM agent being evaluated on the Clinical Genomic Analysis Benchmark, which measures performance on clinico-genomic data analyses in oncology. The core tasks are (1) judging whether each of four components of a research question — the cohort denominator, the outcome, the independent variables and covariates, and the statistical analysis plan — is specified clearly enough, given the BPC data dictionary directives and the structure of the dataset, to yield one unambiguous analysis pipeline; and (2) performing the analysis when every component is clear. The dataset comes from the AACR GENIE Biopharma Collaborative (BPC), which includes longitudinal, granular clinical annotations of cancer diagnosis, treatments, outcomes, and cancer panel (NGS) test specimens and results.
+You are an LLM agent being evaluated on the Clinical Genomic Analysis Benchmark, which measures performance on clinico-genomic data analyses in oncology. The core tasks are (1) judging whether each of four components of a research question — the cohort denominator, the outcome, the independent variables and covariates, and the statistical analysis plan — is specified clearly enough, given this document's conventions, the BPC data dictionary, and the structure of the dataset, to yield one unambiguous analysis pipeline; and (2) performing the analysis when every component is clear. The dataset comes from the AACR GENIE Biopharma Collaborative (BPC), which includes longitudinal, granular clinical annotations of cancer diagnosis, treatments, outcomes, and cancer panel (NGS) test specimens and results.
 
 This document describes what the benchmark expects an agent under evaluation to do, and the conventions it should follow when judging questions and computing answers.
 
@@ -50,13 +50,13 @@ Only invoked if every component was judged clear. Compute the answer using the c
 
 ## Judging clarity
 
-The standard for every component is the same: given this document's conventions and the BPC data dictionary and Analytic Data Guide, does the question fix every choice needed to build this part of the analysis? Imagine writing the analysis code with access to the data dictionary and directives but before seeing any data: every choice that code would have to make must be fixed by the question or by a conventional default. A component can be clear even if building it takes several deterministic steps.
+The standard for every component is the same: given this document's conventions and the BPC data dictionary and Analytic Data Guide, does the question fix every choice needed to build this part of the analysis? Imagine writing the analysis code with access to the data dictionary, the Analytic Data Guide, and this document's conventions but before seeing any data: every choice that code would have to make must be fixed by the question or by a conventional default. A component can be clear even if building it takes several deterministic steps.
 
 ### What counts as a gap
 
 Each component below lists concepts that a question often has to pin down for that component to be clear. They are examples of what an unambiguous research question specifies, not an exhaustive checklist: any other choice an analyst would have to make in building the component is judged the same way. A listed concept that cannot arise in the question (for example, left truncation when there is no time-to-event outcome) is not a gap.
 
-Judge gaps from the question's wording, this document's conventions, and the data dictionary, not from what the cohort data happen to contain. If the question leaves a choice open and no conventional default settles it, the component needs clarification, even if every reading would give the same result in this cohort. For example, a question that groups or measures records by a variable that can be unknown or missing must say how those values are handled, whether or not any analysed record in this cohort has one (see "Missing values" under each component).
+Judge gaps from the question's wording, this document's conventions, the data dictionary, and the Analytic Data Guide, not from what the cohort data happen to contain. If the question leaves a choice open and no conventional default settles it, the component needs clarification, even if every reading would give the same result in this cohort. For example, a question that groups or measures records by a variable that can be unknown or missing must say how those values are handled, whether or not any analysed record in this cohort has one (see "Missing values" under each component).
 
 ### Where a gap belongs
 
@@ -82,18 +82,17 @@ Which patients, or which regimens, specimens, or cancers, are analysed. The over
 **Concepts to pin down** (examples, not an exhaustive list):
 
 - **Disease burden.**
-  - Whether a stage term such as "Stage IV", "Stage I–III", "early stage", "localized", or "locally advanced" means stage at initial diagnosis (de novo, newly diagnosed), or also covers patients who reached that stage later.
-  - Whether "advanced" or "metastatic" includes only de novo advanced disease (Stage IV at diagnosis), or also relapsed or recurrent advanced disease after an earlier-stage diagnosis.
+  - Whether a stage term such as "Stage IV", "Stage I–III", "early stage", "localized", or "locally advanced" means stage at initial diagnosis (de novo, newly diagnosed), or also covers patients who developed the relevant burden of disease later.
+  - Similarly, whether "advanced" or "metastatic" includes only de novo advanced disease (Stage IV at diagnosis), or also relapsed or recurrent advanced disease after an earlier-stage diagnosis.
 - **Line of therapy.** For terms such as "first-line", "second-line", "later-line", "previously treated", or "treatment-naive":
-  - the disease state the line refers to, for example the first regimen for the cancer in any setting versus the first regimen given for advanced or metastatic disease; and
-  - when the line refers to advanced disease that is not exclusively de novo, how treatment given earlier in the early-stage setting (neoadjuvant, adjuvant, or other curative-intent therapy) counts. Some line definitions settle this: "the first regimen started on or after the date of advanced disease" does not count earlier regimens, and "the first regimen for the cancer in any setting" counts them all. A bare "first-line for metastatic disease" that includes recurrent disease does not settle it.
-
-  A line term qualified by a stage (for example, "first-line therapy for Stage IV disease") also raises the disease-burden concept above; both belong to the denominator.
+  - the disease state the line refers to, for example the first regimen for the cancer in any setting, versus the first regimen given for advanced or metastatic disease; and
+  - when the line refers to advanced disease that is not exclusively de novo, how treatment given earlier in the early-stage setting (neoadjuvant, adjuvant, or other curative-intent therapy) counts. Some line definitions settle this: "the first regimen started on or after the date of advanced disease" does not count earlier regimens, and "the first regimen for the cancer in any setting" counts them all. A bare "first-line for metastatic disease" that includes recurrent disease does not settle it. Nor does a line term without a setting, such as "first-line systemic therapy for the cancer": "first-line" usually means the first treatment for advanced disease, so "for the cancer" alone does not bring in early-stage treatment.
+- A line term qualified by a stage (for example, "first-line therapy for Stage IV disease") also raises the disease-burden concept above; both belong to the denominator.
 - **Genomic testing timing.** For a question that touches genomics (a biomarker in the eligibility criteria, an exposure, or the outcome), what to do about patients whose index genomic test (the NGS report for the key index cancer) had not yet happened at a time point that defines eligibility. Such time points include the start of a qualifying regimen, the date of advanced or metastatic disease, the diagnosis date when patients are followed from diagnosis, and any landmark. Acceptable rules include requiring testing before that time point, including patients whatever the testing date, or a stated delayed-entry rule. A stated delayed-entry rule for the outcome's index date (for example, left truncation at the NGS report date) settles this for that time point. The concept applies whenever such a time point is not defined to follow testing, whether or not any patient in this cohort was tested after it. When the time point is also the index date of a time-to-event outcome, this concept and left truncation under the analysis plan are separate gaps: if the question states neither, flag both components. Requiring testing before the index date, or a stated delayed-entry rule, settles both. Including patients whatever the testing date settles eligibility but leaves risk-set entry open.
 - **Biomarker definitions for inclusion.** For a denominator that requires the presence or absence of a biomarker, the genes or gene set, panel coverage, alteration types (SNV/indel, copy number, fusion, structural variant), variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, and which specimen counts.
 - **Cancer type and histology.** The eligible cancer types and histologies (`ca_type`, histology, primary site, sidedness), and how the question's terms map to their codes. A bare reference to the cohort's own cancer, by name or abbreviation, is settled by the key-index-cancer convention. Note that `ca_type` is largely missing in some cohorts (see the Analytic Data Guide).
 - **Unit of analysis.** The unit analysed, and which observation qualifies when a patient can contribute several regimens, specimens, or cancers.
-- **Qualifying treatment.** The drugs or regimens that qualify a patient for a treatment-defined cohort, including whether monotherapy or combinations qualify and how clinical-trial regimens with masked drug names are handled.
+- **Qualifying treatment.** The drugs or regimens that qualify a patient for a treatment-defined cohort, including which drugs a broad drug class covers (see "Drug classes"), whether monotherapy or combinations qualify, and how clinical-trial regimens with masked drug names are handled.
 - **Surgery and treatment timing.** The procedure or timing rule when eligibility depends on surgery, or on adjuvant or neoadjuvant timing.
 - **Eligibility subgroups.** Clinical or molecular subgroups used for eligibility (receptor status, biomarker groups, age bands, demographic categories) and their source variables.
 - **Missing values.** Eligibility criteria apply only to records known to meet them. A criterion that requires a value (for example, "Stage IV at diagnosis" or "with a mutation in gene X") excludes records whose value is unknown, and a criterion that excludes a value (for example, "excluding patients with brain metastases") keeps them. Unknown values in a variable used only for eligibility are therefore not, by themselves, a gap.
@@ -121,7 +120,7 @@ Every exposure, comparison group, stratifier, and adjustment covariate must be d
 **Concepts to pin down** (examples, not an exhaustive list):
 
 - **Biomarker exposures.** The genes or gene set, alteration types, variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, which specimen counts when there are several, and the assay and result that define a non-NGS biomarker (for example, receptor status and how equivocal results count).
-- **Treatment exposures.** The drugs or classes that count (for example, whether "chemotherapy" means cytotoxic therapy only), whether monotherapy or combinations count, how clinical-trial regimens with masked drug names are handled, and the window in which treatment counts (before the index date, or ever).
+- **Treatment exposures.** The drugs or classes that count (for example, whether "chemotherapy" means cytotoxic therapy only; see "Drug classes"), whether monotherapy or combinations count, how clinical-trial regimens with masked drug names are handled, and the window in which treatment counts (before the index date, or ever).
 - **Clinical covariates.** The variable and its time point (for example, age at diagnosis, at sequencing, or at regimen start), the source variable when the data dictionary has several (for example, separate race and ethnicity fields), and category groupings or cutoffs.
 - **Comparison groups.** The reference group for any contrast, and whether there is a comparison group at all when the stated population makes the exposure constant.
 - **Measurement time.** When a characteristic is measured (at diagnosis, before the index date, within a window, or ever during follow-up).
@@ -175,8 +174,8 @@ When a question uses any of these terms without further qualification, assume th
   drug X (case-insensitive substring), including regimens with additional
   concomitant drugs. Treat biosimilars as identical to the reference
   molecule, but treat antibody-drug conjugates with the same antibody but
-  different payloads as distinct drugs. Biosimilar / prodrug / drug-class
-  granularity is not, by itself, a gap. The same substring rule applies to
+  different payloads as distinct drugs. Whether a named drug covers its
+  biosimilar or prodrug forms is not, by itself, a gap. The same substring rule applies to
   "regimen containing X and Y" (both drugs present, other drugs allowed).
   A combination named without "containing", such as "X plus Y" or "X with
   Y", leaves open whether regimens with additional drugs qualify. Naming an
@@ -184,6 +183,27 @@ When a question uses any of these terms without further qualification, assume th
   regimens that add any other drug qualify stays open. Only wording that
   excludes other drugs ("only", "exactly", "and no other drugs") or allows
   them ("containing", "with or without other drugs") settles it.
+  "Single-agent", "monotherapy", and "as the only drug" mean exactly one
+  drug. "Doublet" or "triplet" fixes how many drugs of the named kind the
+  regimen has but leaves open whether drugs of another kind may be added.
+  Excluding a drug or class ("without concurrent immunotherapy") settles
+  only that drug or class, as naming an optional drug does. Drugs are
+  concurrent, or combined, when they belong to the same BPC regimen (the
+  same row of `regimen_cancer_level_dataset`).
+
+- **Clinical-trial regimen** → a regimen with `drugs_ct_yn == 'Yes'`,
+  whether its `regimen_drugs` string masks all, some, or none of its
+  drugs. Institutions differ in which trial drugs they mask (see the
+  Analytic Data Guide), so a masked drug name is not what makes a regimen
+  a trial regimen.
+
+- **Drug classes** → BPC records drugs by name and has no drug-class
+  field. A narrow drug family with a standard membership (for example,
+  platinum, taxane, or PD-1/PD-L1 inhibitor) means its standard members
+  and is not a gap. A broad term (for example, chemotherapy,
+  immunotherapy, or targeted therapy) must list its drugs or otherwise
+  say which count; if it does not, the component that uses it needs
+  clarification.
 
 - **"Assume any clinical-trial regimen did not contain drug X"** (or drugs
   X, Y, …) → treat every regimen with `drugs_ct_yn == 'Yes'` as not
@@ -201,16 +221,22 @@ When a question uses any of these terms without further qualification, assume th
 - **Hazard ratio / Cox model** → a hazard ratio means an unadjusted
   (univariable) Cox proportional-hazards model from `lifelines`, unless the
   question names covariates, says "adjusted", or specifies another model
-  structure. 
+  structure. Wording about delayed entry or left truncation (for example,
+  "risk-set adjustment for delayed entry") sets how patients enter the
+  risk set; it does not make the model multivariable. The p-value for a
+  hazard ratio is the Wald p-value for that coefficient in the fitted
+  model's summary (`CoxPHFitter.summary['p']`).
 
 - **"NGS testing date"** → the patient's earliest sequencing report date
-  for the relevant cancer (`dx_cpt_rep_days` in
+  for the key index cancer (`dx_cpt_rep_days` in
   `cancer_panel_test_level_dataset.csv`). `dx_cpt_rep_days` counts days
   from diagnosis of the cancer; to place it on another time scale, subtract
   that origin's days from diagnosis (for regimen start,
   `dx_reg_start_int` in `regimen_cancer_level_dataset.csv`). When
   left-truncating, a patient enters the risk set at that date on the
-  outcome's time scale, or at the time origin if sequencing came first.
+  outcome's time scale, or at the time origin if sequencing came first. A
+  patient whose entry time is on or after their event or censoring time is
+  never at risk: drop that patient rather than shifting either time.
 
 - **Outcomes of treated patients** → when every patient analysed has a
   qualifying regimen (one regimen group, regimens compared with each
@@ -248,7 +274,9 @@ When a question uses any of these terms without further qualification, assume th
   date. PFS from regimen start (`*_g_*`) censors at the start of the next
   cancer-directed regimen, or at the last known alive date if there is
   none. PFS variables are populated only for cancers that were stage IV at
-  diagnosis or that later developed distant metastasis. Using the canonical
+  diagnosis or that later developed distant metastasis; for the latter,
+  PFS from regimen start is defined only for regimens that began after the
+  date of distant metastasis. Using the canonical
   variable for the stated endpoint and index date settles censoring, but
   not how patients enter the risk set (see "Left truncation").
 
@@ -307,14 +335,15 @@ When a question uses any of these terms without further qualification, assume th
 - Choice of CI method for a median or proportion (use the convention).
 - `Variant_Classification` subset (use the convention).
 - Unadjusted vs. adjusted Cox (use unadjusted unless the question names
-  covariates, says "adjusted", or specifies another model structure).
+  covariates, says "adjusted", or specifies another model structure;
+  delayed-entry wording such as "risk-set adjustment" does not count).
 - Multi-sample patient aggregation (use any-positive).
 - "Contains" drug match (use substring). This does not settle "X plus Y"
   wording (see "regimen containing drug X").
 - Multiple index cancers per patient (use the key index cancer).
 - Whether a regimen or genomic specimen "belongs to an index cancer"
   (resolved by the key-index-cancer convention).
-- Biosimilar / prodrug / drug-class granularity (treat biosimilars as the
+- Biosimilar or prodrug forms of a named drug (treat biosimilars as the
   reference molecule; exclude distinct-INN ADCs).
 - Unknown values of a variable used only for eligibility (criteria apply
   only to records known to meet them; see "Missing values" under the
