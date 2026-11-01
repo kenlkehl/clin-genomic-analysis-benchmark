@@ -56,7 +56,7 @@ The standard for every component is the same: given this document's conventions 
 
 Each component below lists concepts that a question often has to pin down for that component to be clear. They are examples of what an unambiguous research question specifies, not an exhaustive checklist: any other choice an analyst would have to make in building the component is judged the same way. A listed concept that cannot arise in the question (for example, left truncation when there is no time-to-event outcome) is not a gap.
 
-Judge gaps from the question's wording, this document's conventions, the data dictionary, and the Analytic Data Guide, not from what the cohort data happen to contain. If the question leaves a choice open and no conventional default settles it, the component needs clarification, even if every reading would give the same result in this cohort. For example, a question that groups or measures records by a variable that can be unknown or missing must say how those values are handled, whether or not any analysed record in this cohort has one (see "Missing values" under each component).
+Judge gaps from the question's wording, this document's conventions, the data dictionary, and the Analytic Data Guide, not from what the cohort data happen to contain. If the question leaves a choice open and no conventional default settles it, the component needs clarification, even if every reading would give the same result in this cohort. For example, a question that groups or measures records by a variable that can be unknown or missing must say how those values are handled, whether or not any analysed record in this cohort has one (see "Missing values" under each component). Treat a variable as one that can be unknown or missing unless the data dictionary or the Analytic Data Guide says it is always recorded. A recorded value too coarse for the question's grouping (for example, "Stage I-III NOS" when Stage III is grouped apart from Stages I–II) is unknown for that grouping.
 
 ### Where a gap belongs
 
@@ -74,6 +74,7 @@ A gap that touches several components is flagged in each of them. For example:
 - In "overall survival from the start of first-line therapy among patients who received first-line X", an unclear "first-line" decides both who is analysed and when each patient's clock starts, so the denominator and the outcome both need clarification.
 - When the compared groups do not cover everyone in the stated population (for example, "drug A versus drug B" among all treated patients, where patients who received neither drop out), an unclear group definition decides both which group a patient is in and who is analysed, so the covariates and the denominator both need clarification.
 - An unclear definition that changes only which group a patient is in, and not who is analysed, touches only the covariates. If it also decides who counts as tested (for example, whether copy-number changes count, which limits the analysis to copy-number-profiled patients), it touches the denominator too.
+- When a question leaves open how unknown values of the outcome or of a covariate (an exposure, comparison group, stratifier, or adjustment variable) are handled, it also leaves open whether those records are analysed. So the denominator needs clarification too, along with the component whose variable is unknown.
 
 Genomic testing timing (denominator) and left truncation (analysis plan) are two different gaps, not one gap seen twice; see those concepts.
 
@@ -90,9 +91,10 @@ Which patients, or which regimens, specimens, or cancers, are analysed. The over
 - **Disease burden.**
   - Whether a stage term such as "Stage IV", "Stage I–III", "early stage", "localized", or "locally advanced" means stage at initial diagnosis (de novo, newly diagnosed), or also covers patients who developed the relevant burden of disease later.
   - Similarly, whether "advanced" or "metastatic" includes only de novo advanced disease (Stage IV at diagnosis), or also relapsed or recurrent advanced disease after an earlier-stage diagnosis.
+  - Which stage groups "advanced" covers (for example, Stage IV only, or Stages III–IV). "Advanced" does not fix them in any use: as a stage at diagnosis ("diagnosed at an advanced stage"), as a population ("patients with advanced disease"), or as a date ("overall survival from onset of advanced disease", "the first regimen for advanced disease"). BPC's advanced-disease variables (`*_adv_*`) define advanced disease as Stage IV at diagnosis or a distant metastasis after a Stage I–III diagnosis. They apply only when the question defines advanced disease that way.
 - **Line of therapy.** For terms such as "first-line", "second-line", "later-line", "previously treated", or "treatment-naive":
   - the disease state the line refers to, for example the first regimen for the cancer in any setting, versus the first regimen given for advanced or metastatic disease; and
-  - when the line refers to advanced disease that is not exclusively de novo, how treatment given earlier in the early-stage setting (neoadjuvant, adjuvant, or other curative-intent therapy) counts. Some line definitions settle this: "the first regimen started on or after the date of advanced disease" does not count earlier regimens, and "the first regimen for the cancer in any setting" counts them all. A bare "first-line for metastatic disease" that includes recurrent disease does not settle it. Nor does a line term without a setting, such as "first-line systemic therapy for the cancer": "first-line" usually means the first treatment for advanced disease, so "for the cancer" alone does not bring in early-stage treatment.
+  - when the line refers to advanced disease that is not exclusively de novo, how treatment given earlier in the early-stage setting (neoadjuvant, adjuvant, or other curative-intent therapy) counts. Some line definitions settle this: "the first regimen started on or after the date of advanced disease" does not count earlier regimens (which stage groups "advanced" covers is a separate question; see above), and "the first regimen for the cancer in any setting" counts them all. A bare "first-line for metastatic disease" that includes recurrent disease does not settle it. Nor does a line term without a setting, such as "first-line systemic therapy for the cancer": "first-line" usually means the first treatment for advanced disease, so "for the cancer" alone does not bring in early-stage treatment.
 - A line term qualified by a stage (for example, "first-line therapy for Stage IV disease") also raises the disease-burden concept above; both belong to the denominator.
 - **Genomic testing timing.** For a question that touches genomics (a biomarker in the eligibility criteria, an exposure, or the outcome), what to do about patients whose index genomic test (the NGS report for the key index cancer) had not yet happened at a time point that defines eligibility. Such time points include the start of a qualifying regimen, the date of advanced or metastatic disease, the diagnosis date when patients are followed from diagnosis, and any landmark. Acceptable rules include requiring testing before that time point, including patients whatever the testing date, or a stated delayed-entry rule. A stated delayed-entry rule for the outcome's index date (for example, left truncation at the NGS report date) settles this for that time point. The concept applies whenever such a time point is not defined to follow testing, whether or not any patient in this cohort was tested after it. When the time point is also the index date of a time-to-event outcome, this concept and left truncation under the analysis plan are separate gaps: if the question states neither, flag both components. Requiring testing before the index date, or a stated delayed-entry rule, settles both. Including patients whatever the testing date settles eligibility but leaves risk-set entry open.
 - **Biomarker definitions for inclusion.** For a denominator that requires the presence or absence of a biomarker, the genes or gene set, panel coverage, alteration types (SNV/indel, copy number, fusion, structural variant), variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, and which specimen counts.
@@ -102,16 +104,16 @@ Which patients, or which regimens, specimens, or cancers, are analysed. The over
 - **Qualifying treatment.** The drugs or regimens that qualify a patient for a treatment-defined cohort, including which drugs a broad drug class covers (see "Drug classes"), whether monotherapy or combinations qualify, and how clinical-trial regimens with masked drug names are handled.
 - **Surgery and treatment timing.** The procedure or timing rule when eligibility depends on surgery, or on adjuvant or neoadjuvant timing.
 - **Eligibility subgroups.** Clinical or molecular subgroups used for eligibility (receptor status, biomarker groups, age bands, demographic categories) and their source variables.
-- **Missing values.** Eligibility criteria apply only to records known to meet them. A criterion that requires a value (for example, "Stage IV at diagnosis" or "with a mutation in gene X") excludes records whose value is unknown, and a criterion that excludes a value (for example, "excluding patients with brain metastases") keeps them. Unknown values in a variable used only for eligibility are therefore not, by themselves, a gap.
+- **Missing values.** Eligibility criteria apply only to records known to meet them. A criterion that requires a value (for example, "Stage IV at diagnosis" or "with a mutation in gene X") excludes records whose value is unknown, and a criterion that excludes a value (for example, "excluding patients with brain metastases") keeps them. Unknown values in a variable used only for eligibility are therefore not, by themselves, a gap. Unknown values of the outcome or of a covariate are different: when their handling is open, the denominator needs clarification too (see "Where a gap belongs").
 
 ### 2. Outcome
 
-What is measured or counted for each analysed unit.
+What is measured or counted for each analysed unit. The disease-burden and line-of-therapy concepts under the denominator apply here too when the construct is part of the outcome (for example, "what proportion had metastatic disease").
 
 **Concepts to pin down** (examples, not an exhaustive list):
 
 - **Endpoint.** The endpoint itself, when the wording admits more than one (for example, a "benefit" or "outcome" that could be survival, response, or time to next treatment).
-- **Index date.** The time zero of a time-to-event outcome, such as diagnosis, advanced or metastatic disease, regimen start, surgery, sequencing, or another landmark, unless the treated-patient default applies (see "Conventional defaults").
+- **Index date.** The time zero of a time-to-event outcome, such as diagnosis, advanced or metastatic disease (see "Disease burden" for what these terms cover), regimen start, surgery, sequencing, or another landmark, unless the treated-patient default applies (see "Conventional defaults").
 - **Event ascertainment.** How progression, response, recurrence, or relapse is ascertained. BPC curates these from imaging reports (radiologist assessment) and from medical oncologist notes (clinician assessment), and combines them. For progression-free survival, the BPC endpoints are PFS-I (imaging), PFS-M (medical oncologist), PFS-I-or-M (either), and PFS-I-and-M (both). An unqualified "PFS", "progression", "response", "recurrence", or "relapse" leaves the source open.
 - **Censoring and competing events.** When the stated endpoint and index date have no canonical BPC variable, the censoring date and whether death or another event counts as an event, a censoring event, or a competing event. For an endpoint with a competing event (for example, time to next treatment when death can come first, or a cumulative incidence), how that event is handled. The canonical BPC endpoint variables carry their own event and censoring rules, so using one settles this; see "Conventional defaults".
 - **Outcome categories.** What counts as a response or another categorical outcome, when categories could be grouped differently.
@@ -119,7 +121,7 @@ What is measured or counted for each analysed unit.
 - **Treatment received.** When the outcome is receipt of a treatment, the drugs or classes that count (see "Drug classes"), how clinical-trial regimens with masked drug names are handled, and the window in which treatment counts.
 - **Biomarker definition.** For a biomarker outcome, the genes or gene set, alteration types (SNV/indel, copy number, fusion, structural variant), variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, and which specimen counts.
 - **Source variable.** The source variable or coding when the data dictionary records the outcome in more than one place.
-- **Missing values.** How analysed units with an unknown or missing outcome value are handled: for example, whether patients with unknown status are dropped from a proportion's denominator or counted as not having the outcome. Canonical endpoint variables settle this through their own population and censoring rules.
+- **Missing values.** How analysed units with an unknown or missing outcome value are handled: for example, whether patients with unknown status are dropped from a proportion's denominator or counted as not having the outcome. An open choice here touches the denominator too (see "Where a gap belongs"). Canonical endpoint variables settle this through their own population and censoring rules.
 
 ### 3. Independent variables and covariates
 
@@ -132,7 +134,7 @@ Every exposure, comparison group, stratifier, and adjustment covariate must be d
 - **Clinical covariates.** The variable and its time point (for example, age at diagnosis, at sequencing, or at regimen start), the source variable when the data dictionary has several (for example, separate race and ethnicity fields), and category groupings or cutoffs.
 - **Comparison groups.** The reference group for any contrast, and whether there is a comparison group at all when the stated population makes the exposure constant.
 - **Measurement time.** When a characteristic is measured (at diagnosis, before the index date, within a window, or ever during follow-up).
-- **Missing values.** How records with an unknown or missing value of an exposure, comparison group, stratifier, or covariate are handled: for example, a separate category, exclusion, or another stated rule.
+- **Missing values.** How records with an unknown or missing value of an exposure, comparison group, stratifier, or covariate are handled: for example, a separate category, exclusion, or another stated rule. An open choice here touches the denominator too (see "Where a gap belongs").
 
 ### 4. Statistical analysis plan
 
@@ -290,16 +292,20 @@ When a question uses any of these terms without further qualification, assume th
   the lifelines/scipy default.
 
 - **Stage at diagnosis** → `stage_dx`, BPC's stage at diagnosis, when a
-  question restricts or groups by stage at diagnosis. A stage term that
-  does not say "at diagnosis", "de novo", or "newly diagnosed" leaves the
-  disease-burden concept open (see "Disease burden").
+  question restricts, groups, or measures by stage at diagnosis. A patient
+  "diagnosed at" or "diagnosed with" a stage (for example, "diagnosed with
+  Stage IV disease") has that stage at diagnosis. A stage term that does
+  not say "at diagnosis", "diagnosed at" or "diagnosed with", "de novo", or
+  "newly diagnosed" leaves the disease-burden concept open (see "Disease
+  burden").
 
 - **"Survival"** → overall survival, when the question does not name
   another endpoint.
 
 - **"OS"** → use the canonical OS variable for the stated index date when relevant
   (`tt_os_g_*` from regimen start, `tt_os_dx_*` from diagnosis,
-  `tt_os_adv_*` from advanced-disease diagnosis, etc.). If there is no
+  `tt_os_adv_*` from advanced-disease diagnosis when the question defines
+  advanced disease as BPC does (see "Disease burden"), etc.). If there is no
   canonical variable for the index date, derive OS from the same death and
   last-known-alive dates, censoring at last known alive.
 
@@ -328,7 +334,10 @@ When a question uses any of these terms without further qualification, assume th
   present, otherwise `ca_seq`. A later, separate primary that meets the
   criteria therefore makes the patient eligible even when an earlier index
   cancer does not, unless the question excludes patients with prior primary
-  cancers. When the question has no cancer-level criteria, the key index
+  cancers. A cancer-level characteristic that is the outcome or a covariate,
+  rather than an eligibility criterion, does not choose the key index
+  cancer: it is measured on the key index cancer that the eligibility
+  criteria choose. When the question has no cancer-level criteria, the key index
   cancer is the earliest genomically profiled index cancer; in these cohorts
   every patient's earliest index cancer is genomically profiled, so this is
   just the earliest index cancer. All per-patient analyses — population counts, treatment
@@ -389,7 +398,8 @@ When a question uses any of these terms without further qualification, assume th
   questions (they are answered at the patient level).
 - Which canonical BPC variable to use for a stated endpoint and index date,
   or censoring for that variable (use the canonical variable). This does
-  not cover left truncation.
+  not cover left truncation, or which stage groups "advanced" covers in an
+  index date such as "onset of advanced disease".
 
 ## Data that cannot support the question
 
