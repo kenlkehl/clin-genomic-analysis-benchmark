@@ -74,6 +74,8 @@ A gap that touches several components is flagged in each of them. For example:
 - In "overall survival from the start of first-line therapy among patients who received first-line X", an unclear "first-line" decides both who is analysed and when each patient's clock starts, so the denominator and the outcome both need clarification.
 - When the compared groups do not cover everyone in the stated population (for example, "drug A versus drug B" among all treated patients, where patients who received neither drop out), an unclear group definition decides both which group a patient is in and who is analysed, so the covariates and the denominator both need clarification.
 - An unclear definition that changes only which group a patient is in, and not who is analysed, touches only the covariates. If it also decides who counts as tested (for example, whether copy-number changes count, which limits the analysis to copy-number-profiled patients), it touches the denominator too.
+- An unstated index date touches the denominator as well as the outcome when some reasonable readings exist only for some patients (for example, onset of advanced disease, or the start of a regimen in a cohort not defined by treatment).
+- When a biomarker exposure can be ascertained after the index date and the question gives no timing rule (see "Exposure ascertained after the index date"), the choice can move a patient between groups: for example, a later test may show a mutation that an earlier test did not. So the covariates need clarification as well as the analysis plan. A stated rule that settles that concept settles the covariates too.
 - When a question leaves open how unknown values of the outcome or of a covariate (an exposure, comparison group, stratifier, or adjustment variable) are handled, it also leaves open whether those records are analysed. So the denominator needs clarification too, along with the component whose variable is unknown.
 
 Genomic testing timing (denominator) and left truncation (analysis plan) are two different gaps, not one gap seen twice; see those concepts.
@@ -96,9 +98,9 @@ Which patients, or which regimens, specimens, or cancers, are analysed. The over
   - the disease state the line refers to, for example the first regimen for the cancer in any setting, versus the first regimen given for advanced or metastatic disease; and
   - when the line refers to advanced disease that is not exclusively de novo, how treatment given earlier in the early-stage setting (neoadjuvant, adjuvant, or other curative-intent therapy) counts. Some line definitions settle this: "the first regimen started on or after the date of advanced disease" does not count earlier regimens (which stage groups "advanced" covers is a separate question; see above), and "the first regimen for the cancer in any setting" counts them all. A bare "first-line for metastatic disease" that includes recurrent disease does not settle it. Nor does a line term without a setting, such as "first-line systemic therapy for the cancer": "first-line" usually means the first treatment for advanced disease, so "for the cancer" alone does not bring in early-stage treatment.
 - A line term qualified by a stage (for example, "first-line therapy for Stage IV disease") also raises the disease-burden concept above; both belong to the denominator.
-- **Genomic testing timing.** For a question that touches genomics (a biomarker in the eligibility criteria, an exposure, or the outcome), what to do about patients whose index genomic test (the NGS report for the key index cancer) had not yet happened at a time point that defines eligibility. Such time points include the start of a qualifying regimen, the date of advanced or metastatic disease, the diagnosis date when patients are followed from diagnosis, and any landmark. Acceptable rules include requiring testing before that time point, including patients whatever the testing date, or a stated delayed-entry rule. A stated delayed-entry rule for the outcome's index date (for example, left truncation at the NGS report date) settles this for that time point. The concept applies whenever such a time point is not defined to follow testing, whether or not any patient in this cohort was tested after it. When the time point is also the index date of a time-to-event outcome, this concept and left truncation under the analysis plan are separate gaps: if the question states neither, flag both components. Requiring testing before the index date, or a stated delayed-entry rule, settles both. Including patients whatever the testing date settles eligibility but leaves risk-set entry open.
+- **Genomic testing timing.** For a question that touches genomics (a biomarker in the eligibility criteria, an exposure, or the outcome), what to do about patients whose index genomic test (the NGS report for the key index cancer) had not yet happened at a time point that defines eligibility. Such time points include the start of a qualifying regimen, the date of advanced or metastatic disease, the diagnosis date when patients are followed from diagnosis, and any landmark. Acceptable rules include requiring testing before that time point, including patients whatever the testing date, or a stated delayed-entry rule. A stated delayed-entry rule for the outcome's index date (for example, left truncation at the NGS report date) settles this for that time point. The concept applies whenever such a time point is not defined to follow testing, whether or not any patient in this cohort was tested after it. When the time point is itself left open (for example, an unstated index date), the concept applies unless every reasonable reading of it is defined to follow testing. When the time point is also the index date of a time-to-event outcome, this concept and left truncation under the analysis plan are separate gaps: if the question states neither, flag both components. Requiring testing before the index date, or a stated delayed-entry rule, settles both. Including patients whatever the testing date settles eligibility but leaves risk-set entry open.
 - **Biomarker definitions for inclusion.** For a denominator that requires the presence or absence of a biomarker, the genes or gene set, panel coverage, alteration types (SNV/indel, copy number, fusion, structural variant), variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, and which specimen counts.
-- **Cancer type and histology.** The eligible cancer types and histologies (`ca_type`, histology, primary site, sidedness), and how the question's terms map to their codes. A bare reference to the cohort's own cancer, by name or abbreviation, is settled by the key-index-cancer convention. Note that `ca_type` is largely missing in some cohorts (see the Analytic Data Guide).
+- **Cancer type and histology.** The eligible cancer types and histologies (`ca_type`, histology, primary site, sidedness), and how the question's terms map to their codes. No conventional default names a source for histology, so a question that restricts by histology must say which source and codes it uses. A bare reference to the cohort's own cancer, by name or abbreviation, is settled by the key-index-cancer convention. Note that `ca_type` is largely missing in some cohorts (see the Analytic Data Guide).
 - **Implied restrictions.** Wording that presupposes something not every patient in the stated population has (for example, "during their treatment course" when some patients received no treatment) leaves open whether patients without it are analysed.
 - **Unit of analysis.** The unit analysed, and which observation qualifies when a patient can contribute several regimens, specimens, or cancers.
 - **Qualifying treatment.** The drugs or regimens that qualify a patient for a treatment-defined cohort, including which drugs a broad drug class covers (see "Drug classes"), whether monotherapy or combinations qualify, and how clinical-trial regimens with masked drug names are handled.
@@ -129,7 +131,7 @@ Every exposure, comparison group, stratifier, and adjustment covariate must be d
 
 **Concepts to pin down** (examples, not an exhaustive list):
 
-- **Biomarker exposures.** The genes or gene set, alteration types, variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, which specimen counts when there are several, and the assay and result that define a non-NGS biomarker (for example, receptor status and how equivocal results count).
+- **Biomarker exposures.** The genes or gene set, alteration types, variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, which specimen counts when there are several, which tests count when one can follow the index date (see "Exposure ascertained after the index date"), and the assay and result that define a non-NGS biomarker (for example, receptor status and how equivocal results count).
 - **Treatment exposures.** The drugs or classes that count (for example, whether "chemotherapy" means cytotoxic therapy only; see "Drug classes"), whether monotherapy or combinations count, how clinical-trial regimens with masked drug names are handled, and the window in which treatment counts (before the index date, or ever).
 - **Clinical covariates.** The variable and its time point (for example, age at diagnosis, at sequencing, or at regimen start), the source variable when the data dictionary has several (for example, separate race and ethnicity fields), and category groupings or cutoffs.
 - **Comparison groups.** The reference group for any contrast, and whether there is a comparison group at all when the stated population makes the exposure constant.
@@ -142,11 +144,11 @@ How the estimate is computed from the denominator, outcome, and covariates.
 
 **Concepts to pin down** (examples, not an exhaustive list):
 
-- **Statistical estimand.** The quantity to report, such as a hazard ratio, a median, a difference in medians, a survival probability at a stated time, a proportion, an odds ratio, a p-value, or subgroup-specific estimates versus an interaction. "Compare survival between A and B" leaves the estimand open.
+- **Statistical estimand.** The quantity to report, such as a hazard ratio, a median, a difference in medians, a survival probability at a stated time, a proportion, an odds ratio, a p-value, or subgroup-specific estimates versus an interaction. "Compare survival between A and B" and "is there an association between X and survival" leave the estimand open.
 - **Model architecture.** Which model or test produces the estimand when more than one could: for example, Cox proportional hazards, a stratified Cox model, a time-varying exposure, a landmark analysis, logistic regression, a log-rank test, or a chi-square versus Fisher's exact test. The conventions below fix some of these, including the unadjusted Cox model for a hazard ratio and the Kaplan–Meier median.
 - **Variables in a multivariable model.** Which variables to include when the question asks for adjustment ("adjusted", "controlling for", "multivariable"). Their definitions are judged under covariates.
-- **Left truncation (delayed entry).** BPC includes only patients whose tumors were sequenced, so time before sequencing is selectively observed. For a time-to-event outcome whose index date can precede the NGS report (any index date other than sequencing itself or a date defined to follow it), how patients enter the risk set: for example, left truncation at the NGS report date, restriction to patients sequenced before the index date, or an explicit choice to ignore delayed entry. This applies to every time-to-event question, genomic or not, and whether or not any analysed patient in this cohort was sequenced after the index date. Using a canonical endpoint variable does not settle it. For a question that touches genomics, it is a separate gap from genomic testing timing under the denominator (see that concept).
-- **Exposure ascertained after the index date.** When an exposure or biomarker status can be ascertained after the index date (for example, ever receiving a drug, or a biomarker from a test that can follow the index date), how that time is handled: a landmark, a time-varying exposure, an exposure defined before the index date, or left truncation at the testing date. A stated rule of left truncation at the testing date settles this for biomarker status from that test.
+- **Left truncation (delayed entry).** BPC includes only patients whose tumors were sequenced, so time before sequencing is selectively observed. For a time-to-event outcome whose index date can precede the NGS report (any index date other than sequencing itself or a date defined to follow it), how patients enter the risk set: for example, left truncation at the NGS report date, restriction to patients sequenced before the index date, or an explicit choice to ignore delayed entry. This applies to every time-to-event question, genomic or not, and whether or not any analysed patient in this cohort was sequenced after the index date. When the index date itself is left open, it applies unless every reasonable reading of the index date is sequencing or a date defined to follow it. Using a canonical endpoint variable does not settle it. For a question that touches genomics, it is a separate gap from genomic testing timing under the denominator (see that concept).
+- **Exposure ascertained after the index date.** When an exposure or biomarker status can be ascertained after the index date (for example, ever receiving a drug, or a biomarker from a test that can follow the index date), how that time is handled: a landmark, a time-varying exposure, an exposure defined before the index date, or left truncation at the testing date. A stated rule of left truncation at the testing date settles this for biomarker status from that test. For a biomarker exposure, an open choice here touches the covariates too (see "Where a gap belongs").
 
 ---
 
@@ -161,18 +163,27 @@ When a question uses any of these terms without further qualification, assume th
   Splice_Region.
 
 - **"mutation in gene X"** → any non-synonymous (above) somatic variant in
-  `data_mutations_extended.txt` with `Hugo_Symbol == X`.
+  `data_mutations_extended.txt` with `Hugo_Symbol == X`. The same holds
+  for "X-mutant" and "X-mutated", unless clinicians commonly read that
+  gene's mutant label as a specific set of variants (for example, the
+  activating or drug-sensitizing variants of a gene whose targeted
+  therapies act only on those). Then, as with drug classes (see "Drug
+  classes"), the question must list the variants that count, or say "any
+  non-synonymous mutation".
 
 - **Patient-level mutation aggregation** → patient is positive if ANY of
   their sequenced samples carries the qualifying variant (any-positive
-  aggregation).
+  aggregation). Alterations described as co-occurring (for example, a
+  "co-mutation") are each read this way, at the patient level; they need
+  not be on the same sample.
 
 - **Tested for gene X** → a patient or sample was tested for gene X only
   if its panel covers X: use `data_gene_matrix.txt` (or the panel column
-  in `data_clinical_sample.txt`). This applies whether or not the
-  question says "panel covers gene X". Patients not tested for a gene are
-  excluded (not treated as wild-type) when the exposure is a mutation in
-  that gene.
+  in `data_clinical_sample.txt` with the `data_gene_panel_*` files). This
+  applies whether or not the question says "panel covers gene X". Patients
+  not tested for a gene are excluded (not treated as wild-type) when
+  eligibility or the exposure is a mutation in that gene; for eligibility
+  this is the denominator "Missing values" rule.
 
 - **Copy-number profiling** → a sample is copy-number profiled only if it
   has a column in `data_CNA.txt`; some assays report no copy-number data
@@ -327,10 +338,14 @@ When a question uses any of these terms without further qualification, assume th
   question *explicitly* asks about multiple index cancers, derive a single
   **key index cancer** per patient = the **earliest-diagnosed genomically
   profiled index cancer that meets the question's cancer-level eligibility
-  criteria** (for example stage at diagnosis, histology, or a qualifying
-  regimen given for that cancer). A genomically profiled index cancer is one
+  criteria** (for example stage at diagnosis, histology, a biomarker found
+  on that cancer's specimens, or a qualifying regimen given for that
+  cancer). A genomically profiled index cancer is one
   with an associated panel test in `cancer_panel_test_level_dataset.csv`
-  (joined on `record_id` + `ca_seq`); order by `dob_ca_dx_days` where
+  (joined on `record_id` + `ca_seq`). A panel test that BPC lists under
+  more than one cancer, because it could not be tied to a single
+  diagnosis (see the Analytic Data Guide), belongs to each cancer it is
+  listed under. "Earliest" orders cancers by `dob_ca_dx_days` where
   present, otherwise `ca_seq`. A later, separate primary that meets the
   criteria therefore makes the patient eligible even when an earlier index
   cancer does not, unless the question excludes patients with prior primary
@@ -403,7 +418,7 @@ When a question uses any of these terms without further qualification, assume th
 
 ## Data that cannot support the question
 
-When the construct a component needs has no clearly identified variable in the data, or several plausible proxies, that component needs clarification. A question whose components are all clear but whose estimand cannot be estimated from the data is not a clarity problem: judge every component clear and return the structured `unanswerable` result described under "Answer-type schemas".
+When the construct a component needs has no clearly identified variable in the data dictionary or the Analytic Data Guide, or several plausible proxies there, that component needs clarification. Judge this from which variables exist, not from their values. A question whose components are all clear but whose estimand cannot be estimated from the data is not a clarity problem: judge every component clear and return the structured `unanswerable` result described under "Answer-type schemas".
 
 ---
 
