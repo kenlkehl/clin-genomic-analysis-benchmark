@@ -32,10 +32,10 @@ You may read the data dictionary and the Analytic Data Guide, and you may inspec
 **Output** (all four keys are required):
 
 ```json
-{ "denominator":   { "needs_clarification": false, "rationale": "<one sentence>" },
-  "outcome":       { "needs_clarification": true,  "rationale": "<one sentence>" },
-  "covariates":    { "needs_clarification": false, "rationale": "<one sentence>" },
-  "analysis_plan": { "needs_clarification": false, "rationale": "<one sentence>" } }
+{ "denominator":   { "needs_clarification": false, "rationale": "<one or two sentences>" },
+  "outcome":       { "needs_clarification": true,  "rationale": "<one or two sentences>" },
+  "covariates":    { "needs_clarification": false, "rationale": "<one or two sentences>" },
+  "analysis_plan": { "needs_clarification": false, "rationale": "<one or two sentences>" } }
 ```
 
 A component the question does not involve (for example, covariates in a single-group count) does not need clarification. Each `rationale` says what is unclear, or how the question or a convention specifies the component. Rationales are recorded but not scored.
@@ -71,7 +71,8 @@ The same term can sit in different components in different questions, and in mor
 
 A gap that touches several components is flagged in each of them. For example:
 
-- In "overall survival from the start of first-line therapy among patients who received first-line X", an unclear "first-line" decides both who is analysed and when each patient's clock starts, so the denominator and the outcome both need clarification.
+- In "overall survival from the start of first-line therapy among patients who received first-line X", an unclear "first-line" decides both who is analysed and when each patient's clock starts: a patient who received X after surgery and again at relapse is analysed under either reading, but from a different start date. So the denominator and the outcome both need clarification.
+- A gap that decides only whether a patient is analysed, and not when an analysed patient's clock starts, touches the denominator alone. For example, when a line term is tied to a disease state ("first-line X for metastatic disease", outcome measured from the start of that regimen), the readings differ in who is included, but every reading starts an included patient's clock at the same regimen of X, so the outcome is clear. Flag the outcome only if some patient analysed under two readings would get different start dates.
 - When the compared groups do not cover everyone in the stated population (for example, "drug A versus drug B" among all treated patients, where patients who received neither drop out), an unclear group definition decides both which group a patient is in and who is analysed, so the covariates and the denominator both need clarification.
 - An unclear definition that changes only which group a patient is in, and not who is analysed, touches only the covariates. If it also decides who counts as tested (for example, whether copy-number changes count, which limits the analysis to copy-number-profiled patients), it touches the denominator too.
 - An unstated index date touches the denominator as well as the outcome when some reasonable readings exist only for some patients (for example, onset of advanced disease, or the start of a regimen in a cohort not defined by treatment).
@@ -92,12 +93,13 @@ Which patients, or which regimens, specimens, or cancers, are analysed. The over
 
 - **Disease burden.**
   - Whether a stage term such as "Stage IV", "Stage I–III", "early stage", "localized", or "locally advanced" means stage at initial diagnosis (de novo, newly diagnosed), or also covers patients who developed the relevant burden of disease later.
+  - BPC records stage only at diagnosis (`stage_dx`). A distant metastasis after a Stage I–III diagnosis is recorded separately (`dmets_stage_i_iii`, and the "Stage I-III with Distant Mets" group of `pfs_cohort`), not as Stage IV. A reading of "Stage IV" that includes such patients is built from those fields. BPC's own use of "Stage IV" for stage at diagnosis does not settle which reading a question means.
   - Similarly, whether "advanced" or "metastatic" includes only de novo advanced disease (Stage IV at diagnosis), or also relapsed or recurrent advanced disease after an earlier-stage diagnosis.
   - Which stage groups "advanced" covers (for example, Stage IV only, or Stages III–IV). "Advanced" does not fix them in any use: as a stage at diagnosis ("diagnosed at an advanced stage"), as a population ("patients with advanced disease"), or as a date ("overall survival from onset of advanced disease", "the first regimen for advanced disease"). BPC's advanced-disease variables (`*_adv_*`) define advanced disease as Stage IV at diagnosis or a distant metastasis after a Stage I–III diagnosis. They apply only when the question defines advanced disease that way.
 - **Line of therapy.** For terms such as "first-line", "second-line", "later-line", "previously treated", or "treatment-naive":
   - the disease state the line refers to, for example the first regimen for the cancer in any setting, versus the first regimen given for advanced or metastatic disease; and
-  - when the line refers to advanced disease that is not exclusively de novo, how treatment given earlier in the early-stage setting (neoadjuvant, adjuvant, or other curative-intent therapy) counts. Some line definitions settle this: "the first regimen started on or after the date of advanced disease" does not count earlier regimens (which stage groups "advanced" covers is a separate question; see above), and "the first regimen for the cancer in any setting" counts them all. A bare "first-line for metastatic disease" that includes recurrent disease does not settle it. Nor does a line term without a setting, such as "first-line systemic therapy for the cancer": "first-line" usually means the first treatment for advanced disease, so "for the cancer" alone does not bring in early-stage treatment.
-- A line term qualified by a stage (for example, "first-line therapy for Stage IV disease") also raises the disease-burden concept above; both belong to the denominator.
+  - when the line refers to advanced disease that is not exclusively de novo, how treatment given earlier in the early-stage setting (neoadjuvant, adjuvant, or other curative-intent therapy) counts. Some line definitions settle this: "the first regimen started on or after the date of advanced disease" does not count earlier regimens (which stage groups "advanced" covers is a separate question; see above), and "the first regimen for the cancer in any setting" counts them all. A bare "first-line for metastatic disease" that includes recurrent disease does not settle it. Nor does a line term without a setting, such as "first-line systemic therapy for the cancer": "first-line" is often read as the first treatment for advanced disease, and "for the cancer" can be read as any setting, so the wording leaves open whether early-stage treatment counts.
+- A line term qualified by a stage (for example, "first-line therapy for Stage IV disease") also raises the disease-burden concept above; both belong to the denominator, and to the outcome only when they move an analysed patient's start date (see "Where a gap belongs").
 - **Genomic testing timing.** For a question that touches genomics (a biomarker in the eligibility criteria, an exposure, or the outcome), what to do about patients whose index genomic test (the NGS report for the key index cancer) had not yet happened at a time point that defines eligibility. Such time points include the start of a qualifying regimen, the date of advanced or metastatic disease, the diagnosis date when patients are followed from diagnosis, and any landmark. Acceptable rules include requiring testing before that time point, including patients whatever the testing date, or a stated delayed-entry rule. A stated delayed-entry rule for the outcome's index date (for example, left truncation at the NGS report date) settles this for that time point. The concept applies whenever such a time point is not defined to follow testing, whether or not any patient in this cohort was tested after it. When the time point is itself left open (for example, an unstated index date), the concept applies unless every reasonable reading of it is defined to follow testing. When the time point is also the index date of a time-to-event outcome, this concept and left truncation under the analysis plan are separate gaps: if the question states neither, flag both components. Requiring testing before the index date, or a stated delayed-entry rule, settles both. Including patients whatever the testing date settles eligibility but leaves risk-set entry open.
 - **Biomarker definitions for inclusion.** For a denominator that requires the presence or absence of a biomarker, the genes or gene set, panel coverage, alteration types (SNV/indel, copy number, fusion, structural variant), variant filters beyond the non-synonymous default, copy-number thresholds, germline versus somatic scope, and which specimen counts.
 - **Cancer type and histology.** The eligible cancer types and histologies (`ca_type`, histology, primary site, sidedness), and how the question's terms map to their codes. No conventional default names a source for histology, so a question that restricts by histology must say which source and codes it uses. A bare reference to the cohort's own cancer, by name or abbreviation, is settled by the key-index-cancer convention. Note that `ca_type` is largely missing in some cohorts (see the Analytic Data Guide).
@@ -252,7 +254,12 @@ When a question uses any of these terms without further qualification, assume th
   itself, a gap. Wording about time ("ever", "at any point") does not widen this; only wording that names other
   cancers (for example, "for any cancer") does. A regimen not linked to
   any cancer (`ca_seq` missing, which the Analytic Data Guide allows) is
-  not attributed to the key index cancer and does not count.
+  not attributed to the key index cancer and does not count. The same
+  holds for line of therapy: lines are numbered only among regimens for
+  the key index cancer (`regimen_number_within_cancer`, not
+  `regimen_number`, which counts regimens for all cancers), so a regimen
+  for another cancer, or one linked to no cancer, does not move a later
+  regimen to a later line.
 
 - **Patients with no regimen** → BPC curated cancer-directed regimens for
   every cancer diagnosis, so a patient with no regimen for the key index
@@ -324,12 +331,17 @@ When a question uses any of these terms without further qualification, assume th
   their own event and censoring rules, set out in the Analytic Data Guide.
   Death is an event for OS and for every PFS variant. OS, and PFS from
   advanced-disease diagnosis (`*_adv_*`), censor at the last known alive
-  date. PFS from regimen start (`*_g_*`) censors at the start of the next
-  cancer-directed regimen, or at the last known alive date if there is
-  none. PFS variables are populated only for cancers that were stage IV at
+  date. PFS from regimen start (`*_g_*`) censors at the next
+  cancer-directed regimen or at the end of follow-up: the start of the
+  next regimen if there is one, otherwise the last known alive date. PFS
+  variables are populated only for cancers that were stage IV at
   diagnosis or that later developed distant metastasis; for the latter,
   PFS from regimen start is defined only for regimens that began after the
-  date of distant metastasis. Using the canonical
+  date of distant metastasis. A later distant metastasis
+  (`dmets_stage_i_iii`) is recorded only for a patient's first BPC Project
+  Cancer, so a later index cancer that was Stage I–III at diagnosis has no
+  PFS. An analysed unit whose canonical variable is blank is outside that
+  variable's population and is dropped. Using the canonical
   variable for the stated endpoint and index date settles censoring, but
   not how patients enter the risk set (see "Left truncation").
 
