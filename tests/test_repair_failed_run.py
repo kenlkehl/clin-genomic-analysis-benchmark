@@ -1,4 +1,4 @@
-"""Tests for selective, non-destructive repair of failed benchmark stages."""
+"""Tests for selective, non-destructive repair of failed analyze questions."""
 
 from __future__ import annotations
 
@@ -8,18 +8,6 @@ from types import SimpleNamespace
 
 from clin_genomic_analysis_benchmark.agent import repair
 from clin_genomic_analysis_benchmark.agent.orchestrator import QuestionRun
-from clin_genomic_analysis_benchmark.components import COMPONENT_IDS
-
-
-def _assess_result(route: str) -> dict:
-    """A valid assess result whose verdicts derive the requested route."""
-    return {
-        cid: {
-            "needs_clarification": route == "ambiguous" and cid == "outcome",
-            "rationale": "r",
-        }
-        for cid in COMPONENT_IDS
-    }
 
 
 def _invocation(*, success: bool, result: dict | None = None,
@@ -32,111 +20,51 @@ def _invocation(*, success: bool, result: dict | None = None,
     }
 
 
-def _assess(route: str) -> dict:
-    return _invocation(success=True, result=_assess_result(route))
+_ANSWER = {"answer_type": "count", "answer": {"value": 1, "n": 1}}
 
 
-def test_find_score_relevant_failures_excludes_wrong_route_failures():
-    unusable = _assess_result("unambiguous")
-    del unusable["covariates"]
+def test_find_score_relevant_failures_selects_failed_gold_unambiguous_analyses():
     runs = [
-        {
-            "cohort": "c",
-            "question_id": "assess-failed",
-            "assess": _invocation(success=False, reason="exit_code=3"),
-        },
-        {
-            "cohort": "c",
-            "question_id": "assess-unusable",
-            "assess": _invocation(success=True, result=unusable),
-        },
-        {
-            "cohort": "c",
-            "question_id": "flagged",
-            "assess": _assess("ambiguous"),
-        },
-        {
-            "cohort": "c",
-            "question_id": "flagged-gold-clear",
-            "assess": _assess("ambiguous"),
-        },
-        {
-            "cohort": "c",
-            "question_id": "analysis-failed",
-            "assess": _assess("unambiguous"),
-            "analyze": _invocation(success=False, reason="schema_violation"),
-        },
-        {
-            "cohort": "c",
-            "question_id": "wrong-unambiguous-route",
-            "assess": _assess("unambiguous"),
-            "analyze": _invocation(success=False, reason="schema_violation"),
-        },
-        {
-            "cohort": "c",
-            "question_id": "no-gold-answer",
-            "assess": _assess("unambiguous"),
-            "analyze": _invocation(success=False, reason="timeout"),
-        },
+        {"cohort": "c", "question_id": "analysis-failed",
+         "analyze": _invocation(success=False, reason="schema_violation")},
+        {"cohort": "c", "question_id": "blew-up", "analyze": None,
+         "error": "RuntimeError('boom')"},
+        {"cohort": "c", "question_id": "ok", "analyze": _invocation(success=True, result=_ANSWER)},
+        {"cohort": "c", "question_id": "gold-now-ambiguous",
+         "analyze": _invocation(success=False, reason="timeout")},
+        {"cohort": "c", "question_id": "no-gold-answer",
+         "analyze": _invocation(success=False, reason="timeout")},
     ]
     gold = {
-        ("c", "assess-failed"): {"classification": "ambiguous"},
-        ("c", "assess-unusable"): {"classification": "unambiguous",
-                                   "gold_answer": {"value": 1}},
-        ("c", "flagged"): {"classification": "ambiguous"},
-        ("c", "flagged-gold-clear"): {"classification": "unambiguous",
-                                      "gold_answer": {"value": 1}},
-        ("c", "analysis-failed"): {
-            "classification": "unambiguous",
-            "gold_answer": {"value": 1},
-        },
-        ("c", "wrong-unambiguous-route"): {"classification": "ambiguous"},
+        ("c", "analysis-failed"): {"classification": "unambiguous", "gold_answer": {"value": 1}},
+        ("c", "blew-up"): {"classification": "unambiguous", "gold_answer": {"value": 1}},
+        ("c", "ok"): {"classification": "unambiguous", "gold_answer": {"value": 1}},
+        ("c", "gold-now-ambiguous"): {"classification": "ambiguous"},
         ("c", "no-gold-answer"): {"classification": "unambiguous"},
     }
 
     targets = repair.find_score_relevant_failures(runs, gold)
 
-    assert [(target.question_id, target.stage) for target in targets] == [
-        ("assess-failed", "assess"),
-        ("assess-unusable", "assess"),
-        ("analysis-failed", "analyze"),
-    ]
-    assert targets[0].original_failure_reason == "exit_code=3"
+    assert [target.question_id for target in targets] == ["analysis-failed", "blew-up"]
+    assert targets[0].original_failure_reason == "schema_violation"
+    assert targets[1].original_failure_reason == "RuntimeError('boom')"
 
 
-def test_find_score_relevant_failures_respects_partial_run_stages():
-    runs = [
-        {
-            "cohort": "c",
-            "question_id": "q",
-            "assess": None,
-            "classification_gold": "unambiguous",
-            "analyze": _invocation(success=False, reason="timeout"),
-        },
-        {
-            "cohort": "c",
-            "question_id": "q-ambiguous",
-            "assess": None,
-            "classification_gold": "ambiguous",
-            "analyze": None,
-        },
-    ]
-    gold = {
-        ("c", "q"): {"classification": "unambiguous", "gold_answer": {"value": 1}},
-        ("c", "q-ambiguous"): {"classification": "ambiguous"},
-    }
-
-    targets = repair.find_score_relevant_failures(
-        runs,
-        gold,
-        configured_stages={"analyze"},
-    )
-
-    # A deliberately omitted assess stage is not mistaken for a failure;
-    # its persisted harness-side route allows the intended stage to be retried.
-    assert [(target.question_id, target.stage) for target in targets] == [
-        ("q", "analyze")
-    ]
+def test_plan_refuses_a_run_that_is_not_an_analyze_run(tmp_path):
+    for task in (None, "assess"):
+        source = tmp_path / f"source-{task}"
+        source.mkdir()
+        manifest = {"cohorts": [], "integrity": {"status": "valid"}}
+        if task:
+            manifest["task"] = task
+        (source / "manifest.json").write_text(json.dumps(manifest))
+        (source / "runs.json").write_text("[]")
+        try:
+            repair.plan_failed_run(source)
+        except ValueError as exc:
+            assert "is not an analyze run" in str(exc)
+        else:
+            raise AssertionError(f"task={task!r} should not be repairable here")
 
 
 def test_restored_environment_pins_original_claude_model_effort_and_project(monkeypatch):
@@ -210,6 +138,7 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
     source = tmp_path / "runs" / "agent" / "source-run"
     source.mkdir(parents=True)
     manifest = {
+        "task": "analyze",
         "agent_cmd": "fake-agent",
         "agent_name": "agent",
         "run_id": "source-run",
@@ -218,18 +147,13 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
         "n_completed": 2,
         "agent_provenance": {},
         "integrity": {"status": "valid"},
-        "settings": {
-            "stages": ["assess", "analyze"],
-            "timeouts": {"assess": 10, "analyze": 30},
-        },
+        "settings": {"timeouts": {"analyze": 30}},
     }
     original_runs = [
         {
             "question_id": "q-failed",
             "cohort": "c",
             "category": 1,
-            "classification_gold": "",
-            "assess": _assess("unambiguous"),
             "analyze": _invocation(success=False, reason="timeout"),
             "error": None,
         },
@@ -237,9 +161,7 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
             "question_id": "q-ok",
             "cohort": "c",
             "category": 1,
-            "classification_gold": "",
-            "assess": _assess("ambiguous"),
-            "analyze": None,
+            "analyze": _invocation(success=True, result=_ANSWER),
             "error": None,
         },
     ]
@@ -256,7 +178,8 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
         gold_questions=[
             SimpleNamespace(id="q-failed", classification="unambiguous",
                             gold_answer={"value": 1}),
-            SimpleNamespace(id="q-ok", classification="ambiguous", gold_answer=None),
+            SimpleNamespace(id="q-ok", classification="unambiguous",
+                            gold_answer={"value": 1}),
         ],
         public_questions=[
             SimpleNamespace(id="q-failed", category=1, text="failed question"),
@@ -272,7 +195,6 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
             question_id="q-failed",
             cohort="c",
             category=1,
-            classification_gold="unambiguous",
             analyze={
                 "success": True,
                 "result": {"answer_type": "count", "answer": {"value": 1, "n": 1}},
@@ -302,9 +224,7 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
     assert summary.repaired_run_dir == repaired
     assert summary.successful_merges == 1
     assert summary.failed_retries == 0
-    assert captured_kwargs["stages"] == ["analyze"]
-    assert captured_kwargs["gold_classification"] == "unambiguous"
-    assert captured_kwargs["timeout_config"].assess == 10
+    assert "stages" not in captured_kwargs
     assert captured_kwargs["timeout_config"].analyze == 90
 
     # Source result and artifacts remain untouched.
@@ -313,7 +233,6 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
 
     repaired_runs = json.loads((repaired / "runs.json").read_text())
     assert repaired_runs[0]["analyze"]["success"] is True
-    assert repaired_runs[0]["assess"] == original_runs[0]["assess"]
     assert repaired_runs[1] == original_runs[1]
     assert (repaired / "per_question" / "c" / "q-failed" / "original.log").exists()
     assert not (repaired / "scorecard.json").exists()
@@ -333,90 +252,25 @@ def test_retry_failed_run_copies_merges_a_success_and_preserves_source(
     assert scored == [{"run_path": str(repaired), "scoring_config_path": None}]
 
 
-def test_retry_failed_assess_reruns_full_route_and_merges_both_stages(
-    tmp_path, monkeypatch
-):
-    source = tmp_path / "agent" / "source"
-    source.mkdir(parents=True)
-    (source / "manifest.json").write_text(json.dumps({
-        "agent_cmd": "fake-agent",
-        "agent_name": "agent",
-        "run_id": "source",
-        "cohorts": ["c"],
-        "agent_provenance": {},
-        "integrity": {"status": "valid"},
-        "settings": {"stages": ["assess", "analyze"]},
-    }))
-    (source / "runs.json").write_text(json.dumps([{
-        "question_id": "q",
-        "cohort": "c",
-        "category": 1,
-        "classification_gold": "",
-        "assess": _invocation(success=False, reason="timeout"),
-        "analyze": None,
-        "error": "RuntimeError('boom')",
-    }]))
-    _patch_repair_environment(
-        monkeypatch,
-        gold_questions=[SimpleNamespace(id="q", classification="unambiguous",
-                                        gold_answer={"value": 1})],
-        public_questions=[SimpleNamespace(id="q", category=1, text="question")],
-    )
-    monkeypatch.setattr(repair, "score_run", lambda **kwargs: kwargs["run_path"])
-    captured_kwargs = {}
-    new_assess = _invocation(success=True, result=_assess_result("unambiguous"))
-    new_analyze = _invocation(
-        success=True,
-        result={"answer_type": "count", "answer": {"value": 1, "n": 1}},
-    )
-
-    def fake_run_one_question(**kwargs):
-        captured_kwargs.update(kwargs)
-        return QuestionRun(
-            question_id="q", cohort="c", category=1, classification_gold="",
-            assess=new_assess, analyze=new_analyze,
-        )
-
-    monkeypatch.setattr(repair, "_run_one_question", fake_run_one_question)
-
-    summary = repair.retry_failed_run(
-        run_path=source,
-        output_run_id="repaired",
-        max_parallel=1,
-        agent_retry_base_seconds=0,
-        timeout_overrides={"assess": 45},
-    )
-
-    assert summary.successful_merges == 1
-    assert [(t.question_id, t.stage) for t in summary.targets] == [("q", "assess")]
-    assert captured_kwargs["stages"] == ["assess", "analyze"]
-    assert captured_kwargs["gold_classification"] is None
-    assert captured_kwargs["timeout_config"].assess == 45
-    repaired_runs = json.loads((source.parent / "repaired" / "runs.json").read_text())
-    assert repaired_runs[0]["assess"] == new_assess
-    assert repaired_runs[0]["analyze"] == new_analyze
-    assert repaired_runs[0]["error"] is None
-
-
 def test_retry_failed_run_keeps_original_failure_when_retry_exhausts(
     tmp_path, monkeypatch
 ):
     source = tmp_path / "agent" / "source"
     source.mkdir(parents=True)
     (source / "manifest.json").write_text(json.dumps({
+        "task": "analyze",
         "agent_cmd": "fake-agent",
         "agent_name": "agent",
         "run_id": "source",
         "cohorts": ["c"],
         "agent_provenance": {},
-        "settings": {"stages": ["assess", "analyze"]},
+        "settings": {},
     }))
     old_failure = _invocation(success=False, reason="timeout")
     (source / "runs.json").write_text(json.dumps([{
         "question_id": "q",
         "cohort": "c",
         "category": 1,
-        "assess": _assess("unambiguous"),
         "analyze": old_failure,
         "error": None,
     }]))
@@ -434,7 +288,6 @@ def test_retry_failed_run_keeps_original_failure_when_retry_exhausts(
             question_id="q",
             cohort="c",
             category=1,
-            classification_gold="unambiguous",
             analyze={
                 "success": False,
                 "result": None,
@@ -461,6 +314,7 @@ def test_plan_refuses_quarantined_source(tmp_path):
     source = tmp_path / "quarantined"
     source.mkdir()
     (source / "manifest.json").write_text(json.dumps({
+        "task": "analyze",
         "agent_cmd": "bash adapters/claude_code/run.sh",
         "cohorts": [],
         "integrity": {"status": "quarantined"},
@@ -476,19 +330,18 @@ def test_plan_refuses_quarantined_source(tmp_path):
 
 
 def test_timeout_config_rejects_invalid_overrides():
-    manifest = {"settings": {"timeouts": {"assess": 10, "analyze": 30}}}
+    manifest = {"settings": {"timeouts": {"analyze": 30}}}
 
-    configured = repair._timeout_config(manifest, {"assess": 100})
-    assert configured.assess == 100
-    assert configured.analyze == 30
+    assert repair._timeout_config(manifest).analyze == 30
+    assert repair._timeout_config(manifest, {"analyze": 100}).analyze == 100
 
-    for retired in ("unknown", "classify", "disambiguate"):
+    for retired in ("unknown", "assess", "classify", "disambiguate"):
         try:
             repair._timeout_config(manifest, {retired: 5})
         except ValueError as exc:
             assert "unknown timeout override" in str(exc)
         else:
-            raise AssertionError(f"{retired!r} stage should be rejected")
+            raise AssertionError(f"{retired!r} override should be rejected")
 
 
 def test_repair_loop_continues_on_progress_until_complete(tmp_path, monkeypatch):
@@ -496,8 +349,8 @@ def test_repair_loop_continues_on_progress_until_complete(tmp_path, monkeypatch)
     source.mkdir()
     (source / "manifest.json").write_text(json.dumps({"run_id": "source"}))
     (source / "runs.json").write_text("[]")
-    target_one = repair.RepairTarget("q1", "c", "assess", "timeout")
-    target_two = repair.RepairTarget("q2", "c", "analyze", "timeout")
+    target_one = repair.RepairTarget("q1", "c", "timeout")
+    target_two = repair.RepairTarget("q2", "c", "timeout")
     pass_one = source.parent / "loop-output"
     pass_two = source.parent / "loop-output-pass2"
 
@@ -559,7 +412,7 @@ def test_repair_loop_continues_on_progress_until_complete(tmp_path, monkeypatch)
         run_path=source,
         output_run_id="loop-output",
         max_repair_passes=3,
-        timeout_overrides={"assess": 900},
+        timeout_overrides={"analyze": 900},
     )
 
     assert result.stop_reason == "complete"
@@ -580,7 +433,7 @@ def test_repair_loop_continues_on_progress_until_complete(tmp_path, monkeypatch)
     assert not pass_one.exists()
     assert calls[0]["output_run_id"] == "loop-output"
     assert calls[1]["output_run_id"] == "loop-output-pass2"
-    assert calls[1]["timeout_overrides"] == {"assess": 900}
+    assert calls[1]["timeout_overrides"] == {"analyze": 900}
     assert scored == [{
         "run_path": str(pass_two.resolve()),
         "scoring_config_path": None,

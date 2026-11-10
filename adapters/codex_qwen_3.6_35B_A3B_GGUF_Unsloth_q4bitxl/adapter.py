@@ -8,9 +8,7 @@ import os
 import subprocess
 import sys
 import time
-from dataclasses import replace
 from pathlib import Path
-from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 ADAPTER_DIR = Path(__file__).resolve().parent
@@ -21,6 +19,7 @@ if str(ADAPTER_DIR) not in sys.path:
     sys.path.insert(0, str(ADAPTER_DIR))
 
 from adapters.codex_gpt.adapter import (  # noqa: E402
+    TASK,
     _build_prompt,
     _env_float,
     _env_int,
@@ -34,15 +33,16 @@ from unsloth_bridge import (  # noqa: E402
     BridgeConfig,
     DEFAULT_REQUEST_TIMEOUT_SECONDS,
     UnslothResponsesBridge,
-    UnslothResponsesClient,
 )
 from clin_genomic_analysis_benchmark.agent.isolation import (  # noqa: E402
     SANDBOX_SCRATCH_DIR,
     export_agent_session_audit,
     sandboxed_agent_command,
 )
-from clin_genomic_analysis_benchmark.agent.contract import validate_result  # noqa: E402
-from clin_genomic_analysis_benchmark.components import COMPONENT_IDS  # noqa: E402
+from clin_genomic_analysis_benchmark.agent.contract import (  # noqa: E402
+    ANALYZE_RESULT_SCHEMA,
+    validate_result,
+)
 
 
 PROVIDER_NAME = "local_unsloth_qwen3_6_35b_a3b"
@@ -57,35 +57,19 @@ BRIDGE_TOKEN_ENV = "UNSLOTH_STUDIO_BRIDGE_KEY"
 
 def _build_unsloth_prompt(question: dict) -> str:
     prompt = _build_prompt(question)
-    stage = question["stage"]
-    if stage == "analyze":
-        return (
-            f"{prompt}\n\n"
-            "## Local-model analysis completion guard\n"
-            "Finish the computation in this invocation. Work toward one complete "
-            "analysis script instead of repeatedly exploring or rewriting partial "
-            "scripts. Inspect only the files and columns needed for the requested "
-            "estimand. If a command or script fails, fix and rerun it immediately. "
-            "Never end a turn by announcing what you will inspect, build, fix, or "
-            "run next: perform that action with a tool in the same turn. Do not "
-            "stop after planning a final script. Once you have a defensible result, "
-            "stop further refinement and return the required contract JSON as your "
-            "final message. A best contract-valid result is preferable to an "
-            "unfinished exhaustive analysis.\n"
-        )
-    if stage != "assess":
-        return prompt
     return (
         f"{prompt}\n\n"
-        "## Local-model completion guard\n"
-        "Complete this assess stage in at most 16 assistant turns and 8 shell "
-        "commands. Run only the data checks the benchmark rules require for a "
-        "component verdict. Do not enumerate full tables, print full column "
-        "lists, or dump large files. Never end a turn by merely announcing another "
-        "inspection or saying what you will do next: either execute the necessary "
-        "tool now or return the required JSON. If further inspection would only "
-        "refine confidence, stop and return your best contract-compliant answer "
-        "from the evidence already available.\n"
+        "## Local-model analysis completion guard\n"
+        "Finish the computation in this invocation. Work toward one complete "
+        "analysis script instead of repeatedly exploring or rewriting partial "
+        "scripts. Inspect only the files and columns needed for the requested "
+        "estimand. If a command or script fails, fix and rerun it immediately. "
+        "Never end a turn by announcing what you will inspect, build, fix, or "
+        "run next: perform that action with a tool in the same turn. Do not "
+        "stop after planning a final script. Once you have a defensible result, "
+        "stop further refinement and return the required contract JSON as your "
+        "final message. A best contract-valid result is preferable to an "
+        "unfinished exhaustive analysis.\n"
     )
 
 
@@ -114,52 +98,6 @@ def _build_analyze_continuation_prompt(
         "The previous invocation's final message was:\n"
         f"{previous or '(empty)'}\n"
     )
-
-
-def _stage_output_schema(question: dict) -> dict | None:
-    stage = question["stage"]
-    if stage == "assess":
-        # Strict structured output requires every property to be required.
-        verdict = {
-            "type": "object",
-            "properties": {
-                "needs_clarification": {"type": "boolean"},
-                "rationale": {"type": "string", "minLength": 1},
-            },
-            "required": ["needs_clarification", "rationale"],
-            "additionalProperties": False,
-        }
-        return {
-            "type": "object",
-            "properties": {cid: verdict for cid in COMPONENT_IDS},
-            "required": list(COMPONENT_IDS),
-            "additionalProperties": False,
-        }
-    if stage == "analyze":
-        return {
-            "type": "object",
-            "properties": {
-                "answer_type": {
-                    "type": "string",
-                    "enum": [
-                        "count",
-                        "proportion",
-                        "median_with_ci",
-                        "hazard_ratio_with_ci",
-                        "odds_ratio_with_ci",
-                        "pvalue",
-                        "categorical",
-                        "categorical_distribution",
-                    ],
-                },
-                "answer": {"type": "object"},
-                "methods": {"type": "string"},
-                "supporting_evidence": {"type": "object"},
-            },
-            "required": ["answer_type", "answer"],
-            "additionalProperties": False,
-        }
-    return None
 
 
 def _normalize_analyze_result(obj: dict | None) -> dict | None:
@@ -229,119 +167,6 @@ def _normalize_analyze_result(obj: dict | None) -> dict | None:
                 break
     normalized["answer"] = answer
     return normalized
-
-
-def _response_output_text(response: Mapping[str, Any]) -> str:
-    direct = response.get("output_text")
-    if isinstance(direct, str) and direct.strip():
-        return direct.strip()
-    parts: list[str] = []
-    for item in response.get("output") or []:
-        if not isinstance(item, Mapping):
-            continue
-        if item.get("type") == "output_text" and isinstance(item.get("text"), str):
-            parts.append(item["text"])
-            continue
-        if item.get("type") != "message":
-            continue
-        for content in item.get("content") or []:
-            if not isinstance(content, Mapping):
-                continue
-            if content.get("type") != "output_text":
-                continue
-            text = content.get("text")
-            if isinstance(text, str):
-                parts.append(text)
-    return "\n".join(part for part in parts if part).strip()
-
-
-def _contract_fallback_prompt(question: dict, previous_text: str = "") -> str:
-    components = "\n".join(
-        f"- {entry['id']}: {entry.get('label', '')} — {entry.get('description', '')}"
-        for entry in question.get("assessment_components") or []
-        if isinstance(entry, dict) and isinstance(entry.get("id"), str)
-    )
-    prior = ""
-    if previous_text:
-        prior = (
-            "\nYour previous answer was not a valid contract object. Do not repeat it:\n"
-            f"{previous_text[:1000]}\n"
-        )
-    return (
-        "You are the contract-finalization step for a cancer-data benchmark. "
-        "You have no tools and must decide from the public question, stage "
-        "instructions, and component list below. Never announce a plan or request "
-        "more data. Apply conventional defaults; mark a component as needing "
-        "clarification only when the question leaves it open.\n\n"
-        f"Stage: {question['stage']}\n"
-        f"Question: {question['question_text']}\n"
-        f"Stage instructions: {question['instructions']}\n\n"
-        f"Components:\n{components}\n"
-        f"{prior}\n"
-        "Return only the required JSON object, with no Markdown or prose."
-    )
-
-
-def _direct_contract_result(question: dict) -> dict:
-    """Recover a malformed assess-stage final with the same local model."""
-    if question["stage"] != "assess":
-        raise RuntimeError("contract fallback is only available for the assess stage")
-    schema = _stage_output_schema(question)
-    config = _bridge_config()
-    stage = question["stage"]
-    audit_path = (
-        Path(question["scratch_dir"]).resolve().parent
-        / "adapter_audit"
-        / f"unsloth_contract_fallback.{stage}.jsonl"
-    )
-
-    def audit(record: dict[str, Any]) -> None:
-        audit_path.parent.mkdir(parents=True, exist_ok=True)
-        with audit_path.open("a") as handle:
-            handle.write(json.dumps({"timestamp": time.time(), **record}) + "\n")
-
-    client = UnslothResponsesClient(config, audit)
-    previous_text = ""
-    for semantic_attempt in range(1, 3):
-        response = client.complete({
-            "model": config.model,
-            "input": [{
-                "type": "message",
-                "role": "user",
-                "content": [{
-                    "type": "input_text",
-                    "text": _contract_fallback_prompt(question, previous_text),
-                }],
-            }],
-            "tools": [],
-            "max_output_tokens": 4_096,
-            "reasoning": {"effort": "none"},
-            "chat_template_kwargs": {"enable_thinking": False},
-            "text": {
-                "format": {
-                    "type": "json_schema",
-                    "name": f"{stage}_result",
-                    "schema": schema,
-                    "strict": True,
-                }
-            },
-            "stream": False,
-        })
-        previous_text = _response_output_text(response)
-        result = _extract_json(previous_text)
-        schema_errors = validate_result(result, stage) if result is not None else []
-        valid_result = result is not None and not schema_errors
-        audit({
-            "event": "contract_fallback_result",
-            "semantic_attempt": semantic_attempt,
-            "output_item_count": len(response.get("output") or []),
-            "output_character_count": len(previous_text),
-            "valid_contract_json": valid_result,
-            "schema_error_count": len(schema_errors),
-        })
-        if valid_result:
-            return result
-    raise RuntimeError("same-model contract fallback did not return valid JSON")
 
 
 def _model() -> str:
@@ -457,33 +282,15 @@ def _codex_call(
     last_message_file: Path,
     call_label: str = "",
 ) -> str:
-    stage = question["stage"]
+    stage = TASK
     scratch_dir = Path(question["scratch_dir"]).resolve()
     cohort_dir = Path(question["cohort_dir"]).resolve()
     scratch_dir.mkdir(parents=True, exist_ok=True)
     max_attempts = _env_int("CODEX_MAX_ATTEMPTS", 1)
     retry_sleep = _env_float("CODEX_RETRY_BASE_SECONDS", 15.0)
     config = _bridge_config()
-    if stage == "assess":
-        config = replace(
-            config,
-            max_retries=min(
-                config.max_retries,
-                _env_int("UNSLOTH_ASSESS_MAX_RETRIES", 1),
-            ),
-            max_requests=min(
-                config.max_requests,
-                _env_int("UNSLOTH_ASSESS_MAX_REQUESTS", 24),
-            ),
-            max_output_tokens=_env_int(
-                "UNSLOTH_ASSESS_MAX_OUTPUT_TOKENS", 8_192
-            ),
-        )
-    output_schema = _stage_output_schema(question)
-    output_schema_path: Path | None = None
-    if output_schema is not None:
-        output_schema_path = scratch_dir / f".codex_output_schema.{stage}.json"
-        output_schema_path.write_text(json.dumps(output_schema, indent=2))
+    output_schema_path = scratch_dir / f".codex_output_schema.{stage}.json"
+    output_schema_path.write_text(json.dumps(ANALYZE_RESULT_SCHEMA, indent=2))
 
     codex_bin = os.environ.get("CODEX_BIN", "codex")
     cmd = [
@@ -505,11 +312,10 @@ def _codex_call(
         "-o",
         str(SANDBOX_SCRATCH_DIR / last_message_file.name),
     ]
-    if output_schema_path is not None:
-        cmd += [
-            "--output-schema",
-            str(SANDBOX_SCRATCH_DIR / output_schema_path.name),
-        ]
+    cmd += [
+        "--output-schema",
+        str(SANDBOX_SCRATCH_DIR / output_schema_path.name),
+    ]
     if _env_truthy("CODEX_EPHEMERAL", True):
         cmd.append("--ephemeral")
     cmd += [
@@ -620,15 +426,13 @@ def main() -> int:
     args = parser.parse_args()
 
     question = _load_question(args.question_file)
-    stage = question["stage"]
+    stage = TASK
     scratch_dir = Path(question["scratch_dir"])
     scratch_dir.mkdir(parents=True, exist_ok=True)
     last_message_file = scratch_dir / f".codex_last_message.{stage}.txt"
     text = ""
     obj: dict | None = None
-    analyze_continuations = (
-        _env_int("CODEX_ANALYZE_CONTINUATIONS", 2) if stage == "analyze" else 0
-    )
+    analyze_continuations = _env_int("CODEX_ANALYZE_CONTINUATIONS", 2)
     for continuation in range(analyze_continuations + 1):
         call_label = f"continuation_{continuation}" if continuation else ""
         current_last_message = (
@@ -652,11 +456,9 @@ def main() -> int:
             )
         except Exception as exc:
             sys.stderr.write(f"adapter: Codex/Unsloth invocation failed: {exc}\n")
-            if stage != "assess":
-                return 3
-            break
+            return 3
         obj = _normalize_analyze_result(_extract_json(text))
-        result_errors = validate_result(obj, stage) if obj is not None else []
+        result_errors = validate_result(obj) if obj is not None else []
         if obj is not None and not result_errors:
             break
         if continuation < analyze_continuations:
@@ -665,23 +467,7 @@ def main() -> int:
                 "the same model from existing scratch work\n"
             )
 
-    contract_errors = (
-        validate_result(obj, stage)
-        if obj is not None and stage == "assess"
-        else []
-    )
-    if stage == "assess" and (
-        obj is None or contract_errors
-    ):
-        sys.stderr.write(
-            "adapter: Codex final was not valid contract JSON; trying same-model "
-            "no-tools finalizer\n"
-        )
-        try:
-            obj = _direct_contract_result(question)
-        except Exception as exc:
-            sys.stderr.write(f"adapter: contract finalizer failed: {exc}\n")
-    if obj is None or validate_result(obj, stage):
+    if obj is None or validate_result(obj):
         sys.stderr.write("adapter: could not extract JSON from Codex output\n")
         sys.stderr.write(text[:2000] + "\n")
         return 3

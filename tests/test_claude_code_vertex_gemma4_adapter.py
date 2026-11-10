@@ -64,7 +64,6 @@ def _call_adapter(tmp_path) -> str:
         data_dictionary_path="/dictionary.xlsx",
         scratch_dir=str(tmp_path / "question" / "scratch"),
         allowed_tools="Read,Glob,Grep,Bash",
-        stage="analyze",
     )
 
 

@@ -18,6 +18,7 @@ import sys
 import time
 from pathlib import Path
 
+from clin_genomic_analysis_benchmark.instructions import analyze_rulebook
 from clin_genomic_analysis_benchmark.agent.isolation import (
     SANDBOX_SCRATCH_DIR,
     export_agent_session_audit,
@@ -27,6 +28,9 @@ from clin_genomic_analysis_benchmark.agent.isolation import (
 
 ADAPTER_DIR = Path(__file__).resolve().parent
 AZURE_RESOURCE = "https://cognitiveservices.azure.com/"
+# Agents run only the analyze task; the name still labels audit files and
+# per-task environment overrides such as CODEX_SANDBOX_MODE_ANALYZE.
+TASK = "analyze"
 
 
 def _load_question(path: Path) -> dict:
@@ -38,14 +42,11 @@ def _build_prompt(question: dict) -> str:
     # Never disclose host paths to the model.  These aliases are backed by the
     # outer bubblewrap mounts created immediately before launching Codex.
     question = sandbox_question_view(question)
-    repo_root = ADAPTER_DIR.parent.parent
-    instructions_doc = (repo_root / "AGENT_INSTRUCTIONS.md").read_text()
-    stage = question["stage"]
+    instructions_doc = analyze_rulebook()
     payload = (
         f"# Question\n"
         f"- ID: {question['question_id']}\n"
-        f"- Cohort: {question['cohort']}\n"
-        f"- Stage: {stage}\n\n"
+        f"- Cohort: {question['cohort']}\n\n"
         f"## Cohort directory (READ-ONLY)\n"
         f"`{question['cohort_dir']}`\n\n"
         f"## Data dictionary\n"
@@ -57,8 +58,8 @@ def _build_prompt(question: dict) -> str:
         f"Your current working directory is your scratch directory (writable): "
         f"`{question['scratch_dir']}`. Write any intermediate files there. The "
         f"cohort directory is READ-ONLY -- read from it, never write to it. Use "
-        f"Python (pandas/numpy/scipy/statsmodels/lifelines as needed) for "
-        f"data checks in assess and for analyze.\n\n"
+        f"Python (pandas/numpy/scipy/statsmodels/lifelines as needed) to "
+        f"compute the answer.\n\n"
         f"Output ONLY the final JSON object as your very last message, with no "
         f"surrounding prose and no Markdown fences."
     )
@@ -261,13 +262,13 @@ def _env_float(name: str, default: float, *, minimum: float = 0.0) -> float:
     return max(minimum, value)
 
 
-def _sandbox_for(stage: str) -> str:
-    stage_key = f"CODEX_SANDBOX_MODE_{stage.upper()}"
-    if os.environ.get(stage_key):
-        return os.environ[stage_key]
+def _sandbox_for(task: str = TASK) -> str:
+    task_key = f"CODEX_SANDBOX_MODE_{task.upper()}"
+    if os.environ.get(task_key):
+        return os.environ[task_key]
     if os.environ.get("CODEX_SANDBOX_MODE"):
         return os.environ["CODEX_SANDBOX_MODE"]
-    # Both stages run Python over the cohort and may write scratch files.
+    # The analysis runs Python over the cohort and may write scratch files.
     return "workspace-write"
 
 
@@ -336,7 +337,7 @@ def _save_attempt_logs(
 
 
 def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
-    stage = question["stage"]
+    stage = TASK
     scratch_dir = Path(question["scratch_dir"]).resolve()
     cohort_dir = Path(question["cohort_dir"]).resolve()
     scratch_dir.mkdir(parents=True, exist_ok=True)
@@ -442,7 +443,7 @@ def main() -> int:
     args = p.parse_args()
 
     question = _load_question(args.question_file)
-    stage = question["stage"]
+    stage = TASK
     scratch_dir = Path(question["scratch_dir"])
     scratch_dir.mkdir(parents=True, exist_ok=True)
     last_message_file = scratch_dir / f".codex_last_message.{stage}.txt"

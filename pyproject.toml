@@ -34,7 +34,8 @@ build-backend = "hatchling.build"
 packages = ["clin_genomic_analysis_benchmark"]
 
 [tool.hatch.build.targets.sdist]
-include = ["clin_genomic_analysis_benchmark", "adapters", "scoring_configs", "README.md", "pyproject.toml"]
+include = ["clin_genomic_analysis_benchmark", "adapters", "scoring_configs", "README.md", "pyproject.toml",
+           "ASSESS_INSTRUCTIONS.md", "ANALYZE_INSTRUCTIONS.md", "CONVENTIONS.md"]
 
 [dependency-groups]
 dev = [

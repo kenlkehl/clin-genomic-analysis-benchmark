@@ -48,9 +48,8 @@ availability can vary independently of the display names in documentation.
 | `AGY_CLI_DISABLE_AUTO_UPDATE` | forced to `true` | prevents the CLI binary changing during a benchmark run |
 | `AGY_USE_SANDBOX` | `0` | experimental nested Antigravity sandbox; leave disabled for benchmark runs |
 | `AGY_SKIP_PERMISSIONS` | `0` | emergency diagnostic override; avoid in benchmark runs because it bypasses Antigravity permission checks |
-| `AGY_PRINT_TIMEOUT_ASSESS` | `59m30s` | Antigravity print timeout for assess |
 | `AGY_PRINT_TIMEOUT_ANALYZE` | `59m30s` | Antigravity print timeout for analyze |
-| `AGY_PRINT_TIMEOUT` | unset | fallback Antigravity print timeout for all stages |
+| `AGY_PRINT_TIMEOUT` | unset | fallback Antigravity print timeout |
 
 The adapter reads safe runtime fields from
 `~/.gemini/antigravity-cli/settings.json`, but it does not mount that directory.
@@ -67,7 +66,7 @@ application-default credentials are also copied for GCP-backed authentication.
 
 ```bash
 AGY_MODEL=gemini-3.6-flash-high \
-uv run clingen-bench eval \
+uv run clingen-bench analyze \
   --agent "bash adapters/antigravity_gemini/run.sh" \
   --agent-name antigravity_gemini_36_flash_high \
   --question bladder_1.2-Q6f9dd68e \
@@ -78,7 +77,7 @@ uv run clingen-bench eval \
 
 ```bash
 AGY_MODEL=gemini-3.6-flash-high \
-uv run clingen-bench eval \
+uv run clingen-bench analyze \
   --agent "bash adapters/antigravity_gemini/run.sh" \
   --agent-name antigravity_gemini_36_flash_high \
   --cohort all \
@@ -98,7 +97,7 @@ The model process sees only `/data/cohort` (read-only), the current dictionary,
 runtime. The repository, gold root, previous runs, host home, and sibling files
 are absent. Antigravity stdout, stderr, CLI logs, and generated session state are
 preserved under each question's `adapter_audit/` directory after the process
-exits; they are outside the mount used by later stages.
+exits; they are outside the mount used by later harness retries.
 
 The disposable settings allow normal analysis commands while web/MCP tools and
 direct file-tool reads of the disposable credential directories are denied.

@@ -9,6 +9,7 @@ There are two banks:
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Optional
 
@@ -50,6 +51,18 @@ def load_gold(cohort: str) -> Optional[CohortQuestionFile]:
         return None
     raw = yaml.safe_load(path.read_text())
     return CohortQuestionFile.model_validate(raw)
+
+
+def gold_bank_sha256(cohorts: list[str]) -> Optional[str]:
+    """One SHA-256 over the gold banks of ``cohorts``, so two scorecards can be
+    checked against the same gold. None if any bank is missing."""
+    digest = hashlib.sha256()
+    for cohort in sorted(cohorts):
+        path = gold_yaml_path(cohort)
+        if not path.exists():
+            return None
+        digest.update(f"{cohort}\0{hashlib.sha256(path.read_bytes()).hexdigest()}\n".encode())
+    return digest.hexdigest()
 
 
 # ---- public bank (gold-free, in-repo, agent-facing) ------------------------

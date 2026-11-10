@@ -18,7 +18,6 @@ from clin_genomic_analysis_benchmark.agent.orchestrator import (
     _agent_provenance,
     _timeout_config_for_adapter,
 )
-from clin_genomic_analysis_benchmark.components import COMPONENT_IDS, components_payload
 from clin_genomic_analysis_benchmark.config import TimeoutConfig
 
 
@@ -68,120 +67,25 @@ def test_studio_token_is_required_and_supports_legacy_fallback(monkeypatch):
     assert adapter._studio_token() == "preferred-token"
 
 
-def test_unsloth_adapter_uses_longer_request_and_stage_timeouts(monkeypatch):
+def test_unsloth_adapter_uses_longer_request_and_analyze_timeouts(monkeypatch):
     monkeypatch.setenv(adapter.TOKEN_ENV, "test-token")
     monkeypatch.delenv("UNSLOTH_REQUEST_TIMEOUT_SECONDS", raising=False)
 
     assert adapter._bridge_config().request_timeout_seconds == 1_200
     assert _timeout_config_for_adapter(
         "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl"
-    ) == TimeoutConfig(assess=7_200, analyze=7_200)
+    ) == TimeoutConfig(analyze=7_200)
 
     monkeypatch.setenv("UNSLOTH_REQUEST_TIMEOUT_SECONDS", "42")
     assert adapter._bridge_config().request_timeout_seconds == 42
 
 
-def test_all_stages_use_completion_guards_and_output_schemas(monkeypatch):
-    assess = {"stage": "assess", "assessment_components": components_payload()}
-    assess_schema = adapter._stage_output_schema(assess)
-    assert assess_schema["required"] == list(COMPONENT_IDS)
-    assert assess_schema["additionalProperties"] is False
-    for cid in COMPONENT_IDS:
-        verdict = assess_schema["properties"][cid]
-        assert verdict["properties"]["needs_clarification"] == {"type": "boolean"}
-        assert verdict["required"] == ["needs_clarification", "rationale"]
-
-    analyze = {"stage": "analyze"}
-    analyze_schema = adapter._stage_output_schema(analyze)
-    assert analyze_schema["required"] == ["answer_type", "answer"]
-    assert "pvalue" in analyze_schema["properties"]["answer_type"]["enum"]
-
+def test_analyze_prompt_carries_the_completion_guard(monkeypatch):
     monkeypatch.setattr(adapter, "_build_prompt", lambda question: "base prompt")
-    analyze_prompt = adapter._build_unsloth_prompt({"stage": "analyze"})
-    assert "analysis completion guard" in analyze_prompt
-    assert "Never end a turn by announcing" in analyze_prompt
-    assess_prompt = adapter._build_unsloth_prompt({"stage": "assess"})
-    assert "Local-model completion guard" in assess_prompt
-    assert "8 shell commands" in assess_prompt
-
-
-def test_same_model_contract_fallback_uses_no_tools_and_returns_json(
-    tmp_path, monkeypatch
-):
-    captured: dict = {}
-    monkeypatch.setenv(adapter.TOKEN_ENV, "test-token")
-    assess_result = {
-        cid: {
-            "needs_clarification": cid == "outcome",
-            "rationale": "The index date is unspecified." if cid == "outcome" else "Clear.",
-        }
-        for cid in COMPONENT_IDS
-    }
-
-    class FakeClient:
-        def __init__(self, config, audit):
-            captured["config"] = config
-            captured["audit"] = audit
-
-        def complete(self, payload):
-            captured["payload"] = payload
-            return {
-                "output": [{
-                    "type": "message",
-                    "content": [{
-                        "type": "output_text",
-                        "text": json.dumps(assess_result),
-                    }],
-                }],
-            }
-
-    monkeypatch.setattr(adapter, "UnslothResponsesClient", FakeClient)
-    result = adapter._direct_contract_result({
-        "stage": "assess",
-        "question_text": "Compare survival from an unspecified origin.",
-        "instructions": "Judge each component.",
-        "scratch_dir": str(tmp_path / "question" / "scratch"),
-        "assessment_components": components_payload(),
-    })
-
-    assert result == assess_result
-    assert "- outcome: Outcome" in captured["payload"]["input"][0]["content"][0]["text"]
-    assert captured["payload"]["tools"] == []
-    assert captured["payload"]["reasoning"] == {"effort": "none"}
-    assert captured["payload"]["chat_template_kwargs"] == {
-        "enable_thinking": False
-    }
-    assert captured["payload"]["text"]["format"]["strict"] is True
-    audit = (
-        tmp_path
-        / "question"
-        / "adapter_audit"
-        / "unsloth_contract_fallback.assess.jsonl"
-    ).read_text()
-    assert "index date" not in audit
-    assert '"valid_contract_json": true' in audit
-
-
-def test_response_output_text_ignores_reasoning_items():
-    response = {
-        "output": [
-            {
-                "type": "reasoning",
-                "content": [{"type": "reasoning_text", "text": "I will inspect."}],
-            },
-            {
-                "type": "message",
-                "content": [{
-                    "type": "output_text",
-                    "text": '{"classification":"ambiguous","rationale":"x"}',
-                }],
-            },
-        ]
-    }
-
-    assert adapter._response_output_text(response) == (
-        '{"classification":"ambiguous","rationale":"x"}'
-    )
+    prompt = adapter._build_unsloth_prompt({})
+    assert prompt.startswith("base prompt")
+    assert "analysis completion guard" in prompt
+    assert "Never end a turn by announcing" in prompt
 
 
 def test_analyze_contract_aliases_are_normalized_without_changing_values():
@@ -202,7 +106,7 @@ def test_analyze_contract_aliases_are_normalized_without_changing_values():
     assert result["answer"]["ci_high"] == 1.8302
     assert result["answer"]["p_value"] == 0.415778
     assert result["methods"] == "Cox model"
-    assert adapter.validate_result(result, "analyze") == []
+    assert adapter.validate_result(result) == []
 
     median = adapter._normalize_analyze_result({
         "answer_type": "median_with_ci",
@@ -218,31 +122,17 @@ def test_analyze_contract_aliases_are_normalized_without_changing_values():
     assert median["answer"]["ci_low"] == 14.51
     assert median["answer"]["ci_high"] == 39.18
     assert median["answer"]["n_total"] == 46
-    assert adapter.validate_result(median, "analyze") == []
+    assert adapter.validate_result(median) == []
 
 
-def test_invocation_failure_uses_same_model_contract_fallback(tmp_path, monkeypatch):
+def test_invocation_failure_fails_the_attempt(tmp_path, monkeypatch):
     output = tmp_path / "result.json"
-    question = {
-        "stage": "assess",
-        "scratch_dir": str(tmp_path / "scratch"),
-    }
+    question = {"scratch_dir": str(tmp_path / "scratch")}
     monkeypatch.setattr(adapter, "_load_question", lambda path: question)
     monkeypatch.setattr(
         adapter,
         "_codex_call",
         lambda **kwargs: (_ for _ in ()).throw(RuntimeError("schema failure")),
-    )
-    monkeypatch.setattr(
-        adapter,
-        "_direct_contract_result",
-        lambda payload: {
-            cid: {
-                "needs_clarification": cid == "outcome",
-                "rationale": "The endpoint is unspecified." if cid == "outcome" else "Clear.",
-            }
-            for cid in COMPONENT_IDS
-        },
     )
     monkeypatch.setattr(
         sys,
@@ -256,8 +146,8 @@ def test_invocation_failure_uses_same_model_contract_fallback(tmp_path, monkeypa
         ],
     )
 
-    assert adapter.main() == 0
-    assert json.loads(output.read_text())["outcome"]["needs_clarification"] is True
+    assert adapter.main() == 3
+    assert not output.exists()
 
 
 def test_analyze_continues_same_model_from_scratch_after_planning_final(
@@ -265,7 +155,6 @@ def test_analyze_continues_same_model_from_scratch_after_planning_final(
 ):
     output = tmp_path / "result.json"
     question = {
-        "stage": "analyze",
         "scratch_dir": str(tmp_path / "scratch"),
         "question_text": "How many eligible patients are there?",
         "instructions": "Return the typed benchmark JSON.",
@@ -320,7 +209,7 @@ def test_codex_call_pins_provider_and_shields_studio_token(tmp_path, monkeypatch
     monkeypatch.setenv("UNSLOTH_MODEL", "test-qwen")
     monkeypatch.setenv("CODEX_REASONING_EFFORT", "xhigh")
     monkeypatch.delenv("CODEX_SANDBOX_MODE", raising=False)
-    monkeypatch.delenv("CODEX_SANDBOX_MODE_ASSESS", raising=False)
+    monkeypatch.delenv("CODEX_SANDBOX_MODE_ANALYZE", raising=False)
 
     class FakeBridge:
         base_url = "http://127.0.0.1:12345/v1"
@@ -351,14 +240,13 @@ def test_codex_call_pins_provider_and_shields_studio_token(tmp_path, monkeypatch
         adapter.subprocess,
         "run",
         lambda cmd, **kwargs: subprocess.CompletedProcess(
-            cmd, 0, '{"outcome":{"needs_clarification":true}}', ""
+            cmd, 0, '{"answer_type":"count","answer":{"value":7}}', ""
         ),
     )
 
     result = adapter._codex_call(
         prompt="prompt",
         question={
-            "stage": "assess",
             "scratch_dir": str(scratch),
             "cohort_dir": str(cohort),
             "data_dictionary_path": str(dictionary),
@@ -368,7 +256,7 @@ def test_codex_call_pins_provider_and_shields_studio_token(tmp_path, monkeypatch
 
     command = captured["cmd"]
     sandbox_env = captured["env"]
-    assert result == '{"outcome":{"needs_clarification":true}}'
+    assert result == '{"answer_type":"count","answer":{"value":7}}'
     assert command[command.index("--model") + 1] == "test-qwen"
     assert f'model_provider="{adapter.PROVIDER_NAME}"' in command
     assert f"model_context_window={adapter.MODEL_CONTEXT_WINDOW}" in command
@@ -376,13 +264,13 @@ def test_codex_call_pins_provider_and_shields_studio_token(tmp_path, monkeypatch
     assert "--add-dir" not in command
     assert "--ephemeral" in command
     assert command[command.index("--output-schema") + 1] == str(
-        adapter.SANDBOX_SCRATCH_DIR / ".codex_output_schema.assess.json"
+        adapter.SANDBOX_SCRATCH_DIR / ".codex_output_schema.analyze.json"
     )
     assert command[command.index("--sandbox") + 1] == "workspace-write"
     schema = json.loads(
-        (scratch / ".codex_output_schema.assess.json").read_text()
+        (scratch / ".codex_output_schema.analyze.json").read_text()
     )
-    assert schema["required"] == list(COMPONENT_IDS)
+    assert schema["required"] == ["answer_type", "answer"]
     assert any(
         "base_url" in value and "http://127.0.0.1:12345/v1" in value
         for value in command
@@ -397,9 +285,7 @@ def test_codex_call_pins_provider_and_shields_studio_token(tmp_path, monkeypatch
     assert adapter.FALLBACK_TOKEN_ENV not in sandbox_env
     assert "CODEX_REASONING_EFFORT" not in sandbox_env
     assert captured["bridge_config"].api_key == "real-studio-token"
-    assert captured["bridge_config"].max_retries == 1
-    assert captured["bridge_config"].max_requests == 24
-    assert captured["bridge_config"].max_output_tokens == 8_192
+    assert captured["bridge_config"] == adapter._bridge_config()
     assert captured["home_kind"] == "codex_qwen"
 
 

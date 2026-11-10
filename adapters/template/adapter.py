@@ -1,6 +1,6 @@
 """Skeleton adapter for clin-genomic-analysis-benchmark.
 
-Implement `answer_<stage>(question: dict) -> dict` for both stages.
+Agents run only the analyze task: implement `answer_analyze(question: dict) -> dict`.
 The harness writes question.json and reads result.json. Both follow the JSON
 schemas defined in clin_genomic_analysis_benchmark/agent/contract.py.
 
@@ -16,20 +16,9 @@ import sys
 from pathlib import Path
 
 
-def answer_assess(question: dict) -> dict:
-    """Judge whether each component needs clarification. REPLACE THIS IMPLEMENTATION."""
-    raise NotImplementedError("template adapter — implement assess")
-
-
 def answer_analyze(question: dict) -> dict:
     """Compute the answer. REPLACE THIS IMPLEMENTATION."""
     raise NotImplementedError("template adapter — implement analyze")
-
-
-_DISPATCH = {
-    "assess": answer_assess,
-    "analyze": answer_analyze,
-}
 
 
 def main() -> int:
@@ -39,8 +28,7 @@ def main() -> int:
     args = p.parse_args()
 
     question = json.loads(args.question_file.read_text())
-    fn = _DISPATCH[question["stage"]]
-    result = fn(question)
+    result = answer_analyze(question)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2))

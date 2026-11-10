@@ -1,12 +1,12 @@
-"""Result types for deterministic assess-stage scoring."""
+"""Result types for deterministic assess scoring."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Optional
 
-# Outcomes per component. A missing agent verdict (failed or invalid assess
-# stage) is wrong for either gold class: "fn" when gold needs clarification,
+# Outcomes per component. A missing verdict (failed or invalid assess call)
+# is wrong for either gold class: "fn" when gold needs clarification,
 # "fp" when it does not.
 OUTCOMES = ("tp", "fn", "tn", "fp")
 

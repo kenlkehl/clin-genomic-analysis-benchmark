@@ -93,12 +93,8 @@ class AzureConfig:
 
 @dataclass(frozen=True)
 class TimeoutConfig:
-    """Per-stage agent timeouts (seconds).
-
-    Assess replaces the former classify and disambiguate stages (30 min each)
-    and may run data checks, so it gets their combined budget.
-    """
-    assess: int = 3600
+    """Agent timeout for the analyze task (seconds). The assess task is a
+    single API call and is bounded by its request timeout instead."""
     analyze: int = 3600
 
 

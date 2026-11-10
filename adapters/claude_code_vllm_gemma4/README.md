@@ -7,7 +7,7 @@ through `ANTHROPIC_BASE_URL`; no translation bridge is involved. Prompts, the
 tool allow-list, and JSON extraction are the same as the reference
 `claude_code` adapter.
 
-Each stage runs in the benchmark's mandatory bubblewrap isolation with a
+Each question runs in the benchmark's mandatory bubblewrap isolation with a
 disposable Claude Code home. No Vertex, Anthropic, or Google credentials are
 passed in. Claude Code's Haiku, Sonnet, and Opus aliases and its subagent model
 all point at the served model, so background requests never ask vLLM for a
@@ -39,7 +39,7 @@ curl http://sn4622130540:8000/v1/messages \
 ```bash
 VLLM_BASE_URL=http://sn4622130540:8000/v1 \
 VLLM_MODEL=gemma4-26b-a4b \
-uv run clingen-bench eval \
+uv run clingen-bench analyze \
   --agent "bash adapters/claude_code_vllm_gemma4/run.sh" \
   --agent-name claude_code_vllm_gemma4_26b_a4b_nvfp4 \
   --cohort all \

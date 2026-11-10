@@ -1,6 +1,6 @@
 """Codex CLI adapter for Qwen 3.6 27B on local Unsloth Studio.
 
-The request bridge, contract recovery, retries, and isolation behavior are kept
+The request bridge, analysis continuations, retries, and isolation behavior are kept
 in the 35B-A3B adapter implementation so both local Qwen variants remain
 behaviorally identical. Only the provider identity and served model differ.
 """

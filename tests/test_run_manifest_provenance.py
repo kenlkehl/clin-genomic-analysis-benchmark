@@ -228,6 +228,13 @@ def test_run_manifest_records_passed_isolation_checks(tmp_path, monkeypatch):
     monkeypatch.setattr(orchestrator, "resolve_cohorts", lambda spec: [cohort])
     monkeypatch.setattr(orchestrator.q_io, "load_public", lambda name: bank)
     monkeypatch.setattr(
+        orchestrator.q_io,
+        "load_gold",
+        lambda name: SimpleNamespace(
+            questions=[SimpleNamespace(id="c-Q1", classification="unambiguous")]
+        ),
+    )
+    monkeypatch.setattr(
         orchestrator,
         "require_supported_adapter",
         lambda command: "claude_code",
@@ -250,11 +257,10 @@ def test_run_manifest_records_passed_isolation_checks(tmp_path, monkeypatch):
             question_id="c-Q1",
             cohort="c",
             category=1,
-            classification_gold="",
         ),
     )
 
-    run_dir = orchestrator.run_eval(
+    run_dir = orchestrator.run_analyze(
         agent_cmd="bash adapters/claude_code/run.sh",
         agent_name="claude",
         max_parallel=1,
@@ -262,6 +268,7 @@ def test_run_manifest_records_passed_isolation_checks(tmp_path, monkeypatch):
     )
 
     manifest = json.loads((run_dir / "manifest.json").read_text())
+    assert manifest["task"] == "analyze"
     assert manifest["integrity"]["status"] == "valid"
     assert manifest["integrity"]["adapter"] == "claude_code"
     assert manifest["integrity"]["sandbox"]["backend"] == "bubblewrap"

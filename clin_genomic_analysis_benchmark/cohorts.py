@@ -14,6 +14,7 @@ class Cohort:
     label: str              # human-readable label, e.g. "Bladder (BPC v1.2)"
     cancer_type: str        # canonical disease, e.g. "bladder"
     release: str            # e.g. "v1.2-consortium" or "v2.0-public"
+    disease: str            # what the assess prompt calls the cohort's cancer
 
     @property
     def path(self) -> Path:
@@ -21,12 +22,18 @@ class Cohort:
 
 
 COHORTS: list[Cohort] = [
-    Cohort("bladder_1.2",       "Bladder (BPC v1.2 consortium)",  "bladder",  "v1.2-consortium"),
-    Cohort("breast_1.2",        "Breast (BPC v1.2 consortium)",   "breast",   "v1.2-consortium"),
-    Cohort("crc_2.0_public",    "CRC (BPC v2.0 public)",          "crc",      "v2.0-public"),
-    Cohort("nsclc_2.0_public",  "NSCLC (BPC v2.0 public)",        "nsclc",    "v2.0-public"),
-    Cohort("panc_1.2",          "Pancreatic (BPC v1.2 consortium)","panc",    "v1.2-consortium"),
-    Cohort("prostate_1.2",      "Prostate (BPC v1.2 consortium)", "prostate", "v1.2-consortium"),
+    Cohort("bladder_1.2",       "Bladder (BPC v1.2 consortium)",  "bladder",  "v1.2-consortium",
+           "bladder cancer"),
+    Cohort("breast_1.2",        "Breast (BPC v1.2 consortium)",   "breast",   "v1.2-consortium",
+           "breast cancer"),
+    Cohort("crc_2.0_public",    "CRC (BPC v2.0 public)",          "crc",      "v2.0-public",
+           "colorectal cancer (CRC)"),
+    Cohort("nsclc_2.0_public",  "NSCLC (BPC v2.0 public)",        "nsclc",    "v2.0-public",
+           "non-small cell lung cancer (NSCLC)"),
+    Cohort("panc_1.2",          "Pancreatic (BPC v1.2 consortium)","panc",    "v1.2-consortium",
+           "pancreatic cancer"),
+    Cohort("prostate_1.2",      "Prostate (BPC v1.2 consortium)", "prostate", "v1.2-consortium",
+           "prostate cancer"),
 ]
 
 COHORTS_BY_NAME: dict[str, Cohort] = {c.name: c for c in COHORTS}

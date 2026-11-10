@@ -24,7 +24,7 @@ effort as unsupported. Settings use the same `VERTEX_GEMMA_*` names as the
 
 ```bash
 VERTEX_GEMMA_PROJECT_ID=profile-notes \
-uv run clingen-bench eval \
+uv run clingen-bench analyze \
   --agent "bash adapters/claude_code_vertex_gemma4/run.sh" \
   --agent-name claude_code_vertex_gemma4_26b \
   --cohort all \
@@ -38,7 +38,7 @@ The MaaS endpoint is shared and is served only from the `global` location. Its
 capacity varies: on 2026-10-19 it rejected most large requests with HTTP 429
 ("The request queue is full") even for a single question, whereas under 1% of
 requests were rejected in August 2026. The bridge retries 429s with
-exponential backoff, but when rejections are frequent each stage slows sharply.
+exponential backoff, but when rejections are frequent each question slows sharply.
 Run a smoke test (`--question bladder_1.2-Q6f9dd68e --no-retry-failures`) and
 check `adapter_audit/vertex_gemma_bridge.*.jsonl` before starting a full run.
 
@@ -54,8 +54,8 @@ check `adapter_audit/vertex_gemma_bridge.*.jsonl` before starting a full run.
 | `VERTEX_GEMMA_MAX_RETRIES` | `6` | bridge attempts for transient `429` and `5xx` failures |
 | `VERTEX_GEMMA_RETRY_BASE_SECONDS` | `5` | initial exponential-backoff delay |
 | `VERTEX_GEMMA_MAX_RETRY_SLEEP_SECONDS` | `60` | cap on one retry delay |
-| `VERTEX_GEMMA_MAX_REQUESTS` | `256` | fail-closed request limit per stage |
+| `VERTEX_GEMMA_MAX_REQUESTS` | `256` | fail-closed request limit per question |
 | `CLAUDE_BIN` | `claude` | Claude Code executable |
 
 Content-free request metadata is saved to each question's
-`adapter_audit/vertex_gemma_bridge.<stage>.jsonl`.
+`adapter_audit/vertex_gemma_bridge.analyze.jsonl`.

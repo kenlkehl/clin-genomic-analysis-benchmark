@@ -16,6 +16,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from adapters.codex_gpt.adapter import (  # noqa: E402
+    TASK,
     _build_prompt,
     _env_float,
     _env_int,
@@ -103,7 +104,7 @@ def _provider_override(key: str, value: str) -> list[str]:
 
 
 def _codex_call(*, prompt: str, question: dict, last_message_file: Path) -> str:
-    stage = question["stage"]
+    stage = TASK
     scratch_dir = Path(question["scratch_dir"]).resolve()
     cohort_dir = Path(question["cohort_dir"]).resolve()
     scratch_dir.mkdir(parents=True, exist_ok=True)
@@ -224,7 +225,7 @@ def main() -> int:
     args = parser.parse_args()
 
     question = _load_question(args.question_file)
-    stage = question["stage"]
+    stage = TASK
     scratch_dir = Path(question["scratch_dir"])
     scratch_dir.mkdir(parents=True, exist_ok=True)
     last_message_file = scratch_dir / f".codex_last_message.{stage}.txt"

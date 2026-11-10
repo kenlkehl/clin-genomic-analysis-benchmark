@@ -156,6 +156,21 @@ def test_claude_adapter_cannot_read_sibling_gold_file(tmp_path, monkeypatch):
     assert json.loads(text)["rationale"] == "hidden"
 
 
-def test_assess_stage_can_run_code_for_data_checks():
-    assert adapter._allowed_tools_for("assess") == "Read,Glob,Grep,Bash"
-    assert adapter._allowed_tools_for("analyze") == "Read,Glob,Grep,Bash"
+def test_analyze_can_read_files_and_run_code():
+    assert adapter._allowed_tools() == "Read,Glob,Grep,Bash"
+
+
+def test_prompt_uses_the_analyze_rulebook(tmp_path):
+    system, user = adapter._build_prompt({
+        "question_id": "cohort-Q1",
+        "cohort": "cohort",
+        "cohort_dir": str(tmp_path / "cohort"),
+        "data_dictionary_path": str(tmp_path / "dictionary.xlsx"),
+        "scratch_dir": str(tmp_path / "question" / "scratch"),
+        "question_text": "Question?",
+        "instructions": "Compute the answer.",
+    })
+    assert system.startswith("# Instructions for the analyze task")
+    assert "# Conventions" in system
+    assert "assess task" not in system
+    assert "Stage" not in user

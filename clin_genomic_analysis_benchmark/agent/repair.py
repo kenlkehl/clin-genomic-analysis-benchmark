@@ -1,6 +1,7 @@
-"""Retry score-relevant technical failures from an immutable source snapshot.
+"""Retry score-relevant technical failures of an analyze run from an immutable
+source snapshot.
 
-The repair workflow copies a completed run, executes only failed stages that
+The repair workflow copies a completed run, reruns only failed questions that
 could change its deterministic score, merges successful retries, records an
 audit trail in the copied manifest, and regenerates the scorecard. After the
 repair loop, pre-final snapshots are archived under ``pre_repair`` and their
@@ -22,7 +23,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ..cohorts import get_cohort
-from ..components import classification_from_flags, flags_from_assess_result
 from ..config import RUNS_DIR, TimeoutConfig, settings
 from ..questions import io as q_io
 from ..questions.schema import PublicQuestion
@@ -44,11 +44,10 @@ from .isolation import (
 
 @dataclass(frozen=True)
 class RepairTarget:
-    """One failed stage whose retry can affect the run's score."""
+    """One failed question whose retry can affect the run's score."""
 
     question_id: str
     cohort: str
-    stage: str
     original_failure_reason: str
 
 
@@ -74,7 +73,7 @@ class RepairLoopSummary:
     stop_reason: str
 
 
-_STAGES = ("assess", "analyze")
+TASK = "analyze"
 _PRE_REPAIR_DIRNAME = "pre_repair"
 _CONFIG_ENV_VARS = set(_SAFE_AGENT_ENV_VARS) | {
     # These can override ANTHROPIC_VERTEX_PROJECT_ID in Claude Code.
@@ -126,46 +125,26 @@ def _has_gold_answer(gold_question: Any) -> bool:
     return getattr(gold_question, "gold_answer", None) is not None
 
 
-def _failure_reason(qrun: dict, stage: str) -> str:
-    invocation = qrun.get(stage)
+def _failure_reason(qrun: dict) -> str:
+    invocation = qrun.get("analyze")
     if isinstance(invocation, dict) and invocation.get("failure_reason"):
         return str(invocation["failure_reason"])
     if qrun.get("error"):
         return str(qrun["error"])
     if invocation is None:
-        return f"missing {stage} invocation"
-    return f"unsuccessful {stage} invocation"
-
-
-def _classification_label(qrun: dict) -> Optional[str]:
-    """Derive the agent's route from its assess verdicts (None if unusable)."""
-    invocation = qrun.get("assess")
-    if not isinstance(invocation, dict) or not invocation.get("success"):
-        return None
-    result = invocation.get("result")
-    if not isinstance(result, Mapping):
-        return None
-    try:
-        return classification_from_flags(flags_from_assess_result(result))
-    except (KeyError, TypeError, ValueError):
-        return None
+        return "missing analyze invocation"
+    return "unsuccessful analyze invocation"
 
 
 def find_score_relevant_failures(
     runs: list[dict],
     gold_questions: Mapping[tuple[str, str], Any],
-    *,
-    configured_stages: set[str] | None = None,
 ) -> list[RepairTarget]:
     """Select technical failures that can change deterministic scoring.
 
-    Downstream failures caused by an already-wrong route are excluded: retrying
-    them cannot recover points. A failed or unusable assess stage is retried as
-    a full routed question because no downstream stage was originally available.
-    An analyze failure is retried only when the agent judged every component
-    clear and gold is unambiguous with a gold answer.
+    A failed analyze call is retried when gold is still unambiguous and has a
+    gold answer; otherwise the question no longer counts toward the score.
     """
-    stages = set(_STAGES) if configured_stages is None else configured_stages
     targets: list[RepairTarget] = []
     for qrun in runs:
         cohort = str(qrun.get("cohort") or "")
@@ -173,37 +152,15 @@ def find_score_relevant_failures(
         gold = gold_questions.get((cohort, question_id))
         if gold is None:
             raise ValueError(f"Gold question not found for {cohort}/{question_id}")
-
-        label = _classification_label(qrun)
-        if "assess" in stages and label is None:
+        if _gold_classification(gold) != "unambiguous" or not _has_gold_answer(gold):
+            continue
+        invocation = qrun.get("analyze")
+        if not isinstance(invocation, dict) or not invocation.get("success"):
             targets.append(RepairTarget(
                 question_id=question_id,
                 cohort=cohort,
-                stage="assess",
-                original_failure_reason=_failure_reason(qrun, "assess"),
+                original_failure_reason=_failure_reason(qrun),
             ))
-            continue
-
-        # Partial evals intentionally omit assess and persist the harness-side
-        # route in classification_gold. This value is never sent to the agent,
-        # but lets automatic post-run repair retry its failed analyze stage
-        # without mistaking the skipped assess stage for a failure.
-        if label is None and "assess" not in stages:
-            routed_label = qrun.get("classification_gold")
-            if routed_label in {"ambiguous", "unambiguous"}:
-                label = routed_label
-
-        gold_label = _gold_classification(gold)
-        if (label == "unambiguous" and gold_label == "unambiguous"
-                and _has_gold_answer(gold) and "analyze" in stages):
-            invocation = qrun.get("analyze")
-            if not isinstance(invocation, dict) or not invocation.get("success"):
-                targets.append(RepairTarget(
-                    question_id=question_id,
-                    cohort=cohort,
-                    stage="analyze",
-                    original_failure_reason=_failure_reason(qrun, "analyze"),
-                ))
     return targets
 
 
@@ -220,19 +177,22 @@ def _load_gold_questions(manifest: dict) -> dict[tuple[str, str], Any]:
 def plan_failed_run(run_path: str | Path) -> tuple[Path, list[RepairTarget]]:
     """Return the source directory and score-relevant repair targets."""
     source_dir, manifest, runs = _load_source(run_path)
+    _require_analyze_run(source_dir, manifest)
     source_integrity = manifest.get("integrity") or {"status": "unaudited"}
     if source_integrity.get("status") == "quarantined":
         raise ValueError(
             "refusing to repair a quarantined run; rerun it from scratch in the "
             "hardened sandbox"
         )
-    configured = set((manifest.get("settings") or {}).get("stages") or _STAGES)
-    targets = find_score_relevant_failures(
-        runs,
-        _load_gold_questions(manifest),
-        configured_stages=configured,
-    )
+    targets = find_score_relevant_failures(runs, _load_gold_questions(manifest))
     return source_dir, targets
+
+
+def _require_analyze_run(run_dir: Path, manifest: dict) -> None:
+    if manifest.get("task") != TASK:
+        raise ValueError(
+            f"{run_dir} is not an analyze run (task={manifest.get('task')!r}); runs from "
+            "before the assess/analyze split cannot be repaired by this version")
 
 
 def _restored_agent_environment(original: dict) -> dict[str, str]:
@@ -307,24 +267,21 @@ def _timeout_config(
     raw = ((manifest.get("settings") or {}).get("timeouts") or {})
     defaults = settings().timeouts
     overrides = overrides or {}
-    unknown = sorted(set(overrides) - set(_STAGES))
+    unknown = sorted(set(overrides) - {TASK})
     if unknown:
-        raise ValueError(f"unknown timeout override stage(s): {', '.join(unknown)}")
-    values: dict[str, int] = {}
-    for stage in _STAGES:
-        try:
-            inherited = int(raw.get(stage, getattr(defaults, stage)))
-        except (TypeError, ValueError):
-            inherited = getattr(defaults, stage)
-        value = overrides.get(stage, inherited)
-        try:
-            value = int(value)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"{stage} timeout override must be an integer") from exc
-        if value <= 0:
-            raise ValueError(f"{stage} timeout must be > 0")
-        values[stage] = value
-    return TimeoutConfig(**values)
+        raise ValueError(f"unknown timeout override(s): {', '.join(unknown)}")
+    try:
+        inherited = int(raw.get(TASK, defaults.analyze))
+    except (TypeError, ValueError):
+        inherited = defaults.analyze
+    value = overrides.get(TASK, inherited)
+    try:
+        value = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("analyze timeout override must be an integer") from exc
+    if value <= 0:
+        raise ValueError("analyze timeout must be > 0")
+    return TimeoutConfig(analyze=value)
 
 
 def _file_sha256(path: Path) -> str:
@@ -574,18 +531,14 @@ def retry_failed_run(
         raise ValueError("agent_retry_base_seconds must be >= 0")
 
     source_dir, manifest, runs = _load_source(run_path)
+    _require_analyze_run(source_dir, manifest)
     source_integrity = manifest.get("integrity") or {"status": "unaudited"}
     if source_integrity.get("status") == "quarantined":
         raise ValueError(
             "refusing to repair a quarantined run; rerun it from scratch in the "
             "hardened sandbox"
         )
-    configured_stages = set((manifest.get("settings") or {}).get("stages") or _STAGES)
-    targets = find_score_relevant_failures(
-        runs,
-        _load_gold_questions(manifest),
-        configured_stages=configured_stages,
-    )
+    targets = find_score_relevant_failures(runs, _load_gold_questions(manifest))
     if not targets:
         raise ValueError(f"No score-relevant technical failures found in {source_dir}")
 
@@ -635,21 +588,13 @@ def retry_failed_run(
 
     def execute(target: RepairTarget) -> tuple[RepairTarget, QuestionRun]:
         question = public_questions[(target.cohort, target.question_id)]
-        if target.stage == "assess":
-            stages = [stage for stage in _STAGES if stage in configured_stages]
-            route = None
-        else:
-            stages = [target.stage]
-            route = "unambiguous"
         replacement = _run_one_question(
             agent_cmd=effective_agent_cmd,
             q=question,
             cohort=get_cohort(target.cohort),
             run_dir=attempt_root,
-            stages=stages,
             agent_max_attempts=agent_max_attempts,
             agent_retry_base_seconds=agent_retry_base_seconds,
-            gold_classification=route,
             agent_env=repair_env,
             timeout_config=timeout_config,
         )
@@ -669,7 +614,7 @@ def retry_failed_run(
     successful_merges = 0
     retry_findings: list[dict[str, str]] = []
     for target, replacement in sorted(
-        outcomes, key=lambda item: (item[0].cohort, item[0].question_id, item[0].stage)
+        outcomes, key=lambda item: (item[0].cohort, item[0].question_id)
     ):
         original = runs_by_key[(target.cohort, target.question_id)]
         replacement_raw = asdict(replacement)
@@ -681,22 +626,13 @@ def retry_failed_run(
             **finding,
             "question_id": target.question_id,
             "cohort": target.cohort,
-            "stage": target.stage,
         } for finding in target_findings)
-        if target.stage == "assess":
-            invocation = replacement_raw.get("assess") or {}
-            merged = bool(invocation.get("success")) and not target_findings
-            if merged:
-                for stage in _STAGES:
-                    original[stage] = replacement_raw.get(stage)
-                original["error"] = replacement_raw.get("error")
-        else:
-            invocation = replacement_raw.get(target.stage) or {}
-            merged = bool(invocation.get("success")) and not target_findings
-            if merged:
-                original[target.stage] = replacement_raw[target.stage]
-                if original.get("error"):
-                    original["error"] = None
+        invocation = replacement_raw.get("analyze") or {}
+        merged = bool(invocation.get("success")) and not target_findings
+        if merged:
+            original["analyze"] = replacement_raw["analyze"]
+            if original.get("error"):
+                original["error"] = None
         successful_merges += int(merged)
         audit_outcomes.append({
             **asdict(target),
@@ -744,7 +680,7 @@ def retry_failed_run(
     elif source_status == "valid":
         integrity_status = "valid"
     else:
-        # Sandboxing the retries cannot retroactively certify successful stages
+        # Sandboxing the retries cannot retroactively certify successful answers
         # inherited from an older, unisolated source run.
         integrity_status = "unaudited"
     manifest["integrity"] = {

@@ -331,7 +331,6 @@ def _call_adapter(tmp_path) -> str:
         data_dictionary_path="/dictionary.xlsx",
         scratch_dir=str(tmp_path / "question" / "scratch"),
         allowed_tools="Read,Glob,Grep,Bash",
-        stage="assess",
     )
 
 
@@ -350,7 +349,7 @@ def test_claude_call_routes_every_alias_through_the_bridge(monkeypatch, captured
     assert captured["bridge_config"].location == "global"
     assert captured["reasoning_effort"] == "high"
     assert captured["audit_path"] == (
-        tmp_path / "question" / "adapter_audit" / "vertex_gemini_bridge.assess.jsonl"
+        tmp_path / "question" / "adapter_audit" / "vertex_gemini_bridge.analyze.jsonl"
     )
     assert env["ANTHROPIC_BASE_URL"] == "http://127.0.0.1:12345"
     assert env["ANTHROPIC_AUTH_TOKEN"] == "bridge-token"

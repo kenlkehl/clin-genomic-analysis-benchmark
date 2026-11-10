@@ -1,4 +1,4 @@
-"""Tests for model-agnostic agent-stage retries."""
+"""Tests for model-agnostic agent retries on the analyze task."""
 
 from __future__ import annotations
 
@@ -6,26 +6,25 @@ import json
 import subprocess
 
 from clin_genomic_analysis_benchmark.agent import runner
-from clin_genomic_analysis_benchmark.components import COMPONENT_IDS, components_payload
+from clin_genomic_analysis_benchmark.agent.contract import CONTRACT_VERSION
 
-_VALID_ASSESS = {
-    cid: {"needs_clarification": cid == "outcome", "rationale": "Endpoint unstated."}
-    for cid in COMPONENT_IDS
+_VALID_ANALYZE = {
+    "answer_type": "count",
+    "answer": {"value": 12, "n": 40},
+    "methods": "Counted patients.",
 }
 
 
 def _question() -> dict:
     return {
-        "contract_version": "4",
+        "contract_version": CONTRACT_VERSION,
         "question_id": "bladder_1.2-Qabc12345",
-        "question_text": "What is the most common race?",
+        "question_text": "How many patients are there?",
         "cohort": "bladder_1.2",
-        "stage": "assess",
         "cohort_dir": "/abs/cohort",
         "data_dictionary_path": "/abs/dictionary.xlsx",
         "scratch_dir": "/abs/scratch",
-        "instructions": "Assess the question.",
-        "assessment_components": components_payload(),
+        "instructions": "Compute the answer.",
     }
 
 
@@ -39,7 +38,7 @@ def test_invoke_retries_invalid_response_then_succeeds(tmp_path, monkeypatch):
         if calls == 1:
             result_path.write_text(json.dumps({"classification": "ambiguous"}))
         else:
-            result_path.write_text(json.dumps(_VALID_ASSESS))
+            result_path.write_text(json.dumps(_VALID_ANALYZE))
         return subprocess.CompletedProcess(
             args=args[0], returncode=0, stdout=f"attempt {calls}", stderr=""
         )
@@ -60,7 +59,7 @@ def test_invoke_retries_invalid_response_then_succeeds(tmp_path, monkeypatch):
     assert invocation.attempt_count == 2
     assert [attempt.success for attempt in invocation.attempts] == [False, True]
     assert invocation.attempts[0].failure_reason == "schema_violation"
-    assert invocation.result == _VALID_ASSESS
+    assert invocation.result == _VALID_ANALYZE
     log = (tmp_path / "agent.log").read_text()
     assert "=== ATTEMPT 1/3 ===" in log
     assert "=== ATTEMPT 2/3 ===" in log

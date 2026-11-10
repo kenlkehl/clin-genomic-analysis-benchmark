@@ -29,19 +29,19 @@ from clin_genomic_analysis_benchmark.agent.isolation import (
     sandbox_question_view,
     sandboxed_agent_command,
 )
-from clin_genomic_analysis_benchmark.agent.contract import _RESULT_SCHEMAS
-from clin_genomic_analysis_benchmark.components import COMPONENT_IDS
+from clin_genomic_analysis_benchmark.agent.contract import ANALYZE_RESULT_SCHEMA
+from clin_genomic_analysis_benchmark.instructions import analyze_rulebook
 
 ADAPTER_DIR = Path(__file__).resolve().parent
 _MAX_ERROR_STREAM_CHARS = 4000
 
-DEFAULT_PRINT_TIMEOUTS = {
-    "assess": "59m30s",
-    "analyze": "59m30s",
-}
+# Agents run only the analyze task; the name still labels log files and the
+# AGY_PRINT_TIMEOUT_ANALYZE override.
+TASK = "analyze"
+DEFAULT_PRINT_TIMEOUT = "59m30s"
 
-# Top-level keys that mark an already-unwrapped stage result.
-_RESULT_KEYS = (*COMPONENT_IDS, "answer_type")
+# Top-level keys that mark an already-unwrapped result.
+_RESULT_KEYS = ("answer_type",)
 
 
 class AntigravityInvocationError(RuntimeError):
@@ -55,14 +55,11 @@ def _load_question(path: Path) -> dict:
 
 def _build_prompt(question: dict) -> str:
     question = sandbox_question_view(question)
-    repo_root = ADAPTER_DIR.parent.parent
-    instructions_doc = (repo_root / "AGENT_INSTRUCTIONS.md").read_text()
-    stage = question["stage"]
+    instructions_doc = analyze_rulebook()
     payload = (
         f"# Question\n"
         f"- ID: {question['question_id']}\n"
-        f"- Cohort: {question['cohort']}\n"
-        f"- Stage: {stage}\n\n"
+        f"- Cohort: {question['cohort']}\n\n"
         f"## Cohort directory (READ-ONLY)\n"
         f"`{question['cohort_dir']}`\n\n"
         f"## Data dictionary\n"
@@ -74,8 +71,8 @@ def _build_prompt(question: dict) -> str:
         f"Your current working directory is your scratch directory: "
         f"`{question['scratch_dir']}`. Write intermediate files only there. "
         f"The cohort directory is read-only. Use Python "
-        f"(pandas/numpy/scipy/statsmodels/lifelines as needed) for data checks "
-        f"in assess and to compute the answer from the cohort files in analyze.\n\n"
+        f"(pandas/numpy/scipy/statsmodels/lifelines as needed) to compute the "
+        f"answer from the cohort files.\n\n"
         f"Output ONLY the final JSON object as your last response, with no "
         f"surrounding prose and no Markdown fences."
     )
@@ -256,12 +253,11 @@ def _env_truthy(name: str, default: bool) -> bool:
     return raw.strip().lower() not in {"0", "false", "no", "off", ""}
 
 
-def _print_timeout(stage: str) -> str:
-    stage_key = f"AGY_PRINT_TIMEOUT_{stage.upper()}"
+def _print_timeout(task: str = TASK) -> str:
     return (
-        os.environ.get(stage_key)
+        os.environ.get(f"AGY_PRINT_TIMEOUT_{task.upper()}")
         or os.environ.get("AGY_PRINT_TIMEOUT")
-        or DEFAULT_PRINT_TIMEOUTS.get(stage, "5m")
+        or DEFAULT_PRINT_TIMEOUT
     )
 
 
@@ -366,7 +362,7 @@ def _failure_details(proc: subprocess.CompletedProcess[str]) -> str:
 
 
 def _agy_call(*, prompt: str, question: dict) -> str:
-    stage = question["stage"]
+    stage = TASK
     scratch_dir = Path(question["scratch_dir"]).resolve()
     cohort_dir = Path(question["cohort_dir"]).resolve()
     scratch_dir.mkdir(parents=True, exist_ok=True)
@@ -379,7 +375,7 @@ def _agy_call(*, prompt: str, question: dict) -> str:
         "--mode", _agy_mode(),
         "--model", _agy_model(),
         "--output-format", "json",
-        "--json-schema", json.dumps(_RESULT_SCHEMAS[stage], separators=(",", ":")),
+        "--json-schema", json.dumps(ANALYZE_RESULT_SCHEMA, separators=(",", ":")),
         "--disable-slash-commands",
     ]
     effort = _agy_effort()

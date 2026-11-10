@@ -1,4 +1,4 @@
-"""Per-stage agent invocation as a subprocess.
+"""Agent invocation as a subprocess, for the analyze task.
 
 The harness writes a `question.json`, invokes the agent's CLI, and reads back
 `result.json`. Failures (non-zero exit, missing/invalid output, schema violation,
@@ -18,13 +18,13 @@ from pathlib import Path
 from typing import Optional
 
 from ..utils.jsonio import atomic_write_json
-from .contract import Stage, validate_question, validate_result
+from .contract import validate_question, validate_result
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class StageAttempt:
+class AgentAttempt:
     attempt: int
     success: bool
     exit_code: int
@@ -35,8 +35,7 @@ class StageAttempt:
 
 
 @dataclass
-class StageInvocation:
-    stage: Stage
+class AgentInvocation:
     success: bool
     exit_code: int
     timed_out: bool
@@ -47,7 +46,7 @@ class StageInvocation:
     stdout: str
     stderr: str
     attempt_count: int
-    attempts: list[StageAttempt]
+    attempts: list[AgentAttempt]
 
 
 def invoke(
@@ -61,9 +60,8 @@ def invoke(
     max_attempts: int = 3,
     retry_base_seconds: float = 5.0,
     agent_env: Optional[Mapping[str, str]] = None,
-) -> StageInvocation:
-    """Run one stage of one question against the agent CLI, retrying failures."""
-    stage = question_payload["stage"]
+) -> AgentInvocation:
+    """Run one question against the agent CLI, retrying failures."""
     if max_attempts < 1:
         raise ValueError("max_attempts must be >= 1")
     if retry_base_seconds < 0:
@@ -87,7 +85,7 @@ def invoke(
     logger.info("Invoking agent: %s", " ".join(cmd_parts))
 
     overall_start = time.monotonic()
-    attempts: list[StageAttempt] = []
+    attempts: list[AgentAttempt] = []
     log_sections: list[str] = []
     exit_code = -1
     timed_out = False
@@ -150,12 +148,12 @@ def invoke(
                     failure_reason = "result.json is not a JSON object"
                 else:
                     result = loaded_result
-                    schema_errors = validate_result(result, stage)
+                    schema_errors = validate_result(result)
                     if schema_errors:
                         failure_reason = "schema_violation"
 
         success = failure_reason is None
-        attempts.append(StageAttempt(
+        attempts.append(AgentAttempt(
             attempt=attempt_number,
             success=success,
             exit_code=exit_code,
@@ -174,8 +172,8 @@ def invoke(
         if attempt_number < max_attempts:
             delay = retry_base_seconds * (2 ** (attempt_number - 1))
             logger.warning(
-                "Agent %s stage %s attempt %d/%d failed (%s); retrying in %.1fs",
-                question_payload.get("question_id"), stage, attempt_number,
+                "Agent %s attempt %d/%d failed (%s); retrying in %.1fs",
+                question_payload.get("question_id"), attempt_number,
                 max_attempts, failure_reason, delay,
             )
             if delay:
@@ -184,8 +182,7 @@ def invoke(
     duration = time.monotonic() - overall_start
     stderr_log_path.write_text("\n".join(log_sections))
     success = failure_reason is None
-    return StageInvocation(
-        stage=stage,
+    return AgentInvocation(
         success=success,
         exit_code=exit_code,
         timed_out=timed_out,

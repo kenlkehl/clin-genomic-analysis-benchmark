@@ -1,19 +1,20 @@
 ===============================================================================
 Clinical Genomic Analysis Benchmark — Orientation for Colleagues
-Last updated: 2026-10-25
+Last updated: 2026-11-04
 ===============================================================================
 
 WHAT THIS BENCHMARK IS
 -------------------------------------------------------------------------------
-This benchmark measures how well an AI agent can judge whether a clinico-genomic
-analysis question in oncology is specified well enough to answer, and then
-perform the analysis, using real cohorts from AACR Project GENIE BPC
-(Biopharma Collaborative). It is built around a curated bank of analysis
+This benchmark measures two things, as two separate tasks: how well an AI
+model can judge whether a clinico-genomic analysis question in oncology is
+specified well enough to answer (ASSESS), and how well an AI agent can perform
+the analysis of a question that is (ANALYZE), using real cohorts from AACR
+Project GENIE BPC (Biopharma Collaborative). It is built around a curated bank of analysis
 questions, each with a "gold standard" verdict and (where applicable) a
 pre-computed reference answer.
 
-The core idea: a competent biostatistician/oncologist, handed a question and the
-cohort data, checks four parts of it before computing anything:
+The core idea: a competent biostatistician/oncologist, handed a question, checks
+four parts of it before computing anything:
 
   1. the DENOMINATOR  - who (or what) is analysed: cancer type and histology,
                         disease burden (for example, de novo versus recurrent
@@ -33,7 +34,13 @@ cohort data, checks four parts of it before computing anything:
 If any of the four needs clarification, the question is "ambiguous" and the
 analyst would ask before proceeding. If all four are clear, the question is
 "unambiguous" and the analyst computes the one answer it calls for. The
-benchmark tests whether an agent does the same.
+benchmark tests whether a model does the same.
+
+That check is about what the researcher meant, not about any one dataset.
+Datasets define their own terms: BPC, for example, records stage only at
+diagnosis, but a researcher who writes "Stage IV disease" may also mean
+patients whose earlier-stage cancer later spread. So the ASSESS task is judged
+from the question's words and the rulebook alone, without the data.
 
 Six cohorts are used (folder name = cohort id):
    bladder_1.2, breast_1.2, crc_2.0_public, nsclc_2.0_public,
@@ -46,30 +53,35 @@ Current question bank: bpc_benchmark_review_6-19-26.xlsx
    answers are recomputed where questions change.
 
 
-THE TASK WE GIVE THE AGENT (two stages)
+THE TWO TASKS
 -------------------------------------------------------------------------------
-Each question is served to the agent in up to two stages. The agent is given:
-the question text, a read-only copy of the cohort's data directory, the cohort's
-data dictionary, and a scratch directory. All agent outputs are JSON.
+The two tasks are run separately, usually with different models. All outputs
+are JSON.
 
-  1. ASSESS
-     For each of the four parts (denominator, outcome, covariates, analysis
-     plan), say whether it needs clarification, with a one-sentence reason.
-     A part needs clarification when the question leaves a choice open that no
-     convention settles (for example, "Stage IV" that does not say "at
-     diagnosis", "PFS" that does not say who judges progression, or no rule
-     for unknown values of a grouping variable). This is judged from the
-     wording alone, not from whether the choice would change the result in
-     this cohort's data.
+  1. ASSESS  (every question; a single prompt, no tools, no data)
+     The model receives one prompt: the assess rulebook, then the question and
+     the cohort's cancer type. For each of the four parts (denominator,
+     outcome, covariates, analysis plan), it says whether the part needs
+     clarification, with a one- or two-sentence reason. A part needs
+     clarification when the question leaves a choice open that no convention
+     settles (for example, "Stage IV" that does not say "at diagnosis", "PFS"
+     that does not say who judges progression, or no rule for unknown values
+     of a grouping variable). This is judged from the wording alone, not from
+     what any dataset records or whether the choice would change the result.
 
-  2. ANALYZE  (only if the agent found all four parts clear)
-     Actually compute the answer from the cohort data files (Python: pandas,
-     numpy, scipy, statsmodels, lifelines) and return it as typed JSON.
+  2. ANALYZE  (every gold-unambiguous question; an agent with the data)
+     The agent is given the question text, a read-only copy of the cohort's
+     data directory, the cohort's data dictionary, and a scratch directory. It
+     computes the answer from the cohort data files (Python: pandas, numpy,
+     scipy, statsmodels, lifelines) and returns it as typed JSON. It is told
+     the question is fully specified; it is not given the gold verdicts.
 
 HOW IT IS SCORED
 -------------------------------------------------------------------------------
-All scoring is deterministic and makes no LLM or network calls. The headline
-score is half ASSESS and half ANALYZE.
+All scoring is deterministic and makes no LLM or network calls. Each run is
+scored on its own; the headline combines one ASSESS run and one ANALYZE run,
+half each (they must cover the same cohorts and be scored against the same
+gold).
 
   * ASSESS: each of the agent's four verdicts is compared with the gold verdict
     for that part. The reasons are kept for auditing but not scored. Because
@@ -78,57 +90,70 @@ score is half ASSESS and half ANALYZE.
     balanced accuracy: the average of (how often the agent caught a part that
     needs clarification) and (how often it correctly left a clear part alone).
     Saying "clear" every time scores 50%, as does saying "unclear" every time.
-    The ASSESS score is the average over the four parts. If the agent's
-    assess stage fails, all four of its verdicts count as wrong.
+    The ASSESS score is the average over the four parts. If the model never
+    returns a valid reply for a question, all four verdicts count as wrong.
 
   * ANALYZE: the agent's number is compared with the gold answer and earns
     2 (within 5%), 1 (5-15% off) or 0 points. The ANALYZE score is points
-    earned out of 2 per gold-unambiguous question. An agent that wrongly flags
-    a gold-unambiguous question never gets to analyze it and earns 0 for it.
+    earned out of 2 per gold-unambiguous question; a question the agent fails
+    to answer earns 0.
 
   * A question that is perfectly well specified but cannot be estimated from
     the data (for example, a model that cannot be fit because one group is
-    nearly empty) stays unambiguous; the agent earns full analyze credit only
-    by reporting it as "unanswerable".
+    nearly empty) stays unambiguous, so it is in the ANALYZE task; the agent
+    earns full credit only by reporting it as "unanswerable".
 
 
-AGENT_INSTRUCTIONS.md  (the rulebook shown to the agent)
+THE RULEBOOKS  (ASSESS_INSTRUCTIONS.md, ANALYZE_INSTRUCTIONS.md, CONVENTIONS.md)
 -------------------------------------------------------------------------------
-This is the single document the agent under evaluation is expected to follow. It
-is written to be answer-agnostic (it never reveals answers to specific
-questions). It contains:
+Each task has its own rulebook, and both share the conventions. They are
+written to be answer-agnostic (they never reveal answers to specific
+questions).
 
-  * A short upfront checklist of the decision rules.
-  * The two stages and the exact JSON output schema for each.
-  * The four parts, with examples (not an exhaustive list) of the concepts
-    each must pin down to be clear, judged from the wording rather than the
-    data.
-  * Conventional defaults - things the agent must ASSUME, e.g.:
+  * ASSESS_INSTRUCTIONS.md  (shown to the assess model, followed by the
+    conventions and then the question):
+        - a short checklist and the exact JSON output schema;
+        - how to judge clarity from the researcher's words rather than a
+          dataset, and how a question can settle a choice by naming a
+          definition (a published standard such as AJCC or RECIST, a named
+          endpoint such as PFS-I, or the data source's own definition);
+        - for each of the four parts, a catalog of the choices a question has
+          to fix, and which wording fixes or leaves them open;
+        - which components a gap touches, and what not to flag.
+  * ANALYZE_INSTRUCTIONS.md  (shown to the analyze agent, followed by the
+    conventions):
+        - how to map each concept onto the BPC files and variables (for
+          example, stage at diagnosis is stage_dx, and lines of therapy are
+          counted with regimen_number_within_cancer);
+        - file-format reminders (the GENIE/cBioPortal .txt files have leading
+          "#"-comment rows; the *_dataset*.csv files are plain CSV);
+        - answer-type schemas and output discipline (return ONLY the JSON).
+  * CONVENTIONS.md  (both): things to ASSUME when a question does not say,
+    e.g.:
         - non-synonymous mutation definition; "mutation in gene X"; any-positive
-          patient aggregation; panel-coverage lookup.
-        - "regimen containing drug X" = case-insensitive substring; biosimilars
-          count as the reference molecule; distinct-INN ADCs do not.
+          patient aggregation; panel coverage defines who was tested.
+        - "regimen containing drug X" allows other drugs; "X plus Y" leaves
+          that open; biosimilars count as the reference molecule.
         - KEY INDEX CANCER: unless a question explicitly says otherwise, each
           patient is represented by a single "key index cancer" = their
-          earliest genomically profiled index cancer that meets the
+          earliest sequenced cancer of the cohort's type that meets the
           question's cancer-level criteria (so a later, separate primary
           that meets them counts, unless the question excludes patients
-          with prior primaries). Question stems will
-          generally NOT contain the word "index"; "patients with <cohort>
-          cancer" already means this key index cancer.
+          with prior primaries). Question stems will generally NOT contain
+          the word "index"; "patients with <cohort> cancer" already means
+          this key index cancer.
         - GENOMIC-SPECIMEN SCOPE: genomic facts come from specimens of the
           cohort's cancer. Patient-level genomic questions use the key index
-          cancer's specimen; sample-level counts use all of the patient's
+          cancer's specimens; sample-level counts use all of the patient's
           cohort-cancer specimens.
         - outcomes of treated patients are measured from the start of the
           treatment unless the question says otherwise.
         - a hazard ratio means an unadjusted Cox model (lifelines) unless the
           question names covariates, says "adjusted", or names another model.
         - KM + Brookmeyer-Crowley for time-to-event medians; Wilson CIs for
-          proportions.
-  * File-format reminders (the GENIE/cBioPortal .txt files have leading
-    "#"-comment rows; the *_dataset*.csv files are plain CSV).
-  * Answer-type schemas + output discipline (return ONLY the JSON object).
+          proportions; a month is 30.4375 days.
+        - the named PFS endpoints (PFS-I, PFS-M, PFS-I-or-M, PFS-I-and-M) and
+          what each counts as progression.
 
 
 THE REVIEW EXCEL FILE  (bpc_benchmark_review_6-19-26.xlsx)
@@ -151,7 +176,7 @@ Its main sheets:
       denominator_needs_clarification, outcome_needs_clarification,
       covariates_needs_clarification, analysis_plan_needs_clarification
                               Y or N for each of the four parts. These are the
-                              gold the ASSESS stage is scored against. They are
+                              gold the ASSESS task is scored against. They are
                               filled in during the 2026-10 re-review; a blank
                               row has not been re-reviewed yet and cannot be
                               scored. "ambiguous" must mean at least one Y.
@@ -243,7 +268,8 @@ Key files an analysis draws on:
     data_timeline_*.txt                   longitudinal events (treatment, imaging,
                                           path, sequencing, performance status...)
   Each cohort folder also includes its GENIE analytic data guide (PDF) and
-  variable synopsis (xlsx) — the data dictionary the agent is given.
+  variable synopsis (xlsx) — the data dictionary the analyze agent is given.
+  The assess model sees none of these.
 
   (Tab-delimited data_clinical_*.txt / data_timeline_*.txt have FIVE leading
   "#"-comment rows; read with sep='\t', comment='#'. The *_dataset*.csv files
@@ -252,19 +278,30 @@ Key files an analysis draws on:
 
 HOW IT FITS TOGETHER
 -------------------------------------------------------------------------------
-  - To understand the task an agent faces:        read AGENT_INSTRUCTIONS.md.
+  - To understand the assess task:                read ASSESS_INSTRUCTIONS.md
+                                                  and CONVENTIONS.md.
+  - To understand the analyze task:               read ANALYZE_INSTRUCTIONS.md
+                                                  and CONVENTIONS.md.
   - To see the questions + gold verdicts/answers: open the review .xlsx.
   - To see/run how a gold answer was computed:    open gold_standard/<cohort>/<qid>.py.
   - To inspect the data being analyzed:           browse $CLINGEN_DATA_ROOT/<cohort>/.
 
-A typical evaluation: serve question_text to the agent with the cohort
-directory; compare the agent's four assess verdicts with the four
-*_needs_clarification columns; if the agent found every part clear and the
-gold agrees, compare its computed answer with gold_answer.
+A typical evaluation: run ASSESS on every question and compare the model's four
+verdicts with the four *_needs_clarification columns; run ANALYZE on every
+gold-unambiguous question and compare each computed answer with gold_answer;
+then combine the two scores.
 
 
 REVISION NOTES
 -------------------------------------------------------------------------------
+2026-11-04: assess and analyze became separate tasks. ASSESS is now one
+prompt per question with no tools and no data, judged from the question's
+words alone; its rulebook catalogs the choices each part must fix. ANALYZE
+runs only on gold-unambiguous questions, whatever any assess run concluded.
+The single AGENT_INSTRUCTIONS.md was split into ASSESS_INSTRUCTIONS.md,
+ANALYZE_INSTRUCTIONS.md and the shared CONVENTIONS.md. Runs from before the
+split are not comparable with new runs.
+
 2026-10-25: the task was redesigned. The former CLASSIFY and DISAMBIGUATE
 stages (an ambiguous/unambiguous label plus a pick-list of ambiguity concepts)
 were replaced by one ASSESS stage with four verdicts (denominator, outcome,
@@ -275,7 +312,7 @@ comparable with new runs.
 The bank has been refined over several oncologist-reviewed rounds. An earlier round (6-8 review,
 applied 2026-06-19) standardized the "key index cancer" framing across question
 stems, added the genomic-specimen-scope and immortal-time-bias conventions to
-AGENT_INSTRUCTIONS.md, removed 7 low-value/duplicative questions, and
+the rulebook (then AGENT_INSTRUCTIONS.md), removed 7 low-value/duplicative questions, and
 reclassified several questions after subtype-scope clarifications. The current
 bank file is bpc_benchmark_review_6-19-26.xlsx.
 ===============================================================================

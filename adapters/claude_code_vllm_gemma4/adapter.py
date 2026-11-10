@@ -26,7 +26,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from adapters.claude_code.adapter import (  # noqa: E402
     ClaudeInvocationError,
-    _allowed_tools_for,
+    _allowed_tools,
     _build_prompt,
     _claude_failure_message,
     _extract_json,
@@ -178,7 +178,6 @@ def main() -> int:
     args = p.parse_args()
 
     question = _load_question(args.question_file)
-    stage = question["stage"]
     system_prompt, user_prompt = _build_prompt(question)
 
     try:
@@ -188,7 +187,7 @@ def main() -> int:
             cohort_dir=question["cohort_dir"],
             data_dictionary_path=question["data_dictionary_path"],
             scratch_dir=question["scratch_dir"],
-            allowed_tools=_allowed_tools_for(stage),
+            allowed_tools=_allowed_tools(),
         )
     except ClaudeInvocationError as exc:
         sys.stderr.write(f"adapter: {exc}\n")

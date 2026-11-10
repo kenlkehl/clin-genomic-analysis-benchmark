@@ -19,7 +19,7 @@ Gemini 3 attaches a thought signature to its tool calls and rejects a replayed
 call without it (HTTP 400). Anthropic `tool_use` blocks have no field for one,
 so the bridge records each signature under the `tool_use` id it gives Claude
 Code and reattaches it when the call comes back. A call the bridge did not issue
-gets Google's documented placeholder signature; the per-stage audit records how
+gets Google's documented placeholder signature; the per-question audit records how
 often that happened (`signature_placeholders`).
 
 ## Prerequisites
@@ -38,7 +38,7 @@ Smoke-test one question:
 VERTEX_GEMINI_PROJECT_ID=profile-notes \
 VERTEX_GEMINI_MODEL=google/gemini-3.8-flash \
 VERTEX_GEMINI_REASONING_EFFORT=high \
-uv run clingen-bench eval \
+uv run clingen-bench analyze \
   --agent "bash adapters/claude_code_vertex_gemini/run.sh" \
   --agent-name claude_code_vertex_gemini_3.8_flash_high \
   --question bladder_1.2-Q6f9dd68e \
@@ -68,7 +68,7 @@ records them in `manifest.json` and restores them during failed-run repair.
 | `VERTEX_GEMINI_MAX_RETRIES` | `6` | bridge attempts for transient `429` and `5xx` failures |
 | `VERTEX_GEMINI_RETRY_BASE_SECONDS` | `5` | initial exponential-backoff delay |
 | `VERTEX_GEMINI_MAX_RETRY_SLEEP_SECONDS` | `60` | cap on one retry delay |
-| `VERTEX_GEMINI_MAX_REQUESTS` | `256` | fail-closed request limit per stage |
+| `VERTEX_GEMINI_MAX_REQUESTS` | `256` | fail-closed request limit per question |
 | `CLAUDE_BIN` | `claude` | Claude Code executable |
 
 The bridge buffers each upstream answer and then replays it to Claude Code as
@@ -79,4 +79,4 @@ replaced with a placeholder. Claude Code assumes a 200,000-token context window
 for models it does not recognize, which is within Gemini's.
 
 Content-free request metadata is saved to each question's
-`adapter_audit/vertex_gemini_bridge.<stage>.jsonl`.
+`adapter_audit/vertex_gemini_bridge.analyze.jsonl`.

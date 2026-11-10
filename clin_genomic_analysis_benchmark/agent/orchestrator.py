@@ -1,6 +1,9 @@
-"""2-stage flow per question:
-  1. assess  — a needs-clarification verdict for each of the four components
-  2. analyze — only when every component was judged clear
+"""Run the analyze task: an agent computes each gold-unambiguous question.
+
+The assess task is a separate, agent-free prompt (see ``assess/``). Analyze
+runs only on questions whose gold says every component is clear, so the
+harness reads the gold bank's classifications to choose them; the agent sees
+only the public question.
 
 Writes per-question artifacts under runs/<agent_name>/<run_id>/per_question/<cohort>/<qid>/.
 Builds a per-run manifest.json with agent_cmd, run start/end, env (no secrets).
@@ -24,44 +27,31 @@ from pathlib import Path
 from typing import Optional
 
 from ..cohorts import Cohort, resolve_cohorts
-from ..components import classification_from_flags, components_payload, flags_from_assess_result
 from ..config import RUNS_DIR, TimeoutConfig, settings
+from ..instructions import rulebook_provenance
 from ..questions import io as q_io
 from ..questions.schema import PublicQuestion
 from ..utils.jsonio import atomic_write_json
+from .contract import CONTRACT_VERSION
 from .isolation import (
     audit_agent_artifacts,
     require_supported_adapter,
     run_isolation_preflight,
     sandbox_backend_provenance,
 )
-from .runner import StageInvocation, invoke
+from .runner import AgentInvocation, invoke
 
 logger = logging.getLogger(__name__)
 
+TASK = "analyze"
 
-_DEFAULT_INSTRUCTIONS = {
-    "assess": (
-        "You are evaluating one analysis question against AACR Project GENIE BPC cohort data. "
-        "The cohort folder and a data dictionary are provided. For each of the four components "
-        "defined in the benchmark instructions (denominator, outcome, covariates, "
-        "analysis_plan), decide "
-        "whether the question needs clarification before one analysis pipeline follows from it, "
-        "applying the rules in the benchmark instructions. Judge from the question wording, the "
-        "benchmark conventions, the data dictionary and the Analytic Data Guide, not from "
-        "whether competing readings change the result in this cohort. "
-        "Return strictly: {\"denominator\": {\"needs_clarification\": true|false, "
-        "\"rationale\": \"...\"}, \"outcome\": {...}, \"covariates\": {...}, "
-        "\"analysis_plan\": {...}}."
-    ),
-    "analyze": (
-        "You previously judged every component of this question clear. Compute the answer using the "
-        "cohort data files. Use Python (pandas/numpy/scipy/statsmodels/lifelines as needed). "
-        "Return strictly: "
-        "{\"answer_type\": \"count|proportion|median_with_ci|hazard_ratio_with_ci|odds_ratio_with_ci|pvalue|categorical|categorical_distribution\", "
-        "\"answer\": {<typed fields>}, \"methods\": \"...\", \"supporting_evidence\": {...}}."
-    ),
-}
+_ANALYZE_INSTRUCTIONS = (
+    "This question has been reviewed and is fully specified. Compute its answer from the "
+    "cohort data files, following the benchmark's analyze instructions and conventions. "
+    "Use Python (pandas/numpy/scipy/statsmodels/lifelines as needed). Return strictly: "
+    "{\"answer_type\": \"count|proportion|median_with_ci|hazard_ratio_with_ci|odds_ratio_with_ci|pvalue|categorical|categorical_distribution\", "
+    "\"answer\": {<typed fields>}, \"methods\": \"...\", \"supporting_evidence\": {...}}."
+)
 
 
 @dataclass
@@ -69,14 +59,13 @@ class QuestionRun:
     question_id: str
     cohort: str
     category: int
-    classification_gold: str
-    assess: Optional[dict] = None          # serialised StageInvocation
-    analyze: Optional[dict] = None
+    analyze: Optional[dict] = None          # serialised AgentInvocation
     error: Optional[str] = None
 
 
 @dataclass
 class RunManifest:
+    task: str
     agent_cmd: str
     agent_name: str
     run_id: str
@@ -88,6 +77,7 @@ class RunManifest:
     n_questions: int
     n_completed: int
     agent_provenance: dict
+    rulebook: dict
     integrity: dict
     settings: dict
 
@@ -134,9 +124,6 @@ _SAFE_AGENT_ENV_VARS = (
     "UNSLOTH_RETRY_BASE_SECONDS",
     "UNSLOTH_MAX_RETRY_SLEEP_SECONDS",
     "UNSLOTH_MAX_REQUESTS",
-    "UNSLOTH_ASSESS_MAX_OUTPUT_TOKENS",
-    "UNSLOTH_ASSESS_MAX_REQUESTS",
-    "UNSLOTH_ASSESS_MAX_RETRIES",
     "VERTEX_GEMMA_PROJECT_ID",
     "VERTEX_GEMMA_LOCATION",
     "VERTEX_GEMMA_MODEL",
@@ -165,27 +152,20 @@ _SAFE_AGENT_ENV_VARS = (
     "AGY_USE_SANDBOX",
     "AGY_SKIP_PERMISSIONS",
     "AGY_PRINT_TIMEOUT",
-    "AGY_PRINT_TIMEOUT_ASSESS",
     "AGY_PRINT_TIMEOUT_ANALYZE",
 )
 
 
 _ADAPTER_TIMEOUTS = {
     # This local model can spend several minutes on one generation and may make
-    # multiple tool-calling turns before returning the stage contract.
-    "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl": TimeoutConfig(
-        assess=7_200,
-        analyze=7_200,
-    ),
-    "codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl": TimeoutConfig(
-        assess=7_200,
-        analyze=7_200,
-    ),
+    # multiple tool-calling turns before returning the result contract.
+    "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl": TimeoutConfig(analyze=7_200),
+    "codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl": TimeoutConfig(analyze=7_200),
 }
 
 
 def _timeout_config_for_adapter(adapter_name: str) -> TimeoutConfig:
-    """Return per-stage defaults, with narrow overrides for slow adapters."""
+    """Return the default timeout, with narrow overrides for slow adapters."""
     return _ADAPTER_TIMEOUTS.get(adapter_name, settings().timeouts)
 
 
@@ -943,7 +923,7 @@ def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) 
     return provenance
 
 
-def _serialise(inv: StageInvocation) -> dict:
+def _serialise(inv: AgentInvocation) -> dict:
     d = asdict(inv)
     # stdout/stderr already persisted to disk; keep size-bounded copies in JSON
     d["stdout"] = (d.get("stdout") or "")[:1000]
@@ -955,33 +935,27 @@ def _per_question_dir(run_dir: Path, cohort: str, qid: str) -> Path:
     return run_dir / "per_question" / cohort / qid
 
 
-def _build_question_payload(*, q: PublicQuestion, cohort: Cohort, stage: str, scratch_dir: Path,
+def _build_question_payload(*, q: PublicQuestion, cohort: Cohort, scratch_dir: Path,
                             data_dictionary_path: Path,
-                            prior_classification: Optional[str] = None,
                             max_runtime_seconds: Optional[int] = None) -> dict:
     payload = {
-        "contract_version": "4",
+        "contract_version": CONTRACT_VERSION,
         "question_id": q.id,
         "question_text": q.text,
         "cohort": cohort.name,
-        "stage": stage,
         "cohort_dir": str(cohort.path.resolve()),
         "data_dictionary_path": str(data_dictionary_path.resolve()),
         "scratch_dir": str(scratch_dir.resolve()),
-        "instructions": _DEFAULT_INSTRUCTIONS[stage],
-        "assessment_components": components_payload(),
+        "instructions": _ANALYZE_INSTRUCTIONS,
     }
-    if prior_classification is not None:
-        payload["prior_classification"] = prior_classification
     if max_runtime_seconds is not None:
         payload["max_runtime_seconds"] = max_runtime_seconds
     return payload
 
 
 def _run_one_question(*, agent_cmd: str, q: PublicQuestion, cohort: Cohort, run_dir: Path,
-                      stages: list[str], agent_max_attempts: int,
+                      agent_max_attempts: int,
                       agent_retry_base_seconds: float,
-                      gold_classification: Optional[str] = None,
                       agent_env: Optional[Mapping[str, str]] = None,
                       timeout_config: Optional[TimeoutConfig] = None) -> QuestionRun:
     from ..cohorts import find_data_dictionary
@@ -989,98 +963,65 @@ def _run_one_question(*, agent_cmd: str, q: PublicQuestion, cohort: Cohort, run_
     qdir.mkdir(parents=True, exist_ok=True)
     scratch = qdir / "scratch"
     scratch.mkdir(exist_ok=True)
-    dict_path = find_data_dictionary(cohort)
     timeouts = timeout_config or settings().timeouts
-    qrun = QuestionRun(
-        question_id=q.id, cohort=cohort.name, category=q.category,
-        # runs/ lives in the agent-reachable repo, so keep it gold-free: only
-        # populated for partial reruns that skip assess (harness-side gold).
-        classification_gold=gold_classification or "",
-    )
-
-    classification: Optional[str] = None
+    qrun = QuestionRun(question_id=q.id, cohort=cohort.name, category=q.category)
     try:
-        if "assess" in stages:
-            payload = _build_question_payload(
-                q=q, cohort=cohort, stage="assess", scratch_dir=scratch,
-                data_dictionary_path=dict_path, max_runtime_seconds=timeouts.assess,
-            )
-            inv = invoke(
-                agent_cmd=agent_cmd,
-                question_payload=payload,
-                question_path=qdir / "assess.question.json",
-                result_path=qdir / "assess.json",
-                stderr_log_path=qdir / "assess.agent.log",
-                timeout_s=timeouts.assess,
-                max_attempts=agent_max_attempts,
-                retry_base_seconds=agent_retry_base_seconds,
-                agent_env=agent_env,
-            )
-            qrun.assess = _serialise(inv)
-            if inv.success and isinstance(inv.result, dict):
-                classification = classification_from_flags(
-                    flags_from_assess_result(inv.result))
-        else:
-            classification = gold_classification  # follow gold, useful for partial reruns
-
-        if classification == "unambiguous" and "analyze" in stages:
-            payload = _build_question_payload(
-                q=q, cohort=cohort, stage="analyze", scratch_dir=scratch,
-                data_dictionary_path=dict_path, prior_classification="unambiguous",
-                max_runtime_seconds=timeouts.analyze,
-            )
-            inv = invoke(
-                agent_cmd=agent_cmd,
-                question_payload=payload,
-                question_path=qdir / "analyze.question.json",
-                result_path=qdir / "analyze.json",
-                stderr_log_path=qdir / "analyze.agent.log",
-                timeout_s=timeouts.analyze,
-                max_attempts=agent_max_attempts,
-                retry_base_seconds=agent_retry_base_seconds,
-                agent_env=agent_env,
-            )
-            qrun.analyze = _serialise(inv)
+        payload = _build_question_payload(
+            q=q, cohort=cohort, scratch_dir=scratch,
+            data_dictionary_path=find_data_dictionary(cohort),
+            max_runtime_seconds=timeouts.analyze,
+        )
+        inv = invoke(
+            agent_cmd=agent_cmd,
+            question_payload=payload,
+            question_path=qdir / "analyze.question.json",
+            result_path=qdir / "analyze.json",
+            stderr_log_path=qdir / "analyze.agent.log",
+            timeout_s=timeouts.analyze,
+            max_attempts=agent_max_attempts,
+            retry_base_seconds=agent_retry_base_seconds,
+            agent_env=agent_env,
+        )
+        qrun.analyze = _serialise(inv)
     except Exception as exc:
         logger.exception("Question %s blew up", q.id)
         qrun.error = repr(exc)
     return qrun
 
 
-def run_eval(
+def gold_unambiguous_ids(cohort_name: str) -> set[str]:
+    """IDs of the cohort's gold-unambiguous questions (read harness-side)."""
+    bank = q_io.load_gold(cohort_name)
+    if bank is None:
+        raise click_exception(
+            f"no gold bank found for {cohort_name} (set CLINGEN_GOLD_ROOT / run sync); "
+            "analyze needs it to choose the gold-unambiguous questions")
+    return {q.id for q in bank.questions if q.classification == "unambiguous"}
+
+
+def run_analyze(
     *,
     agent_cmd: str,
     agent_name: str,
     cohort_spec: str = "all",
     question_id: Optional[str] = None,
-    stages: Optional[list[str]] = None,
     max_parallel: int = 4,
     agent_max_attempts: int = 3,
     agent_retry_base_seconds: float = 5.0,
     run_id: Optional[str] = None,
 ) -> Path:
-    """Run the harness against an agent. Returns the run directory."""
+    """Run an agent on every gold-unambiguous question. Returns the run directory."""
     adapter_name = require_supported_adapter(agent_cmd)
     timeout_config = _timeout_config_for_adapter(adapter_name)
     sandbox = sandbox_backend_provenance()
     preflight = run_isolation_preflight()
-    stages = stages or ["assess", "analyze"]
-    unknown_stages = sorted(set(stages) - {"assess", "analyze"})
-    if unknown_stages:
-        raise click_exception(
-            f"unknown stage(s): {', '.join(unknown_stages)}; expected assess, analyze")
     if agent_max_attempts < 1:
         raise click_exception("agent_max_attempts must be >= 1")
     if agent_retry_base_seconds < 0:
         raise click_exception("agent_retry_base_seconds must be >= 0")
-    run_id = run_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + uuid.uuid4().hex[:6]
-    run_dir = RUNS_DIR / agent_name / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
-    logger.info("Run dir: %s", run_dir)
 
-    started = datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-    # Collect questions from the PUBLIC (gold-free) bank — this is all the agent sees.
+    # The agent sees only the public question; which questions it gets comes
+    # from the gold bank's classifications, read here and never sent.
     cohorts = resolve_cohorts(cohort_spec)
     work: list[tuple[Cohort, PublicQuestion]] = []
     for c in cohorts:
@@ -1088,54 +1029,50 @@ def run_eval(
         if pcqf is None:
             logger.warning("No public questions YAML for %s; skipping.", c.name)
             continue
+        selected = gold_unambiguous_ids(c.name)
         for q in pcqf.questions:
             if question_id and q.id != question_id:
+                continue
+            if q.id not in selected:
+                if question_id:
+                    raise click_exception(
+                        f"{question_id} is not gold-unambiguous; analyze runs only on "
+                        "questions whose gold says every component is clear")
                 continue
             work.append((c, q))
 
     n_total = len(work)
     if n_total == 0:
-        raise click_exception("No questions matched the requested cohort/question filter.")
+        raise click_exception("No gold-unambiguous questions matched the cohort/question filter.")
 
-    # Partial reruns that skip the assess stage need the gold classification to
-    # decide whether to analyze. Read it harness-side from the gold bank
-    # (never exposed to the agent); normal full runs stay entirely gold-free.
-    gold_cls: dict[tuple[str, str], str] = {}
-    if "assess" not in stages:
-        for c in cohorts:
-            gcqf = q_io.load_gold(c.name)
-            if gcqf is None:
-                raise click_exception(
-                    f"--stages omits 'assess' but no gold bank found for {c.name} "
-                    f"(set CLINGEN_GOLD_ROOT / run sync)."
-                )
-            for q in gcqf.questions:
-                gold_cls[(c.name, q.id)] = q.classification
-
-    logger.info("Eval: %d question(s) across %d cohort(s); parallel=%d",
+    run_id = run_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + uuid.uuid4().hex[:6]
+    run_dir = RUNS_DIR / agent_name / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("Run dir: %s", run_dir)
+    started = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    logger.info("Analyze: %d question(s) across %d cohort(s); parallel=%d",
                 n_total, len(cohorts), max_parallel)
 
     runs: list[QuestionRun] = []
     if max_parallel <= 1:
         for c, q in work:
             runs.append(_run_one_question(
-                agent_cmd=agent_cmd, q=q, cohort=c, run_dir=run_dir, stages=stages,
+                agent_cmd=agent_cmd, q=q, cohort=c, run_dir=run_dir,
                 agent_max_attempts=agent_max_attempts,
                 agent_retry_base_seconds=agent_retry_base_seconds,
-                gold_classification=gold_cls.get((c.name, q.id)),
                 timeout_config=timeout_config,
             ))
     else:
         with ThreadPoolExecutor(max_workers=max_parallel) as pool:
             futures = [pool.submit(_run_one_question, agent_cmd=agent_cmd, q=q, cohort=c,
-                                   run_dir=run_dir, stages=stages,
+                                   run_dir=run_dir,
                                    agent_max_attempts=agent_max_attempts,
                                    agent_retry_base_seconds=agent_retry_base_seconds,
-                                   gold_classification=gold_cls.get((c.name, q.id)),
                                    timeout_config=timeout_config)
                        for c, q in work]
             for fut in as_completed(futures):
                 runs.append(fut.result())
+    runs.sort(key=lambda r: (r.cohort, r.question_id))
 
     ended = datetime.now(timezone.utc).isoformat(timespec="seconds")
     postflight_findings = audit_agent_artifacts(run_dir / "per_question")
@@ -1151,6 +1088,7 @@ def run_eval(
         "postflight": postflight,
     }
     manifest = RunManifest(
+        task=TASK,
         agent_cmd=agent_cmd,
         agent_name=agent_name,
         run_id=run_id,
@@ -1162,9 +1100,11 @@ def run_eval(
         n_questions=n_total,
         n_completed=sum(1 for r in runs if r.error is None),
         agent_provenance=_agent_provenance(agent_cmd),
+        rulebook=rulebook_provenance(TASK),
         integrity=integrity,
         settings={
-            "stages": stages,
+            "question_filter": question_id,
+            "selection": "gold_unambiguous",
             "max_parallel": max_parallel,
             "timeouts": asdict(timeout_config),
             "retries": {

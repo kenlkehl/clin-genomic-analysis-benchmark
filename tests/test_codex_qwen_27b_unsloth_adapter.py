@@ -40,10 +40,7 @@ def test_27b_defaults_match_loaded_unsloth_model(monkeypatch):
 def test_27b_adapter_is_registered_with_timeouts_and_provenance():
     command = f"bash adapters/{ADAPTER_NAME}/run.sh"
     assert require_supported_adapter(command) == ADAPTER_NAME
-    assert _timeout_config_for_adapter(ADAPTER_NAME) == TimeoutConfig(
-        assess=7_200,
-        analyze=7_200,
-    )
+    assert _timeout_config_for_adapter(ADAPTER_NAME) == TimeoutConfig(analyze=7_200)
 
     provenance = _agent_provenance(command, environ={})
     assert provenance["adapter"] == ADAPTER_NAME

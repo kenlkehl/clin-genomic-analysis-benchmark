@@ -21,10 +21,10 @@ Known deployments:
 Check `max_model_len` in the server's `/v1/models` response and set
 `VLLM_CONTEXT_WINDOW` to match.
 
-The adapter does not depend on or modify `~/.codex/config.toml`. Each stage runs
+The adapter does not depend on or modify `~/.codex/config.toml`. Each question runs
 in the benchmark's mandatory bubblewrap isolation with a disposable Codex home.
 The cohort is read-only and only the per-question scratch directory is writable;
-both the assess and analyze stages may run Python there.
+the analysis may run Python there.
 
 The Camus server returns Gemma 4's native `<|tool_call>...` markup as ordinary
 response text rather than parsed Responses API tool-call items. For each Codex
@@ -58,7 +58,7 @@ curl http://camus.dfci.harvard.edu:8002/v1/models
 Smoke-test one question (against the default 31B deployment):
 
 ```bash
-uv run clingen-bench eval \
+uv run clingen-bench analyze \
   --agent "bash adapters/codex_vllm_gemma4/run.sh" \
   --agent-name codex_vllm_gemma4_31b \
   --question bladder_1.2-Q6f9dd68e \
@@ -73,7 +73,7 @@ directory:
 VLLM_BASE_URL=http://sn4622130540:8000/v1 \
 VLLM_MODEL=gemma4-26b-a4b \
 VLLM_CONTEXT_WINDOW=250000 \
-uv run clingen-bench eval \
+uv run clingen-bench analyze \
   --agent "bash adapters/codex_vllm_gemma4/run.sh" \
   --agent-name codex_vllm_gemma4_26b_a4b_nvfp4 \
   --cohort all \
@@ -99,12 +99,12 @@ All settings are optional:
 | `VLLM_TOKEN` | unset | optional bearer token; never written to run provenance |
 | `CODEX_BIN` | `codex` | Codex executable |
 | `CODEX_SANDBOX_MODE` | `workspace-write` | override Codex's inner sandbox mode |
-| `CODEX_MAX_ATTEMPTS` | `1` | optional adapter-level retries (the harness already retries stages) |
+| `CODEX_MAX_ATTEMPTS` | `1` | optional adapter-level retries (the harness already retries failed questions) |
 | `VLLM_REQUEST_TIMEOUT_SECONDS` | `600` | timeout for each upstream inference request |
 | `VLLM_MAX_RETRIES` | `3` | bridge retries for transient upstream failures |
 | `VLLM_RETRY_BASE_SECONDS` | `2` | initial exponential-backoff delay |
 | `VLLM_MAX_RETRY_SLEEP_SECONDS` | `30` | cap on one bridge retry delay |
-| `VLLM_MAX_REQUESTS` | `256` | fail-closed tool-loop request limit per stage |
+| `VLLM_MAX_REQUESTS` | `256` | fail-closed tool-loop request limit per question |
 
 Set overrides in the shell that launches `clingen-bench`, rather than only in
 an adapter-local shell. This lets the harness record the non-secret endpoint and

@@ -23,7 +23,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from adapters.claude_code.adapter import (  # noqa: E402
     ClaudeInvocationError,
-    _allowed_tools_for,
+    _allowed_tools,
     _build_prompt,
     _claude_failure_message,
     _extract_json,
@@ -84,12 +84,12 @@ def _bridge_config() -> BridgeConfig:
 
 def _claude_call(*, system_prompt: str, user_prompt: str, cohort_dir: str,
                  data_dictionary_path: str, scratch_dir: str,
-                 allowed_tools: str, stage: str) -> str:
+                 allowed_tools: str) -> str:
     config = _bridge_config()
     audit_path = (
         Path(scratch_dir).resolve().parent
         / "adapter_audit"
-        / f"vertex_gemma_bridge.{stage}.jsonl"
+        / "vertex_gemma_bridge.analyze.jsonl"
     )
     with AnthropicVertexBridge(config, audit_path=audit_path, reasoning_effort=None) as bridge:
         env = _claude_environment(config.model, bridge)
@@ -146,7 +146,6 @@ def main() -> int:
     args = p.parse_args()
 
     question = _load_question(args.question_file)
-    stage = question["stage"]
     system_prompt, user_prompt = _build_prompt(question)
 
     try:
@@ -156,8 +155,7 @@ def main() -> int:
             cohort_dir=question["cohort_dir"],
             data_dictionary_path=question["data_dictionary_path"],
             scratch_dir=question["scratch_dir"],
-            allowed_tools=_allowed_tools_for(stage),
-            stage=stage,
+            allowed_tools=_allowed_tools(),
         )
     except ClaudeInvocationError as exc:
         sys.stderr.write(f"adapter: {exc}\n")

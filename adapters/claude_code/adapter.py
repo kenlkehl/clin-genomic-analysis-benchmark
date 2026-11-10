@@ -1,8 +1,8 @@
 """Reference Claude Code adapter for clin-genomic-analysis-benchmark.
 
-For each stage, this adapter:
+For each analyze question, this adapter:
   - reads the question.json passed by the harness,
-  - constructs a stage-specific prompt,
+  - builds the prompt from the analyze rulebook and the question,
   - shells out to `claude --print --output-format json` with the cohort directory
     bound via --add-dir and a narrow tool allow-list,
   - extracts the final assistant text,
@@ -28,6 +28,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from clin_genomic_analysis_benchmark.instructions import analyze_rulebook
 from clin_genomic_analysis_benchmark.agent.isolation import (
     SANDBOX_COHORT_DIR,
     SANDBOX_SCRATCH_DIR,
@@ -50,29 +51,21 @@ class ClaudeInvocationError(RuntimeError):
     """Claude Code failed before returning a usable assistant response."""
 
 
-def _read(path: Path) -> str:
-    return path.read_text()
-
-
 def _load_question(path: Path) -> dict:
     with open(path) as f:
         return json.load(f)
 
 
 def _build_prompt(question: dict) -> tuple[str, str]:
-    """Return (system_prompt, user_prompt) for the requested stage."""
+    """Return (system_prompt, user_prompt) for one analyze question."""
     question = sandbox_question_view(question)
-    stage = question["stage"]
-    # Single source of truth: the repo-root AGENT_INSTRUCTIONS.md (covers all three
-    # stages, the current conventions, and the answer schemas). The user payload below
-    # tells the agent which stage it is on.
-    repo_root = ADAPTER_DIR.parent.parent
-    sys_prompt = _read(repo_root / "AGENT_INSTRUCTIONS.md")
+    # Single source of truth: the repo-root ANALYZE_INSTRUCTIONS.md and
+    # CONVENTIONS.md (the task, the conventions, and the answer schemas).
+    sys_prompt = analyze_rulebook()
     user = (
         f"# Question\n"
         f"- ID: {question['question_id']}\n"
-        f"- Cohort: {question['cohort']}\n"
-        f"- Stage: {stage}\n\n"
+        f"- Cohort: {question['cohort']}\n\n"
         f"## Cohort directory (read-only)\n"
         f"`{question['cohort_dir']}`\n\n"
         f"## Data dictionary\n"
@@ -277,12 +270,8 @@ def _extract_json(text: str) -> dict | None:
     return None
 
 
-def _allowed_tools_for(stage: str) -> str:
-    """Allow agentic file-reading and Python execution; deny network/edit tools.
-
-    Both stages run code: analyze computes the answer, and assess checks the
-    cohort data where the rubric requires it.
-    """
+def _allowed_tools() -> str:
+    """Allow agentic file-reading and Python execution; deny network/edit tools."""
     return "Read,Glob,Grep,Bash"
 
 
@@ -399,7 +388,6 @@ def main() -> int:
     args = p.parse_args()
 
     question = _load_question(args.question_file)
-    stage = question["stage"]
     system_prompt, user_prompt = _build_prompt(question)
 
     try:
@@ -409,7 +397,7 @@ def main() -> int:
             cohort_dir=question["cohort_dir"],
             data_dictionary_path=question["data_dictionary_path"],
             scratch_dir=question["scratch_dir"],
-            allowed_tools=_allowed_tools_for(stage),
+            allowed_tools=_allowed_tools(),
         )
     except ClaudeInvocationError as exc:
         # Keep the harness log concise and actionable rather than burying the

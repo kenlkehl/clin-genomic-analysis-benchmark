@@ -714,7 +714,7 @@ def _copy_scratch_tree(*, source: Path, destination: Path) -> None:
 
     The sandbox binds ``destination`` rather than the real run directory. This
     keeps the host-side run path out of procfs mount metadata while preserving
-    scratch files between stages and harness retries.
+    scratch files between harness retries.
     """
     destination.mkdir(mode=0o700, parents=True, exist_ok=True)
     for path in sorted(source.rglob("*")):

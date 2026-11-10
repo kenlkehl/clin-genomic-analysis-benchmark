@@ -69,7 +69,7 @@ class ComponentVerdict(BaseModel):
 
 
 class ComponentAssessment(BaseModel):
-    """Gold verdicts for the four components judged in the assess stage."""
+    """Gold verdicts for the four components judged in the assess task."""
     model_config = ConfigDict(extra="forbid")
 
     denominator: ComponentVerdict
@@ -94,7 +94,7 @@ class Question(BaseModel):
     classification: Classification
     rationale: Optional[str] = None
 
-    # Gold for the assess stage. None until the question has been reviewed
+    # Gold for the assess task. None until the question has been reviewed
     # under the four-component rubric; scoring refuses unreviewed questions.
     component_assessment: Optional[ComponentAssessment] = None
 

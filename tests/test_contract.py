@@ -1,26 +1,26 @@
-"""Tests for the agent-harness contract JSON schemas."""
+"""Tests for the analyze agent contract and the assess reply schema."""
 
 from __future__ import annotations
 
 from clin_genomic_analysis_benchmark.agent.contract import (
+    CONTRACT_VERSION,
     validate_question,
     validate_result,
 )
-from clin_genomic_analysis_benchmark.components import COMPONENT_IDS, components_payload
+from clin_genomic_analysis_benchmark.assess.schema import validate_assess_result
+from clin_genomic_analysis_benchmark.components import COMPONENT_IDS
 
 
-def _q(stage: str = "assess") -> dict:
+def _q() -> dict:
     return {
-        "contract_version": "4",
+        "contract_version": CONTRACT_VERSION,
         "question_id": "bladder_1.2-Qabc12345",
         "question_text": "What is the most common race?",
         "cohort": "bladder_1.2",
-        "stage": stage,
         "cohort_dir": "/abs/path",
         "data_dictionary_path": "/abs/dict",
         "scratch_dir": "/abs/scratch",
         "instructions": "do the thing",
-        "assessment_components": components_payload(),
     }
 
 
@@ -32,60 +32,31 @@ def _assess(**flags: bool) -> dict:
 
 
 def test_question_schema_valid():
-    assert validate_question(_q("assess")) == []
-    assert validate_question(_q("analyze")) == []
+    assert validate_question(_q()) == []
+    budget = _q()
+    budget["max_runtime_seconds"] = 60
+    assert validate_question(budget) == []
 
 
-def test_question_schema_rejects_bad_stage():
-    for stage in ("frobnicate", "classify", "disambiguate"):
-        bad = _q("assess")
-        bad["stage"] = stage
-        assert validate_question(bad), f"should reject stage {stage!r}"
+def test_question_schema_rejects_retired_fields():
+    """The agent contract is analyze-only: no stage, components, or route."""
+    for key, value in (
+        ("stage", "analyze"),
+        ("assessment_components", []),
+        ("prior_classification", "unambiguous"),
+        ("category", 1),
+        ("disambiguation_concept_menu", []),
+    ):
+        bad = _q()
+        bad[key] = value
+        assert validate_question(bad), f"should reject {key!r}"
 
 
-def test_question_schema_rejects_old_contract_and_menu():
-    old = _q("assess")
-    old["contract_version"] = "3"
-    assert validate_question(old)
-    cat = _q("assess")
-    cat["category"] = 1
-    assert validate_question(cat), "category is no longer sent to the agent"
-    menu = _q("assess")
-    menu["disambiguation_concept_menu"] = []
-    assert validate_question(menu), "concept menu is no longer part of the contract"
-
-
-def test_question_schema_requires_canonical_components_in_order():
-    missing = _q("assess")
-    del missing["assessment_components"]
-    assert validate_question(missing)
-    reordered = _q("assess")
-    reordered["assessment_components"] = list(reversed(components_payload()))
-    assert any("canonical components" in e for e in validate_question(reordered))
-
-
-def test_assess_result_valid():
-    assert validate_result(_assess(), "assess") == []
-    assert validate_result(_assess(outcome=True, analysis_plan=True), "assess") == []
-    no_rationale = {cid: {"needs_clarification": False} for cid in COMPONENT_IDS}
-    assert validate_result(no_rationale, "assess") == [], "rationale is optional"
-
-
-def test_assess_result_rejects_missing_component():
-    for cid in COMPONENT_IDS:
-        bad = _assess()
-        del bad[cid]
-        assert validate_result(bad, "assess"), f"should reject missing {cid}"
-
-
-def test_assess_result_rejects_non_boolean_verdict():
-    for value in ("yes", 1, None):
-        bad = _assess()
-        bad["denominator"]["needs_clarification"] = value
-        assert validate_result(bad, "assess"), f"should reject {value!r}"
-    missing = _assess()
-    del missing["covariates"]["needs_clarification"]
-    assert validate_result(missing, "assess")
+def test_question_schema_rejects_old_contract():
+    for version in ("3", "4"):
+        old = _q()
+        old["contract_version"] = version
+        assert validate_question(old)
 
 
 def test_analyze_result_valid():
@@ -97,15 +68,42 @@ def test_analyze_result_valid():
         },
         "methods": "x",
     }
-    assert validate_result(r, "analyze") == []
-    bad = {"answer_type": "weird", "answer": {}}
-    assert validate_result(bad, "analyze")
+    assert validate_result(r) == []
+    assert validate_result({"answer_type": "weird", "answer": {}})
 
 
-def test_stage_results_reject_extra_properties():
+def test_analyze_result_rejects_an_assess_reply():
+    assert validate_result(_assess())
+
+
+def test_assess_result_valid():
+    assert validate_assess_result(_assess()) == []
+    assert validate_assess_result(_assess(outcome=True, analysis_plan=True)) == []
+    no_rationale = {cid: {"needs_clarification": False} for cid in COMPONENT_IDS}
+    assert validate_assess_result(no_rationale) == [], "rationale is optional"
+
+
+def test_assess_result_rejects_missing_component():
+    for cid in COMPONENT_IDS:
+        bad = _assess()
+        del bad[cid]
+        assert validate_assess_result(bad), f"should reject missing {cid}"
+
+
+def test_assess_result_rejects_non_boolean_verdict():
+    for value in ("yes", 1, None):
+        bad = _assess()
+        bad["denominator"]["needs_clarification"] = value
+        assert validate_assess_result(bad), f"should reject {value!r}"
+    missing = _assess()
+    del missing["covariates"]["needs_clarification"]
+    assert validate_assess_result(missing)
+
+
+def test_assess_result_rejects_extra_properties():
     top = _assess()
     top["classification"] = "ambiguous"
-    assert validate_result(top, "assess")
+    assert validate_assess_result(top)
     nested = _assess()
     nested["outcome"]["concept_ids"] = ["TIME_ORIGIN"]
-    assert validate_result(nested, "assess")
+    assert validate_assess_result(nested)

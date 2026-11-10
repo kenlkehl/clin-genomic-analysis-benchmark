@@ -5,10 +5,12 @@ Only scorecards at ``RUNS_DIR/<agent>/<run>/scorecard.json`` are included.
 This intentionally excludes deeper archive/grouping directories such as
 ``runs/failed_runs`` and ``runs/contaminated_gpt_cheated``.
 
-Only scorecards from the four-component scorer (``deterministic-rules-v3``)
-are aggregated. Older scorecards (classify/disambiguate, concept-ID scoring)
-measure a different task, so they are skipped with a note on stderr rather
-than mixed into the comparison.
+Assess runs, analyze runs, and combined scorecards (``runs/combined/<id>``) each
+get a row, labelled by ``task``. Only scorecards from the split-task scorer
+(``deterministic-rules-v4``) are aggregated. Older scorecards (a single run
+holding both tasks, or classify/disambiguate and concept-ID scoring) measure a
+different setup, so they are skipped with a note on stderr rather than mixed
+into the comparison.
 """
 
 from __future__ import annotations
@@ -23,11 +25,13 @@ from typing import Any
 
 from clin_genomic_analysis_benchmark.components import COMPONENT_IDS
 
-SCORER = "deterministic-rules-v3"
+SCORER = "deterministic-rules-v4"
+TASKS = ("assess", "analyze", "combined")
 COMPONENT_METRICS = ("balanced_accuracy", "sensitivity", "specificity")
 
 CSV_FIELDS = (
-    "agent",
+    "task",
+    "run_name",
     "run_id",
     "model",
     "provider",
@@ -36,7 +40,7 @@ CSV_FIELDS = (
     "questions_scored",
     "questions_failed_after_retries",
     "questions_completed_successfully",
-    "overall_score_pct",
+    "score_pct",
     "assess_score_pct",
     "analyze_score_pct",
     "question_level_accuracy_pct",
@@ -98,36 +102,38 @@ def _questions_failed_after_retries(scorecard_path: Path) -> int:
         raise ValueError(f"could not read manifest {manifest_path}: {exc}") from exc
 
     manifest = _mapping(payload, field="manifest", path=manifest_path)
-    repair_history = manifest.get("repair_history")
+    # Analyze runs record repairs in repair_history, assess runs in retry_history.
+    history_field = "repair_history" if "repair_history" in manifest else "retry_history"
+    repair_history = manifest.get(history_field)
     if repair_history is None:
         return 0
     if not isinstance(repair_history, list):
-        raise ValueError(f"{manifest_path}: repair_history must be a JSON array")
+        raise ValueError(f"{manifest_path}: {history_field} must be a JSON array")
     if not repair_history:
         return 0
 
     final_repair = _mapping(
         repair_history[-1],
-        field="repair_history[-1]",
+        field=f"{history_field}[-1]",
         path=manifest_path,
     )
     targets = final_repair.get("targets")
     if not isinstance(targets, list):
         raise ValueError(
-            f"{manifest_path}: repair_history[-1].targets must be a JSON array"
+            f"{manifest_path}: {history_field}[-1].targets must be a JSON array"
         )
 
     failed_questions: set[tuple[str, str]] = set()
     for index, value in enumerate(targets):
         target = _mapping(
             value,
-            field=f"repair_history[-1].targets[{index}]",
+            field=f"{history_field}[-1].targets[{index}]",
             path=manifest_path,
         )
         merged = target.get("merged")
         if not isinstance(merged, bool):
             raise ValueError(
-                f"{manifest_path}: repair_history[-1].targets[{index}].merged "
+                f"{manifest_path}: {history_field}[-1].targets[{index}].merged "
                 "must be a boolean"
             )
         if not merged:
@@ -135,12 +141,12 @@ def _questions_failed_after_retries(scorecard_path: Path) -> int:
                 (
                     _required_string(
                         target.get("cohort"),
-                        field=f"repair_history[-1].targets[{index}].cohort",
+                        field=f"{history_field}[-1].targets[{index}].cohort",
                         path=manifest_path,
                     ),
                     _required_string(
                         target.get("question_id"),
-                        field=f"repair_history[-1].targets[{index}].question_id",
+                        field=f"{history_field}[-1].targets[{index}].question_id",
                         path=manifest_path,
                     ),
                 )
@@ -148,24 +154,61 @@ def _questions_failed_after_retries(scorecard_path: Path) -> int:
     return len(failed_questions)
 
 
-def _component_columns(overall: dict[str, Any], *, path: Path) -> dict[str, str]:
+def _component_columns(assess: dict[str, Any] | None, *, field: str,
+                       path: Path) -> dict[str, str]:
+    if assess is None:
+        return {f"{component}_{metric}_pct": "" for component in COMPONENT_IDS
+                for metric in COMPONENT_METRICS}
     components = _mapping(
-        overall.get("components"), field="overall.components", path=path
+        assess.get("components"), field=f"{field}.components", path=path
     )
     columns: dict[str, str] = {}
     for component in COMPONENT_IDS:
         tally = _mapping(
             components.get(component),
-            field=f"overall.components.{component}",
+            field=f"{field}.components.{component}",
             path=path,
         )
         for metric in COMPONENT_METRICS:
             columns[f"{component}_{metric}_pct"] = _percentage(
                 tally.get(metric),
-                field=f"overall.components.{component}.{metric}",
+                field=f"{field}.components.{component}.{metric}",
                 path=path,
             )
     return columns
+
+
+def _provenance(root: dict[str, Any], task: str, *, path: Path) -> dict[str, str]:
+    """Model, provider, effort, and integrity; a combined row joins both runs'."""
+    if task != "combined":
+        provenance = _mapping(root.get("provenance") or {}, field="provenance", path=path)
+        integrity = _mapping(root.get("integrity") or {}, field="integrity", path=path)
+        return {
+            "model": _optional_string(provenance.get("model")),
+            "provider": _optional_string(provenance.get("provider")),
+            "effort": _optional_string(provenance.get("effort_level")),
+            "integrity_status": _optional_string(integrity.get("status")),
+        }
+    sources = _mapping(root.get("sources"), field="sources", path=path)
+    parts = [
+        _mapping(sources.get(name), field=f"sources.{name}", path=path)
+        for name in ("assess", "analyze")
+    ]
+    provenances = [
+        _mapping(part.get("provenance") or {}, field="sources.provenance", path=path)
+        for part in parts
+    ]
+
+    def joined(values: list[str]) -> str:
+        return values[0] if values[0] == values[1] else " | ".join(values)
+
+    return {
+        "model": joined([_optional_string(p.get("model")) for p in provenances]),
+        "provider": joined([_optional_string(p.get("provider")) for p in provenances]),
+        "effort": _optional_string(provenances[1].get("effort_level")),
+        "integrity_status": joined(
+            [_optional_string(part.get("integrity_status")) for part in parts]),
+    }
 
 
 def read_scorecard(scorecard_path: Path, runs_dir: Path) -> dict[str, str | int]:
@@ -183,86 +226,79 @@ def read_scorecard(scorecard_path: Path, runs_dir: Path) -> dict[str, str | int]
     scorer = root.get("scorer")
     if scorer != SCORER:
         raise IncompatibleScorecard(
-            f"{scorecard_path}: scorer {scorer!r} is not {SCORER!r}; "
-            "pre-component scorecards are not comparable"
+            f"{scorecard_path}: scorer {scorer!r} is not {SCORER!r}; scorecards from "
+            "before the assess/analyze split are not comparable"
         )
+    task = root.get("task")
+    if task not in TASKS:
+        raise ValueError(f"{scorecard_path}: task must be one of {', '.join(TASKS)}")
     overall = _mapping(root.get("overall"), field="overall", path=scorecard_path)
-    subtask_scores = _mapping(
-        overall.get("subtask_scores"),
-        field="overall.subtask_scores",
-        path=scorecard_path,
-    )
-    provenance = root.get("agent_provenance")
-    if provenance is None:
-        provenance = {}
-    provenance = _mapping(
-        provenance,
-        field="agent_provenance",
-        path=scorecard_path,
-    )
-    integrity = root.get("integrity")
-    if integrity is None:
-        integrity = {}
-    integrity = _mapping(integrity, field="integrity", path=scorecard_path)
+
+    if task == "combined":
+        subtask_scores = _mapping(overall.get("subtask_scores"),
+                                  field="overall.subtask_scores", path=scorecard_path)
+        assess = _mapping(overall.get("assess"), field="overall.assess", path=scorecard_path)
+        assess_field = "overall.assess"
+        assess_score = subtask_scores.get("assess")
+        analyze_score = subtask_scores.get("analyze")
+        questions_scored = _questions_scored(assess.get("n"), path=scorecard_path)
+        questions_failed_after_retries = 0
+    else:
+        assess = overall if task == "assess" else None
+        assess_field = "overall"
+        assess_score = overall.get("score") if task == "assess" else None
+        analyze_score = overall.get("score") if task == "analyze" else None
+        questions_scored = _questions_scored(overall.get("n"), path=scorecard_path)
+        questions_failed_after_retries = _questions_failed_after_retries(scorecard_path)
+    if questions_failed_after_retries > questions_scored:
+        raise ValueError(
+            f"{scorecard_path}: questions failed after retries cannot exceed overall.n"
+        )
 
     try:
         relative_scorecard = scorecard_path.relative_to(runs_dir)
     except ValueError:
         relative_scorecard = scorecard_path
 
-    questions_scored = _questions_scored(overall.get("n"), path=scorecard_path)
-    questions_failed_after_retries = _questions_failed_after_retries(scorecard_path)
-    if questions_failed_after_retries > questions_scored:
-        raise ValueError(
-            f"{scorecard_path}: questions failed after retries cannot exceed overall.n"
-        )
-
     return {
-        "agent": _required_string(
-            root.get("agent_name"), field="agent_name", path=scorecard_path
+        "task": task,
+        "run_name": _required_string(
+            root.get("run_name"), field="run_name", path=scorecard_path
         ),
         "run_id": _required_string(
             root.get("run_id"), field="run_id", path=scorecard_path
         ),
-        "model": _optional_string(provenance.get("model")),
-        "provider": _optional_string(provenance.get("provider")),
-        "effort": _optional_string(provenance.get("effort_level")),
-        "integrity_status": _optional_string(integrity.get("status")),
+        **_provenance(root, task, path=scorecard_path),
         "questions_scored": questions_scored,
         "questions_failed_after_retries": questions_failed_after_retries,
         "questions_completed_successfully": (
             questions_scored - questions_failed_after_retries
         ),
-        "overall_score_pct": _percentage(
-            overall.get("overall_score"),
-            field="overall.overall_score",
-            path=scorecard_path,
+        "score_pct": _percentage(
+            overall.get("score"), field="overall.score", path=scorecard_path
         ),
         "assess_score_pct": _percentage(
-            subtask_scores.get("assess"),
-            field="overall.subtask_scores.assess",
-            path=scorecard_path,
+            assess_score, field="assess score", path=scorecard_path
         ),
         "analyze_score_pct": _percentage(
-            subtask_scores.get("analyze"),
-            field="overall.subtask_scores.analyze",
-            path=scorecard_path,
+            analyze_score, field="analyze score", path=scorecard_path
         ),
         "question_level_accuracy_pct": _percentage(
-            overall.get("classify_accuracy"),
-            field="overall.classify_accuracy",
+            assess.get("classify_accuracy") if assess is not None else None,
+            field=f"{assess_field}.classify_accuracy",
             path=scorecard_path,
         ),
-        **_component_columns(overall, path=scorecard_path),
+        **_component_columns(assess, field=assess_field, path=scorecard_path),
         "scorecard": relative_scorecard.as_posix(),
     }
 
 
-def _sort_key(row: dict[str, str | int]) -> tuple[float, str, str]:
-    score = row["overall_score_pct"]
+def _sort_key(row: dict[str, str | int]) -> tuple[str, float, str, str]:
+    score = row["score_pct"]
     return (
+        str(row["task"]),
         -float(score) if score != "" else math.inf,
-        str(row["agent"]),
+        str(row["run_name"]),
         str(row["run_id"]),
     )
 

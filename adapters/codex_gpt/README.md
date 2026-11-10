@@ -26,7 +26,8 @@ bash adapters/codex_gpt/run.sh \
   --output <abs result.json>
 ```
 
-The adapter builds a prompt from `AGENT_INSTRUCTIONS.md` plus the stage payload,
+The adapter builds a prompt from the analyze rulebook (`ANALYZE_INSTRUCTIONS.md`
+followed by `CONVENTIONS.md`) plus the question payload,
 runs `codex exec` non-interactively, reads Codex's final message via
 `--output-last-message`, extracts the final JSON object, and writes it to
 `result.json`. The Codex process is enclosed in a mandatory outer `bubblewrap`
@@ -41,13 +42,12 @@ Codex history, or gold root.
 | `CODEX_REFRESH_AZURE_TOKEN` | `1` | refresh `AZURE_OPENAI_API_KEY` before each Codex attempt |
 | `CODEX_AZ_TOKEN_ATTEMPTS` | `3` | retry count for `az account get-access-token` |
 | `CODEX_AZ_TOKEN_RETRY_SLEEP_SECONDS` | `5` | delay between Azure token refresh attempts |
-| `CODEX_MAX_ATTEMPTS` | `1` | inner Codex retry count; the benchmark harness retries each failed stage three times by default |
+| `CODEX_MAX_ATTEMPTS` | `1` | inner Codex retry count; the benchmark harness retries each failed question three times by default |
 | `CODEX_RETRY_BASE_SECONDS` | `15` | linear backoff base for Codex retries |
 | `CODEX_SAVE_ATTEMPT_LOGS` | `1` | save full per-attempt Codex stdout/stderr in scratch |
 | `CODEX_EPHEMERAL` | `1` | pass `--ephemeral` to avoid saving many sessions |
-| `CODEX_SANDBOX_MODE_ASSESS` | `workspace-write` | assess sandbox |
 | `CODEX_SANDBOX_MODE_ANALYZE` | `workspace-write` | analyze sandbox |
-| `CODEX_SANDBOX_MODE` | unset | fallback sandbox for all stages |
+| `CODEX_SANDBOX_MODE` | unset | fallback sandbox |
 | `CODEX_PROFILE` | unset | optional Codex profile override |
 | `CODEX_MODEL_PROVIDER` | unset | optional provider key, such as `azure` |
 | `CODEX_MODEL` | unset | optional model override; leave unset to use `~/.codex/config.toml` |
@@ -59,7 +59,7 @@ Codex history, or gold root.
 CODEX_MODEL_PROVIDER=azure \
 CODEX_MODEL=gpt-5.6-terra \
 CODEX_REASONING_EFFORT=xhigh \
-uv run clingen-bench eval \
+uv run clingen-bench analyze \
   --agent "bash adapters/codex_gpt/run.sh" \
   --agent-name codex_azure_gpt_5_6_terra_xhigh \
   --question bladder_1.2-Q6f9dd68e \
@@ -72,7 +72,7 @@ uv run clingen-bench eval \
 CODEX_MODEL_PROVIDER=azure \
 CODEX_MODEL=gpt-5.6-terra \
 CODEX_REASONING_EFFORT=xhigh \
-uv run clingen-bench eval \
+uv run clingen-bench analyze \
   --agent "bash adapters/codex_gpt/run.sh" \
   --agent-name codex_azure_gpt_5_6_terra_xhigh \
   --cohort all \

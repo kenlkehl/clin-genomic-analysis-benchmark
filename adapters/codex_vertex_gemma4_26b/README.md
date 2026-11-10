@@ -21,7 +21,7 @@ Run the benchmark:
 
 ```bash
 VERTEX_GEMMA_PROJECT_ID="$(gcloud config get-value project)" \
-uv run clingen-bench eval \
+uv run clingen-bench analyze \
   --agent "bash adapters/codex_vertex_gemma4_26b/run.sh" \
   --agent-name codex_vertex_gemma4_26b \
   --max-parallel 1

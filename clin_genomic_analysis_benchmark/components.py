@@ -1,9 +1,9 @@
-"""The four question components judged in the assess stage.
+"""The four question components judged in the assess task.
 
-The agent decides, for each component, whether the question needs
-clarification before one analysis pipeline follows from it. A question is
-ambiguous when any component needs clarification. The rules for each
-component live in AGENT_INSTRUCTIONS.md; this module only fixes the IDs.
+The model decides, for each component, whether the question needs
+clarification before one analysis follows from it. A question is ambiguous
+when any component needs clarification. The rules for each component live in
+ASSESS_INSTRUCTIONS.md; this module only fixes the IDs.
 """
 
 from __future__ import annotations

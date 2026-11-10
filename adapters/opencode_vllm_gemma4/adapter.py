@@ -17,6 +17,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from adapters.codex_gpt.adapter import (  # noqa: E402
+    TASK,
     _build_prompt,
     _env_float,
     _env_int,
@@ -115,7 +116,7 @@ def _bridge_config() -> BridgeConfig:
 
 
 def _opencode_config(*, bridge_url: str, max_output_tokens: int) -> str:
-    """Build the complete disposable OpenCode configuration for one stage."""
+    """Build the complete disposable OpenCode configuration for one question."""
     model = _model()
     return json.dumps({
         "$schema": "https://opencode.ai/config.json",
@@ -259,7 +260,7 @@ def _is_retryable_opencode_failure(stderr: str) -> bool:
 
 
 def _opencode_call(*, prompt: str, question: dict) -> str:
-    stage = question["stage"]
+    stage = TASK
     scratch_dir = Path(question["scratch_dir"]).resolve()
     cohort_dir = Path(question["cohort_dir"]).resolve()
     scratch_dir.mkdir(parents=True, exist_ok=True)

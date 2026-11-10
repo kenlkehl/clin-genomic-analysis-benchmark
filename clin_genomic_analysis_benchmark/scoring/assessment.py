@@ -1,4 +1,4 @@
-"""Exact per-component scorer for the assess stage."""
+"""Exact per-component scorer for the assess task."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def score_assessment(
 ) -> AssessmentResult:
     """Compare the agent's ``needs_clarification`` verdicts with gold.
 
-    ``agent_flags`` is None when the assess stage failed; every component then
+    ``agent_flags`` is None when the assess call failed; every component then
     counts as wrong. Rationales are recorded but never scored.
     """
     gold_classification = classification_from_flags(gold_flags)

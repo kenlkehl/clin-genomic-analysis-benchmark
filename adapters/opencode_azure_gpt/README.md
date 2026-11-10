@@ -5,7 +5,7 @@ deployment on an Azure OpenAI resource, using the Responses API. Select the
 deployment with `OPENCODE_AZURE_MODEL` and the reasoning effort with
 `OPENCODE_AZURE_REASONING_EFFORT`.
 
-Each stage runs in the benchmark's mandatory bubblewrap isolation with a fresh
+Each question runs in the benchmark's mandatory bubblewrap isolation with a fresh
 OpenCode home and an inline, adapter-owned configuration. The adapter does not
 read the user's normal OpenCode configuration, credentials, plugins, skills, or
 session history.
@@ -58,7 +58,7 @@ effort a run actually used.
 AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com/openai/v1 \
 OPENCODE_AZURE_MODEL=gpt-6-luna \
 OPENCODE_AZURE_REASONING_EFFORT=xhigh \
-uv run clingen-bench eval \
+uv run clingen-bench analyze \
   --agent "bash adapters/opencode_azure_gpt/run.sh" \
   --agent-name opencode_azure_gpt_6_luna_xhigh \
   --cohort all \
@@ -81,10 +81,10 @@ records them in `manifest.json` and restores them during repairs.
 | `OPENCODE_AZURE_MAX_RETRIES` | `6` | bridge attempts for retryable upstream failures |
 | `OPENCODE_AZURE_RETRY_BASE_SECONDS` | `5` | initial exponential-backoff delay |
 | `OPENCODE_AZURE_MAX_RETRY_SLEEP_SECONDS` | `60` | cap on one bridge retry delay |
-| `OPENCODE_AZURE_MAX_REQUESTS` | `512` | fail-closed request limit per stage |
+| `OPENCODE_AZURE_MAX_REQUESTS` | `512` | fail-closed request limit per question |
 | `OPENCODE_BIN` | `opencode` | OpenCode executable |
 | `OPENCODE_AGENT` | `build` | OpenCode primary agent |
-| `OPENCODE_MAX_ATTEMPTS` | `1` | adapter-level retries (the harness already retries stages) |
+| `OPENCODE_MAX_ATTEMPTS` | `1` | adapter-level retries (the harness already retries failed questions) |
 | `OPENCODE_RETRY_BASE_SECONDS` | `15` | adapter retry delay multiplier |
 
 OpenCode is invoked with `--pure`; sharing and automatic updates are disabled,

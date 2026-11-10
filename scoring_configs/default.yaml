@@ -1,14 +1,15 @@
 # Scoring configuration.
 #
-# subtask_weights: how the two subtasks combine into the headline score.
-# Each subtask is a fraction in [0, 1]:
+# Assess and analyze runs are scored separately, each as a fraction in [0, 1]:
 #   assess  — mean over the four components (denominator, outcome, covariates,
 #             analysis_plan) of balanced accuracy on the needs-clarification
 #             verdicts. Balanced accuracy scores "always clear" and "always
 #             unclear" at 50%, which plain accuracy would not.
 #   analyze — 2/1/0 points per gold-unambiguous question, over 2 per question.
-# Weights are renormalised if they do not sum to 1, and a subtask with nothing
-# to score in a given cohort drops out.
+#
+# subtask_weights: how `clingen-bench combine` weights one assess run and one
+# analyze run into the headline score. Weights are renormalised if they do not
+# sum to 1, and a task with nothing to score in a given cohort drops out.
 subtask_weights:
   assess: 0.5
   analyze: 0.5
