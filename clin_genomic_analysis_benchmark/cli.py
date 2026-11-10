@@ -160,8 +160,8 @@ def compute_gold(cohort: str, max_repair_iters: int, only: str | None,
 @click.option("--run-name", default=None,
               help="Directory under runs/ (default: assess_<model>).")
 @click.option("--cohort", default="all", show_default=True)
-@click.option("--question", default=None,
-              help="Restrict to a single question id (across cohorts).")
+@click.option("--question", "questions", multiple=True,
+              help="Restrict to this question id (across cohorts); repeatable.")
 @click.option("--max-parallel", default=4, type=click.IntRange(min=1), show_default=True)
 @click.option("--max-attempts", default=3, type=click.IntRange(min=1), show_default=True,
               help="Calls per question until a reply validates.")
@@ -184,7 +184,7 @@ def compute_gold(cohort: str, max_repair_iters: int, only: str | None,
               show_default=True, help="Seconds before one API call is abandoned.")
 @click.option("--run-id", default=None)
 @click.option("--verbose", is_flag=True)
-def assess(model_spec: str, run_name: str | None, cohort: str, question: str | None,
+def assess(model_spec: str, run_name: str | None, cohort: str, questions: tuple[str, ...],
            max_parallel: int, max_attempts: int, retry_base_seconds: float,
            max_tokens: int | None, temperature: float | None, params: str | None,
            base_url: str | None, api_key_env: str | None, project: str | None,
@@ -211,7 +211,7 @@ def assess(model_spec: str, run_name: str | None, cohort: str, question: str | N
         )
         run_dir = run_assess(
             backend_config=config, run_name=run_name or default_run_name(model_spec),
-            cohort_spec=cohort, question_id=question, max_parallel=max_parallel,
+            cohort_spec=cohort, question_ids=questions, max_parallel=max_parallel,
             max_attempts=max_attempts, retry_base_seconds=retry_base_seconds, run_id=run_id,
         )
     except (ValueError, _json.JSONDecodeError) as exc:

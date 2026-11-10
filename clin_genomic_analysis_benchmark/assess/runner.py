@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from ..cohorts import Cohort, get_cohort, resolve_cohorts
 from ..config import RUNS_DIR
@@ -257,14 +257,15 @@ def run_assess(
     backend_config: BackendConfig,
     run_name: str,
     cohort_spec: str = "all",
-    question_id: Optional[str] = None,
+    question_ids: Sequence[str] = (),
     max_parallel: int = 4,
     max_attempts: int = 3,
     retry_base_seconds: float = 5.0,
     run_id: Optional[str] = None,
     backend: Optional[Backend] = None,
 ) -> Path:
-    """Assess every matching public question. Returns the run directory.
+    """Assess every matching public question (all of them when
+    ``question_ids`` is empty). Returns the run directory.
 
     ``backend`` overrides the one built from ``backend_config`` (for tests).
     """
@@ -280,9 +281,12 @@ def run_assess(
             logger.warning("No public questions YAML for %s; skipping.", cohort.name)
             continue
         work.extend((cohort, q) for q in bank.questions
-                    if question_id is None or q.id == question_id)
+                    if not question_ids or q.id in question_ids)
     if not work:
         raise ValueError("No questions matched the requested cohort/question filter.")
+    unmatched = sorted(set(question_ids) - {q.id for _, q in work})
+    if unmatched:
+        raise ValueError(f"No such question(s) in the requested cohorts: {', '.join(unmatched)}")
 
     backend = backend or make_backend(backend_config)
     rulebook = assess_rulebook()
@@ -314,7 +318,7 @@ def run_assess(
         "rulebook": _rulebook_record(rulebook),
         "integrity": dict(INTEGRITY),
         "settings": {
-            "question_filter": question_id,
+            "question_filter": sorted(question_ids) or None,
             "max_parallel": max_parallel,
             "retries": {"max_attempts": max_attempts,
                         "base_delay_seconds": retry_base_seconds,

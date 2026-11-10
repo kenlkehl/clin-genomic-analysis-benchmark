@@ -180,6 +180,24 @@ def test_run_assess_writes_a_prompt_only_run(bank, tmp_path):
                           cohort_spec="bladder_1.2", run_id="r1", backend=backend)
 
 
+def test_run_assess_filters_to_the_requested_questions(bank, tmp_path):
+    backend = FakeBackend([json.dumps(_VERDICTS)])
+    run_dir = runner.run_assess(
+        backend_config=backend.config, run_name="assess_fake", cohort_spec="bladder_1.2",
+        question_ids=("bladder_1.2-Q2",), max_parallel=1, retry_base_seconds=0, run_id="r1",
+        backend=backend)
+
+    runs = json.loads((run_dir / "runs.json").read_text())
+    assert [r["question_id"] for r in runs] == ["bladder_1.2-Q2"]
+    manifest = json.loads((run_dir / "manifest.json").read_text())
+    assert manifest["settings"]["question_filter"] == ["bladder_1.2-Q2"]
+    with pytest.raises(ValueError, match="bladder_1.2-Q9"):
+        runner.run_assess(backend_config=backend.config, run_name="assess_fake",
+                          cohort_spec="bladder_1.2", question_ids=("bladder_1.2-Q1",
+                                                                   "bladder_1.2-Q9"),
+                          run_id="r2", backend=backend)
+
+
 def test_retry_assess_failures_merges_into_a_copy_and_archives_the_source(bank, tmp_path):
     first = FakeBackend([json.dumps(_VERDICTS), "nothing"])
     source = runner.run_assess(
