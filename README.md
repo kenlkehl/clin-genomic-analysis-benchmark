@@ -185,7 +185,9 @@ export CLINGEN_DATA_ROOT=/path/to/cohort/data   # required: directory containing
 
 # ---- assess: one prompt per question, no tools ----------------------------
 # --model is <provider>:<model>, with providers vertex-anthropic, vertex-openai
-# (Gemini, Gemma, and other Vertex MaaS models), azure-openai, and
+# (Gemini, Gemma, and other Vertex MaaS models), vertex-responses (partner
+# models Vertex serves only on its Responses endpoint, such as
+# meta/muse-ember-1.0), azure-openai, and
 # openai-compatible (a local vLLM or Unsloth server; pass --base-url). Extra
 # request fields go in --params as JSON. Each question is called up to
 # --max-attempts times until its reply validates; the run is then scored.
@@ -303,7 +305,7 @@ defense in depth. Antigravity relies on the outer boundary because its Linux
 `nsjail` cannot execute correctly when nested inside bubblewrap.
 
 Start from `adapters/template/`. The assess task needs no adapter: add a model
-API to `assess/backends.py` if none of the four providers reaches it.
+API to `assess/backends.py` if none of the five providers reaches it.
 
 ## Repo layout
 

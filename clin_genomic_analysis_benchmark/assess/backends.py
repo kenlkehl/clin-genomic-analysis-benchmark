@@ -7,6 +7,9 @@ A model is named ``<provider>:<model>``:
   The rulebook is sent as a cached prompt block.
 - ``vertex-openai:<model>`` — any model on Vertex AI's OpenAI-compatible endpoint
   (Gemini, Gemma, other MaaS models), with Google application-default credentials.
+- ``vertex-responses:<publisher>/<model>`` — a partner model that Vertex AI serves
+  only through its per-publisher OpenAI Responses endpoint (for example
+  ``meta/muse-ember-1.0``), with the same credentials.
 - ``azure-openai:<deployment>`` — a GPT deployment on Azure OpenAI's v1 endpoint
   (``AZURE_OPENAI_ENDPOINT``; key from ``AZURE_OPENAI_API_KEY`` or ``az``).
 - ``openai-compatible:<model>`` — any OpenAI-compatible server, such as a local vLLM
@@ -26,7 +29,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 from .prompt import SEPARATOR, AssessPrompt
 
-PROVIDERS = ("vertex-anthropic", "vertex-openai", "azure-openai", "openai-compatible")
+PROVIDERS = ("vertex-anthropic", "vertex-openai", "vertex-responses", "azure-openai",
+             "openai-compatible")
 DEFAULT_ANTHROPIC_MAX_TOKENS = 32_000
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 900.0
 
@@ -190,6 +194,31 @@ def _chat_completion(client: Any, config: BackendConfig, prompt: AssessPrompt, *
     )
 
 
+def _response(client: Any, model: str, config: BackendConfig,
+              prompt: AssessPrompt) -> Completion:
+    """One call to an OpenAI Responses endpoint."""
+    kwargs: dict[str, Any] = {"model": model, "input": prompt.text}
+    if config.max_tokens is not None:
+        kwargs["max_output_tokens"] = config.max_tokens
+    if config.temperature is not None:
+        kwargs["temperature"] = config.temperature
+    kwargs.update(config.params)
+    response = client.responses.create(**kwargs)
+    incomplete = getattr(response, "incomplete_details", None)
+    stop_reason = getattr(incomplete, "reason", None) or getattr(response, "status", None)
+    usage = getattr(response, "usage", None)
+    return Completion(
+        text=response.output_text or "",
+        # A reply cut off by the token limit reports the same reason as Chat Completions.
+        stop_reason="length" if stop_reason == "max_output_tokens" else stop_reason,
+        response_model=getattr(response, "model", None),
+        usage={
+            "input_tokens": getattr(usage, "input_tokens", 0) or 0,
+            "output_tokens": getattr(usage, "output_tokens", 0) or 0,
+        } if usage is not None else {},
+    )
+
+
 class OpenAICompatibleBackend:
     def __init__(self, config: BackendConfig):
         from openai import OpenAI
@@ -228,7 +257,8 @@ class VertexOpenAIBackend:
         region = config.region or "global"
         host = "aiplatform.googleapis.com" if region == "global" else (
             f"{region}-aiplatform.googleapis.com")
-        base_url = f"https://{host}/v1/projects/{project}/locations/{region}/endpoints/openapi"
+        base_url = (f"https://{host}/v1/projects/{project}/locations/{region}"
+                    f"{self._endpoint_path(config.model)}")
         self.config = BackendConfig.from_dict({**config.to_dict(), "project": project,
                                                "region": region, "base_url": base_url})
         self._credentials, _ = google.auth.default(
@@ -243,16 +273,37 @@ class VertexOpenAIBackend:
                 self._credentials.refresh(Request())
             return self._credentials.token
 
-    def complete(self, prompt: AssessPrompt) -> Completion:
+    def _endpoint_path(self, model: str) -> str:
+        return "/endpoints/openapi"
+
+    def _client(self) -> Any:
         from openai import OpenAI
 
-        client = OpenAI(base_url=self.config.base_url, api_key=self._token(),
-                        timeout=self.config.request_timeout_seconds, max_retries=0)
-        return _chat_completion(client, self.config, prompt, max_tokens_field="max_tokens")
+        return OpenAI(base_url=self.config.base_url, api_key=self._token(),
+                      timeout=self.config.request_timeout_seconds, max_retries=0)
+
+    def complete(self, prompt: AssessPrompt) -> Completion:
+        return _chat_completion(self._client(), self.config, prompt,
+                                max_tokens_field="max_tokens")
 
     def provenance(self) -> dict[str, Any]:
         return {**_base_provenance(self.config), "project": self.config.project,
                 "region": self.config.region}
+
+
+class VertexResponsesBackend(VertexOpenAIBackend):
+    """Vertex AI's per-publisher OpenAI Responses endpoint. The model is
+    ``<publisher>/<model>``; the request names the bare model."""
+
+    def _endpoint_path(self, model: str) -> str:
+        publisher, sep, name = model.partition("/")
+        if not sep or not publisher or not name:
+            raise ValueError(f"vertex-responses model must be <publisher>/<model>, got {model!r}")
+        return f"/publishers/{publisher}/v1"
+
+    def complete(self, prompt: AssessPrompt) -> Completion:
+        return _response(self._client(), self.config.model.partition("/")[2], self.config,
+                         prompt)
 
 
 class AzureOpenAIBackend:
@@ -303,6 +354,7 @@ class AzureOpenAIBackend:
 _BACKENDS = {
     "vertex-anthropic": VertexAnthropicBackend,
     "vertex-openai": VertexOpenAIBackend,
+    "vertex-responses": VertexResponsesBackend,
     "azure-openai": AzureOpenAIBackend,
     "openai-compatible": OpenAICompatibleBackend,
 }

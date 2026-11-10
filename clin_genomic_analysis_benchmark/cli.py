@@ -154,7 +154,8 @@ def compute_gold(cohort: str, max_repair_iters: int, only: str | None,
 @cli.command()
 @click.option("--model", "model_spec", required=True,
               help="<provider>:<model>, e.g. vertex-anthropic:claude-opus-5-5, "
-                   "vertex-openai:google/gemini-3-pro, azure-openai:gpt-5, "
+                   "vertex-openai:google/gemini-3-pro, "
+                   "vertex-responses:meta/muse-ember-1.0, azure-openai:gpt-5, "
                    "openai-compatible:google/gemma-4-26b-it.")
 @click.option("--run-name", default=None,
               help="Directory under runs/ (default: assess_<model>).")

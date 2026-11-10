@@ -333,6 +333,46 @@ def test_openai_compatible_sends_one_user_message_and_redacts_the_url(monkeypatc
     assert "secret-key" not in json.dumps(provenance)
 
 
+def test_vertex_responses_calls_the_publisher_endpoint_with_the_bare_model(monkeypatch):
+    captured = {}
+
+    def create(**kwargs):
+        captured["request"] = kwargs
+        return SimpleNamespace(
+            model="meta/muse-ember-1.0", output_text="reply", status="incomplete",
+            incomplete_details=SimpleNamespace(reason="max_output_tokens"),
+            usage=SimpleNamespace(input_tokens=7, output_tokens=3))
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured["client"] = kwargs
+            self.responses = SimpleNamespace(create=create)
+
+    class FakeCredentials:
+        valid, token = True, "google-token"
+
+    import google.auth
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+    monkeypatch.setattr(google.auth, "default", lambda scopes: (FakeCredentials(), "proj"))
+    backend = backends.make_backend(backends.BackendConfig(
+        provider="vertex-responses", model="meta/muse-ember-1.0", max_tokens=64,
+        project="proj"))
+
+    completion = backend.complete(AssessPrompt(rulebook="RULES", question="Q"))
+
+    assert captured["client"]["base_url"] == (
+        "https://aiplatform.googleapis.com/v1/projects/proj/locations/global/publishers/meta/v1")
+    assert captured["client"]["api_key"] == "google-token"
+    assert captured["request"] == {"model": "muse-ember-1.0", "input": "RULES" + SEPARATOR + "Q",
+                                   "max_output_tokens": 64}
+    assert (completion.text, completion.stop_reason) == ("reply", "length")
+    assert completion.usage == {"input_tokens": 7, "output_tokens": 3}
+    with pytest.raises(ValueError, match="<publisher>/<model>"):
+        backends.make_backend(backends.BackendConfig(
+            provider="vertex-responses", model="muse-ember-1.0", project="proj"))
+
+
 def test_openai_compatible_needs_a_base_url_and_a_set_key(monkeypatch):
     monkeypatch.delenv("CLINGEN_ASSESS_BASE_URL", raising=False)
     with pytest.raises(ValueError, match="--base-url"):
