@@ -55,7 +55,7 @@ These endpoint names come from the BPC data source. A question that uses one ado
 - **PFS-I (imaging).** An event is progression documented in an imaging report (the radiologist's assessment that the cancer is progressing, worsening, or enlarging), or death.
 - **PFS-M (medical oncologist).** An event is progression documented in a medical oncologist's assessment, or death.
 - **PFS-I-or-M.** An event is the first progression documented by either source, or death.
-- **PFS-I-and-M.** An event is progression documented by both sources (that is, the point at which progression has previously been documented by both sources, which may not necessary have documented the progression at the same time), or death.
+- **PFS-I-and-M.** An event is progression documented by both sources (that is, the point at which progression has previously been documented by both sources, which may not necessarily have documented the progression at the same time), or death.
 
 Each is defined from two index dates, and only for cancers that were Stage IV at diagnosis, or that were Stage I–III at diagnosis and later developed a distant metastasis:
 
