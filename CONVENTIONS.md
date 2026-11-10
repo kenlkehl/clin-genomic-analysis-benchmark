@@ -14,7 +14,7 @@ These conventions fix the meaning of common terms in the benchmark's questions. 
 
 ## Stage
 
-- **Stage at diagnosis.** The overall stage group at initial diagnosis of the cancer: the best available combination of clinical and pathologic staging, under the staging edition in use at diagnosis. A patient "diagnosed at" or "diagnosed with" a stage (for example, "diagnosed with Stage IV disease") has that stage at diagnosis. A stage term that does not say "at diagnosis", "diagnosed at" or "diagnosed with", "de novo", or "newly diagnosed" leaves open whether it means stage at diagnosis.
+- **Stage at diagnosis.** The overall stage group at initial diagnosis of the cancer: the best available combination of clinical and pathologic staging, under the staging edition in use at diagnosis. A patient "diagnosed at" a stage (for example, "diagnosed at Stage IV") has that stage at diagnosis. A reference to stage that does not explicitly tie it to the initial diagnosis ("at diagnosis", "at initial diagnosis", "diagnosed at", "de novo", "newly diagnosed", or similar) leaves open whether it means stage at diagnosis. That includes "diagnosed with Stage IV" and "after Stage IV diagnosis", because a distant recurrence is also diagnosed.
 - **Metastatic.** Distant metastasis. Spread to regional lymph nodes alone is not metastatic disease. Whether "metastatic" includes only de novo metastatic disease, or also distant recurrence, is left open.
 
 ## Genomics
