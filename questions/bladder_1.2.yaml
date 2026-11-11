@@ -1,5 +1,5 @@
 cohort: bladder_1.2
-generated_at: '2026-10-13T21:05:06.429755Z'
+generated_at: '2026-11-11T23:56:58.506763Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -18,9 +18,10 @@ questions:
     or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q45ea5e4b
   category: 2
-  text: How many bladder cancers had squamous cell histology? (Treat 'bladder cancer'
-    here as cancer of any histology arising from either the urinary bladder or the
-    upper urinary tract / renal pelvis.)
+  text: How many bladder cancers had pure squamous cell carcinoma histology (mixed
+    tumors with a squamous component do not count)? (Treat 'bladder cancer' here as
+    cancer of any histology arising from either the urinary bladder or the upper urinary
+    tract / renal pelvis.)
 - id: bladder_1.2-Q6f9dd68e
   category: 1
   text: What proportion of patients in the bladder cancer cohort are female?
