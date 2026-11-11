@@ -16,6 +16,7 @@ These conventions fix the meaning of common terms in the benchmark's questions. 
 
 - **Stage at diagnosis.** The overall stage group at initial diagnosis of the cancer: the best available combination of clinical and pathologic staging, under the staging edition in use at diagnosis. A patient "diagnosed at" a stage (for example, "diagnosed at Stage IV") has that stage at diagnosis. A reference to stage that does not explicitly tie it to the initial diagnosis ("at diagnosis", "at initial diagnosis", "diagnosed at", "de novo", "newly diagnosed", or similar) leaves open whether it means stage at diagnosis. That includes "diagnosed with Stage IV" and "after Stage IV diagnosis", because a distant recurrence is also diagnosed.
 - **Metastatic.** Distant metastasis. Spread to regional lymph nodes alone is not metastatic disease. Whether "metastatic" includes only de novo metastatic disease, or also distant recurrence, is left open.
+- **Advanced.** Stage IV disease is advanced disease, so a cancer that was Stage IV at diagnosis had advanced disease from its diagnosis. Whether "advanced" also covers Stage III disease, and whether it covers disease that became advanced after diagnosis, is left open.
 
 ## Genomics
 
@@ -50,7 +51,7 @@ These conventions fix the meaning of common terms in the benchmark's questions. 
 
 ## Named endpoints
 
-These endpoint names come from the BPC data source. A question that uses one adopts its definition: its events, its censoring, and the units for which it is defined. A unit outside an endpoint's population is not analysed. The question must still fix everything else, including how patients enter the risk set. The name does not define the question's own words: "PFS-I from onset of advanced disease" still needs "advanced" defined by its stage groups, and the endpoint's advanced-disease index date applies only when the question defines advanced disease as below.
+These endpoint names come from the BPC data source. A question that uses one adopts its definition: its events, its censoring, and the units for which it is defined. A unit outside an endpoint's population is not analysed. The question must still fix everything else, including how patients enter the risk set. The name does not define the question's own words: "PFS-I from onset of advanced disease" still needs "advanced" defined by its stage groups (see "Advanced"), and the endpoint's advanced-disease index date applies only when the question defines advanced disease as below, or when every analysed cancer was Stage IV at diagnosis.
 
 - **PFS-I (imaging).** An event is progression documented in an imaging report (the radiologist's assessment that the cancer is progressing, worsening, or enlarging), or death.
 - **PFS-M (medical oncologist).** An event is progression documented in a medical oncologist's assessment, or death.

@@ -1,5 +1,5 @@
 cohort: crc_2.0_public
-generated_at: '2026-10-16T23:39:26.361338Z'
+generated_at: '2026-11-11T21:22:57.939613Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -17,17 +17,15 @@ questions:
     rectal/rectosigmoid primaries, and unspecified colorectal primaries.)
 - id: crc_2.0_public-Q22367f07
   category: 7
-  text: Among patients with Stage IV colorectal cancer at diagnosis who received first-line
-    FOLFOX (Fluorouracil + Leucovorin + Oxaliplatin) with Bevacizumab versus first-line
-    FOLFOX with no additional biologic or targeted antibody (i.e., excluding regimens
-    that also contain an anti-EGFR agent such as cetuximab or panitumumab, or any
-    other biologic/targeted agent), what is the hazard ratio for overall survival
-    measured from regimen start, with risk-set adjustment for delayed cohort entry
-    (left-truncating at NGS testing date), excluding patients whose first-line regimen
-    was a clinical-trial regimen (composition not annotated in BPC)? (FOLFOX regimens
-    that add another cytotoxic agent, such as FOLFOXIRI, count in neither arm.) (Include
-    the full colorectal cancer cohort — colon primaries, rectal/rectosigmoid primaries,
-    and unspecified colorectal primaries.)
+  text: Among patients with Stage IV colorectal cancer at diagnosis whose first-line
+    regimen was FOLFOX plus bevacizumab (exactly fluorouracil, leucovorin, oxaliplatin,
+    and bevacizumab) versus FOLFOX alone (exactly fluorouracil, leucovorin, and oxaliplatin),
+    what is the hazard ratio for overall survival measured from regimen start, with
+    risk-set adjustment for delayed cohort entry (left-truncating at NGS testing date),
+    excluding patients whose first-line regimen was a clinical-trial regimen (composition
+    not annotated in BPC)? (A first-line regimen containing any other drug counts
+    in neither arm.) (Include the full colorectal cancer cohort — colon primaries,
+    rectal/rectosigmoid primaries, and unspecified colorectal primaries.)
 - id: crc_2.0_public-Q73ef7699
   category: 2
   text: How many patients in the colorectal cancer cohort had liver metastases present
