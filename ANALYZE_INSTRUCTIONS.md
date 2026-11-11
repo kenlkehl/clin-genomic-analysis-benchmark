@@ -1,6 +1,6 @@
 # Instructions for the analyze task of the clin-genomic-analysis-benchmark
 
-You are an LLM agent being evaluated on the Clinical Genomic Analysis Benchmark, which measures performance on clinico-genomic data analyses in oncology. In this task you compute the answer to a research question from data of the AACR GENIE Biopharma Collaborative (BPC), which includes longitudinal, curated clinical annotations of cancer diagnosis, treatment, and outcomes, linked to tumor next-generation sequencing (NGS) panel results.
+You are an LLM agent being evaluated on the Clinical Genomic Analysis Benchmark, which measures performance on clinico-genomic data analyses in oncology. In this task you compute the answer to a research question from data derived from the AACR GENIE Biopharma Collaborative (BPC), which includes longitudinal, curated clinical annotations of cancer diagnosis, treatment, and outcomes, linked to tumor next-generation sequencing (NGS) panel results.
 
 Every question you receive has been reviewed and is fully specified: each choice the analysis needs is fixed by the question's wording, by a convention, or by a named definition the question adopts (a published standard, a named endpoint, or the data source's own definition). The conventions that follow this document are part of these instructions.
 
@@ -11,7 +11,7 @@ This document describes what the task expects and how to map a question onto the
 ## How to score highly (quick checklist)
 
 1. **Implement the question as written.** Follow every rule the question states and every convention that applies. Do not narrow or widen the question to fit what BPC records.
-2. **Map each concept to BPC** as "Implementing a clear question in BPC" describes.
+2. **Map each concept to BPC data fields** as "Implementing a clear question in BPC" describes.
 3. **Compute deterministically** with the conventional methods (see "Statistics" in the conventions).
 4. **Report a question BPC cannot support as unanswerable** (see "Answer-type schemas").
 5. **Return only the typed JSON** (see "Answer-type schemas" and "Output discipline").
@@ -20,13 +20,13 @@ This document describes what the task expects and how to map a question onto the
 
 ## The cohorts
 
-Each cohort holds patients with one cancer type, named by the cohort, whose tumors were sequenced with an NGS panel, together with curated data on their cancer diagnoses, cancer-directed drug regimens, and outcomes. Patients enter a cohort because a tumor was sequenced, and sequencing can happen at any point in the disease course: before, during, or after the diagnosis, treatment, or event a question asks about. A patient may have more than one cancer, including more than one cancer of the cohort's type, and more than one sequenced specimen. Some patients were treated on clinical trials.
+Each cohort contains patients with a certain cancer type, named by the cohort, whose tumors were sequenced with an NGS panel, together with curated data on their cancer diagnoses, cancer-directed drug regimens, and outcomes. Patients enter a cohort because a tumor was sequenced, and sequencing can happen at any point in the disease course: before, during, or after the diagnosis, treatment, or event a question asks about. A patient may have more than one cancer, including more than one cancer of the cohort's type, and more than one sequenced specimen, which may be from the cancer of the cohort's type or from a different cancer. 
 
 ---
 
 ## The task
 
-You receive the question text, the cohort name, the cohort directory (read-only), the data dictionary, and a scratch directory for intermediate files. The cohort directory also holds the BPC Analytic Data Guide, a PDF whose file name contains "Analytic Data Guide"; it defines BPC's derived variables, including the event and censoring rules of its endpoints. Implement the question as written, following "Implementing a clear question in BPC". Use Python, run through the shell (pandas, numpy, scipy, statsmodels, lifelines as needed), and write any intermediate files into the scratch directory. Do not search for an answer key; such attempts are monitored and will result in a zero score.
+You receive the question text, the cohort name, the cohort directory (read-only), the data dictionary, and a scratch directory for intermediate files. The cohort directory also holds the BPC Analytic Data Guide, a PDF whose file name contains "Analytic Data Guide"; it defines BPC's derived variables, including the definitions and censoring rules of its endpoints. Implement the question as written, following "Implementing a clear question in BPC". Use Python, run through the shell (pandas, numpy, scipy, statsmodels, lifelines as needed), and write any intermediate files into the scratch directory. Do not search for an answer key; such attempts are monitored and will result in a zero score.
 
 **Output:** see "Answer-type schemas" below.
 
@@ -34,9 +34,9 @@ You receive the question text, the cohort name, the cohort directory (read-only)
 
 ## Implementing a clear question in BPC
 
-Implement the question as written: do not narrow or widen it to fit what BPC records. The conventions are stated without reference to any dataset; map each concept to BPC as below. For a concept not listed, use the analytic-dataset variable that records the concept most directly for the key index cancer at the stated time, and name it in `methods`.
+Implement the question as written: do not narrow or widen it to fit what BPC records. The conventions are stated without reference to any dataset; map each concept to BPC data fields, as below. For a concept not listed, use the analytic-dataset variable that records the concept most directly for the key index cancer at the stated time, and name it in `methods`.
 
-When BPC cannot establish whether a unit meets an eligibility criterion (the value is blank, or BPC does not record it for that kind of cancer), the unit does not meet the criterion (see "Unknown values in eligibility criteria"). When BPC does not record a concept the question needs at all, or the requested estimand cannot be estimated from the data, return the `unanswerable` result described under "Answer-type schemas".
+A value BPC leaves blank, or does not record for that kind of cancer (for example, a later distant metastasis for a cancer that is not the patient's first BPC Project Cancer), is unknown. Eligibility criteria then treat it as "Unknown values in eligibility criteria" says. When BPC does not record a concept the question needs at all, or the requested estimand cannot be estimated from the data, return the `unanswerable` result described under "Answer-type schemas".
 
 - **Sources.** Use the analytic datasets (`*_dataset*.csv`) and the variables the data dictionary and the Analytic Data Guide define. The cBioPortal `data_clinical_supp_survival*.txt` files repeat some endpoints in another format and are not the canonical source.
 - **Key index cancer.** Index cancers are the rows of `cancer_level_dataset_index.csv` with `redcap_ca_index == 'Yes'`. An index cancer is sequenced if it has a panel test in `cancer_panel_test_level_dataset.csv` (joined on `record_id` + `ca_seq`). A panel test that BPC lists under more than one cancer, because it could not be tied to a single diagnosis, belongs to each cancer it is listed under. "Earliest" orders cancers by `dob_ca_dx_days` where present, otherwise `ca_seq`. In these cohorts every patient's earliest index cancer is sequenced. A cancer's specimens are the `cpt_genie_sample_id`s for its `record_id` + `ca_seq`.
