@@ -105,7 +105,7 @@ Which patients, or which cancers, regimens, or specimens, are analysed.
 
 - **The cohort's cancer.** A reference to the cohort's own cancer, by name or usual abbreviation (for example, "patients with colorectal cancer" in the colorectal cancer cohort), means each patient's key index cancer and is clear (see "Key index cancer"). It is not a restriction by histology or site.
 - **Histology.** A restriction to a histologic type (for example, "adenocarcinoma") leaves open whether tumors of mixed histology that include that type, and carcinomas not otherwise specified, count, unless the question says, or adopts a named classification (for example, a WHO classification edition, or the data source's curated histology categories).
-- **Molecular and receptor-defined subtypes.** Receptor or subtype status means the result as the testing laboratory reported it (positive, negative, or equivocal). A restriction by such a status must say how equivocal or borderline results count and, because status can be measured more than once and can change, which measurement counts (for example, at diagnosis, or the most recent before the index date).
+- **Molecular and receptor-defined subtypes.** How equivocal results count is settled by convention (see "Receptor status"). Because status can be measured more than once and can change, a restriction or grouping by such a status must say which measurement counts (for example, at diagnosis, the most recent before the index date, or any measurement).
 - **Primary site.** A restriction or grouping by primary cancer site must name the sites that count. A grouping whose boundaries are drawn differently in practice must say where they fall.
 - **Other cancers.** Patients who also had other primary cancers are analysed unless the question excludes them (see "Other primary cancers"). An exclusion must say which other cancers count (any, or invasive cancers only) and in which period (before the key index cancer, or at any time).
 
@@ -129,7 +129,7 @@ For a population defined by the presence or absence of a biomarker:
 - **Fusions.** For fusions or rearrangements, which partner genes count.
 - **Germline variants.** "Mutation" means a variant reported by tumor sequencing (see "Mutation in gene X"). A question about inherited (germline) variants must say how they are identified.
 - **Composite biomarkers.** For tumor mutational burden, microsatellite instability, homologous recombination deficiency, and similar measures: the measure, the assay (for example, panel sequencing or immunohistochemistry), and the threshold.
-- **Biomarkers not from sequencing.** For immunohistochemistry, in situ hybridization, or other assays: the assay, the scoring method, the threshold, and how equivocal results count.
+- **Biomarkers not from sequencing.** For immunohistochemistry, in situ hybridization, or other assays: the assay, the scoring method, the threshold, and how equivocal results count. A receptor status the laboratory reports as positive or negative (for example, ER, PR, or HER2) follows "Molecular and receptor-defined subtypes" instead.
 - **Specimen.** Which specimen counts when a patient has several is settled by any-positive aggregation (see "Patient-level aggregation"), unless the question names one (for example, the first specimen, or metastatic specimens only). In a time-to-event analysis, when a later specimen's result counts is a separate choice (see "Exposure ascertained after the index date").
 - **Tested patients.** Settled by convention: a patient is tested for a gene only if the assay covered it, and untested patients are excluded, not treated as negative (see "Tested for gene X").
 
@@ -187,7 +187,7 @@ What is measured or counted for each analysed unit. The stage, treatment, and bi
 - **Characteristics measured.** For a characteristic that is measured or counted (a stage, a site of metastasis, a test result): when it is measured (at diagnosis, before the index date, within a window, or ever during follow-up), and the categories reported.
 - **Treatment received.** When the outcome is receipt of a treatment: the drugs or classes that count (see "Drug classes"), how trial regimens count, the window in which treatment counts, and the setting. Treatment for other cancers does not count (see "Treatment attribution").
 - **Biomarker outcomes.** For the prevalence of a biomarker: the biomarker-definition concepts under the denominator. The denominator of a prevalence is the patients or specimens tested for it (see "Tested for gene X").
-- **Counts.** What is counted (patients, cancers, specimens, or regimens), and whether a unit is counted once or each time it occurs.
+- **Counts.** What is counted (patients, cancers, specimens, or regimens), and whether a unit is counted once or each time it occurs. In a count of units with a characteristic ("how many patients had X"), the characteristic is the outcome; the denominator is the population the count is taken in.
 - **Missing values.** How analysed units with an unknown outcome value are handled: for example, whether patients with unknown status are dropped from a proportion's denominator or counted as not having the outcome. An open choice here touches the denominator too (see "Where a gap belongs"). Overall survival and the named endpoints settle this through their own definitions.
 
 ### 3. Independent variables and covariates
@@ -223,7 +223,7 @@ How the estimate is computed from the denominator, outcome, and covariates.
 
 ## Avoid flagging on these grounds alone
 
-- Choice of CI method for a median, proportion, or survival probability (use the convention).
+- Choice of CI method for a single median, proportion, or survival probability (use the convention). This does not cover a difference or ratio of two estimates.
 - Which mutation types count as non-synonymous (use the convention).
 - Unadjusted vs. adjusted Cox (use unadjusted unless the question names covariates, says "adjusted", or specifies another model structure; delayed-entry wording such as "risk-set adjustment" does not count).
 - Multi-specimen patient aggregation (use any-positive). This does not settle when a later specimen's result counts in a time-to-event analysis (see "Exposure ascertained after the index date").

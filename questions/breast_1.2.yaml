@@ -1,5 +1,5 @@
 cohort: breast_1.2
-generated_at: '2026-10-16T18:14:54.820688Z'
+generated_at: '2026-11-18T21:28:34.816794Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -51,9 +51,14 @@ questions:
   text: What proportion of patients with breast cancer had metastatic disease?
 - id: breast_1.2-Q086f5cc2
   category: 7
-  text: Compare survival between patients receiving capecitabine-based and eribulin-based
-    regimens in metastatic breast cancer, with risk-set adjustment for delayed cohort
-    entry (left-truncating at NGS testing date).
+  text: Among patients with HR-positive, HER2-negative metastatic breast cancer (Stage
+    IV at diagnosis, or a distant metastasis after a Stage I–III diagnosis), consider
+    each patient's first regimen started on or after the onset of metastatic disease
+    that was capecitabine or eribulin as the only drug. What is the hazard ratio (95%
+    CI) for overall survival from the start of that regimen for eribulin versus capecitabine,
+    using a univariable Cox model, with risk-set adjustment for delayed cohort entry
+    (left-truncating at NGS testing date), excluding patients whose regimen was a
+    clinical-trial regimen?
 - id: breast_1.2-Q0c55cde3
   category: 5
   text: Among regimens containing palbociclib for HR+/HER2- breast cancer, what is
@@ -68,11 +73,15 @@ questions:
     CI, among unique patients in the cohort?
 - id: breast_1.2-Q32e231ae
   category: 7
-  text: Among patients with HR+/HER2- stage IV breast cancer who received a CDK4/6
-    inhibitor (palbociclib, ribociclib, or abemaciclib) combined with an aromatase
-    inhibitor (anastrozole, letrozole, or exemestane) as their first regimen, what
-    is the median PFS-I from regimen start in months with 95% CI? Assume any clinical-trial
-    regimen did not contain a CDK4/6 inhibitor or aromatase inhibitor.
+  text: Among patients whose breast cancer was Stage IV and HR-positive, HER2-negative
+    at diagnosis, and whose first regimen for the cancer contained a CDK4/6 inhibitor
+    (palbociclib, ribociclib, or abemaciclib) and an aromatase inhibitor (anastrozole,
+    letrozole, or exemestane), with or without other drugs, what is the median progression-free
+    survival from regimen start in months with 95% CI, counting as events progression
+    documented in a radiologist's imaging assessment and death without progression,
+    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
+    date)? Assume any clinical-trial regimen did not contain a CDK4/6 inhibitor or
+    aromatase inhibitor.
 - id: breast_1.2-Q336fdccc
   category: 7
   text: Does adding pertuzumab to trastuzumab-based therapy improve outcomes in HER2-positive
@@ -84,18 +93,27 @@ questions:
     HR+/HER2- metastatic breast cancer who got one of those two treatments?
 - id: breast_1.2-Q3ad97efc
   category: 8
-  text: Among patients with HER2+ metastatic breast cancer receiving first-line trastuzumab-based
-    therapy (with first line anchored to the first treatment after onset of metastatic
-    disease), does ERBB2 amplification status modify the effect of adding pertuzumab
-    on PFS-I measured from regimen start, tested via the interaction term in a Cox
-    PH model? (Count trastuzumab and its biosimilars, but exclude trastuzumab-based
-    antibody-drug conjugates such as trastuzumab emtansine and trastuzumab deruxtecan.)
+  text: Among patients with metastatic breast cancer (Stage IV at diagnosis, or a
+    distant metastasis after a Stage I–III diagnosis) that was HER2-positive at diagnosis,
+    whose first regimen started on or after the onset of metastatic disease contained
+    trastuzumab (not a trastuzumab antibody-drug conjugate), does ERBB2 amplification
+    on the first sequencing report modify the effect of pertuzumab (regimens containing
+    pertuzumab versus regimens without it) on PFS-I from regimen start? Report the
+    p-value for the pertuzumab × ERBB2-amplification interaction term in a Cox model
+    with both main effects, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date), excluding clinical-trial regimens.
 - id: breast_1.2-Q3b4023fc
   category: 1
-  text: How many young patients are in the breast cancer cohort?
+  text: How many patients in the breast cancer cohort were younger than 40 at diagnosis
+    of their breast cancer and are of Asian race?
 - id: breast_1.2-Q3c5c07a6
   category: 6
-  text: Does GATA3 mutation status affect outcomes in patients with breast cancer?
+  text: Among patients whose breast cancer was Stage I–III at diagnosis, what is the
+    hazard ratio (95% CI) for distant metastasis comparing patients with versus without
+    a GATA3 mutation on the first sequencing report, measured from diagnosis, treating
+    death without distant metastasis as censoring and censoring at the last known
+    alive date, using a univariable Cox model, with risk-set adjustment for delayed
+    cohort entry (left-truncating at NGS testing date)?
 - id: breast_1.2-Q3d022b1f
   category: 2
   text: How many patients in the breast cohort had stage IV breast cancer at initial
@@ -103,12 +121,15 @@ questions:
     breast sarcomas.)
 - id: breast_1.2-Q4a538b91
   category: 8
-  text: Among patients with HR+/HER2- metastatic breast cancer receiving a CDK4/6
-    inhibitor (palbociclib, ribociclib, or abemaciclib) in combination with an aromatase
-    inhibitor as their first regimen after Stage IV diagnosis, does PIK3CA mutation
-    status (any non-synonymous mutation) modify the treatment effect on PFS-I from
-    regimen start, tested via the interaction p-value in a Cox PH model with a CDK4/6i
-    × PIK3CA interaction term?
+  text: Among patients with metastatic breast cancer (Stage IV at diagnosis, or a
+    distant metastasis after a Stage I–III diagnosis) that was HR-positive and HER2-negative
+    at diagnosis, whose first regimen started on or after the onset of metastatic
+    disease contained an aromatase inhibitor (anastrozole, letrozole, or exemestane),
+    does PIK3CA mutation status (any non-synonymous mutation) modify the effect of
+    adding a CDK4/6 inhibitor (palbociclib, ribociclib, or abemaciclib) on PFS-I from
+    regimen start? Report the p-value for the CDK4/6-inhibitor × PIK3CA interaction
+    term in a Cox model with both main effects, with risk-set adjustment for delayed
+    cohort entry (left-truncating at NGS testing date), excluding clinical-trial regimens.
 - id: breast_1.2-Q56286dd2
   category: 5
   text: In the breast cancer cohort, do patients on CDK4/6 inhibitor regimens do better
@@ -135,9 +156,11 @@ questions:
     small subset of breast sarcomas.)
 - id: breast_1.2-Q8a4babcc
   category: 5
-  text: Among patients with triple-negative breast cancer, what is the median PFS-I
-    from the date of advanced/metastatic diagnosis (including both de novo Stage IV
-    and recurrent/relapsed metastatic disease), with 95% confidence interval?
+  text: Among patients whose breast cancer was triple-negative at diagnosis, became
+    advanced (Stage IV at diagnosis, or a distant metastasis after a Stage I–III diagnosis),
+    and had brain metastases, what is the median PFS-I from the onset of advanced
+    disease, with 95% CI, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date)?
 - id: breast_1.2-Q8d802225
   category: 7
   text: Among patients with HER2+ metastatic breast cancer initiating first-line therapy
@@ -150,14 +173,18 @@ questions:
     a regimen, including separately curated LHRH-agonist records.)
 - id: breast_1.2-Q993b440a
   category: 3
-  text: In the breast cancer cohort, how many patients have at least one tumor with
-    a recorded ERBB2 fusion event?
+  text: In the breast cancer cohort, how many patients had a tumor that was ERBB2-mutant
+    or harbored an ERBB2 fusion (any partner gene)?
 - id: breast_1.2-Qc8e7299d
   category: 5
-  text: Among patients with metastatic breast cancer, how does overall survival from
-    start of first-line treatment in the metastatic setting compare across breast
-    cancer subtypes, with risk-set adjustment for delayed cohort entry (left-truncating
-    at NGS testing date)?
+  text: Among patients with metastatic breast cancer (Stage IV at diagnosis, or a
+    distant metastasis after a Stage I–III diagnosis) whose cancer at diagnosis was
+    HR-positive/HER2-negative, HER2-positive, or triple-negative, what are the hazard
+    ratios (95% CI) for overall survival from the start of the first regimen started
+    on or after the onset of metastatic disease, for HER2-positive and for triple-negative
+    versus HR-positive/HER2-negative, from a Cox model adjusted for age at that regimen's
+    start and for stage at diagnosis (Stage I, II, III, or IV), with risk-set adjustment
+    for delayed cohort entry (left-truncating at NGS testing date)?
 - id: breast_1.2-Qd26c20c2
   category: 2
   text: What proportion of patients in the breast cancer cohort were diagnosed at
@@ -171,8 +198,10 @@ questions:
     risk-set adjustment for delayed cohort entry (left-truncating at NGS testing date)?
 - id: breast_1.2-Qd65985df
   category: 3
-  text: Among patients with a HR+/HER2- breast cancer, what fraction had a tumor that
-    ever had an ESR1 alteration detected?
+  text: Among patients whose breast cancer was HR-positive and HER2-negative at diagnosis
+    and who received an aromatase inhibitor (anastrozole, letrozole, or exemestane)
+    for it, what fraction had any non-synonymous ESR1 mutation or an ESR1 fusion (any
+    partner gene) on any sequenced specimen?
 - id: breast_1.2-Qdc5b5eb2
   category: 4
   text: How many patients in the breast cohort received endocrine therapy as part
@@ -188,11 +217,15 @@ questions:
     what proportion have at least one PIK3CA mutation?
 - id: breast_1.2-Qe98ae915
   category: 6
-  text: Among patients with HR+/HER2- metastatic breast cancer who received a CDK4/6
-    inhibitor (palbociclib, ribociclib, or abemaciclib) as their first regimen after
-    advanced disease diagnosis, what is the median PFS-I from regimen start, comparing
-    patients with a PIK3CA-mutant tumor vs PIK3CA-wildtype tumor (restricted to sequencing
-    panels covering PIK3CA)?
+  text: Among patients with metastatic breast cancer (Stage IV at diagnosis, or a
+    distant metastasis after a Stage I–III diagnosis) that was HR-positive and HER2-negative
+    at diagnosis, whose first regimen started on or after the onset of metastatic
+    disease contained a CDK4/6 inhibitor (palbociclib, ribociclib, or abemaciclib),
+    what is the median PFS-I from regimen start, with 95% CI, separately for patients
+    with a PIK3CA-mutant tumor and patients with a PIK3CA-wild-type tumor on the first
+    sequencing report, restricted to patients whose first sequencing panel covered
+    PIK3CA, with risk-set adjustment for delayed cohort entry (left-truncating at
+    NGS testing date), excluding clinical-trial regimens?
 - id: breast_1.2-Qf5fdd296
   category: 4
   text: What proportion of patients with metastatic breast cancer received chemotherapy
