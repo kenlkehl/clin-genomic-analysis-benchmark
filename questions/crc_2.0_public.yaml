@@ -1,5 +1,5 @@
 cohort: crc_2.0_public
-generated_at: '2026-11-11T21:22:57.939613Z'
+generated_at: '2026-11-18T22:40:58.389091Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -62,16 +62,25 @@ questions:
     primaries, and unspecified colorectal primaries.)
 - id: crc_2.0_public-Q032daf19
   category: 6
-  text: Among patients with Stage IV colorectal cancer who received cetuximab or panitumumab
-    in any line of therapy, what is the hazard ratio for PFS-imaging from the start
-    of their first anti-EGFR regimen comparing patients with BRAF V600E-mutant tumors
-    versus those with BRAF-wildtype tumors (restricted to patients whose tested panel
-    covered BRAF)?
+  text: Among patients whose colorectal cancer was Stage IV at diagnosis and RAS wild-type
+    on the first sequencing report, and who received a regimen containing cetuximab
+    or panitumumab, what is the hazard ratio (95% CI) for PFS-I from the start of
+    their first such regimen comparing patients whose tumors had a BRAF V600E mutation
+    on the first sequencing report versus patients whose tumors had no BRAF mutation,
+    using a univariable Cox model, with risk-set adjustment for delayed cohort entry
+    (left-truncating at NGS testing date), excluding patients whose first such regimen
+    was a clinical-trial regimen?
 - id: crc_2.0_public-Q0cd6a6b0
   category: 7
-  text: Is targeted therapy associated with improved outcomes versus chemotherapy
-    alone (without concurrent targeted therapy) in patients with metastatic colorectal
-    cancer in this cohort?
+  text: Among patients whose colorectal cancer was Stage IV at diagnosis, what is
+    the hazard ratio (95% CI) for overall survival from the start of the first regimen
+    for the cancer, comparing patients whose first regimen was fluorouracil plus oxaliplatin
+    or irinotecan, with or without leucovorin, together with bevacizumab, cetuximab,
+    or panitumumab, versus patients whose first regimen was fluorouracil plus oxaliplatin
+    or irinotecan, with or without leucovorin, and no other drug, using a univariable
+    Cox model, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date), excluding patients whose first regimen was a clinical-trial
+    regimen?
 - id: crc_2.0_public-Q0f6de4fb
   category: 2
   text: What proportion of patients with colorectal cancer had a high-grade tumor
@@ -88,12 +97,24 @@ questions:
   text: How many unique patients in the colorectal cancer cohort are female?
 - id: crc_2.0_public-Q3837133d
   category: 6
-  text: Is there an association between PIK3CA alterations in the tumor and survival
-    in patients with colorectal cancer treated with anti-EGFR therapy?
+  text: Among patients with colorectal cancer who received a regimen containing cetuximab
+    or panitumumab, considering each patient's first such regimen, what is the hazard
+    ratio (95% CI) for overall survival comparing patients with versus without a PIK3CA
+    alteration on the first sequencing report, using a univariable Cox model, with
+    risk-set adjustment for delayed cohort entry (left-truncating at NGS testing date),
+    excluding patients whose first such regimen was a clinical-trial regimen?
 - id: crc_2.0_public-Q5b55230f
   category: 8
-  text: Does the benefit of anti-EGFR therapy differ by primary tumor sidedness in
-    patients with metastatic colorectal cancer?
+  text: 'Among patients whose colorectal cancer was Stage IV at diagnosis and whose
+    first regimen for the cancer contained fluorouracil or capecitabine together with
+    oxaliplatin or irinotecan, does primary tumor side (right-sided: cecum, ascending
+    colon, or hepatic flexure; left-sided: descending colon, sigmoid colon, rectosigmoid
+    junction, or rectum) modify the effect of a first regimen containing cetuximab
+    or panitumumab, versus one containing neither, on overall survival from the start
+    of that regimen? Report the p-value for the anti-EGFR × side interaction term
+    in a Cox model with both main effects, with risk-set adjustment for delayed cohort
+    entry (left-truncating at NGS testing date), excluding patients whose first regimen
+    was a clinical-trial regimen.'
 - id: crc_2.0_public-Q66c627ab
   category: 6
   text: Do patients with KRAS-mutant colorectal cancer have worse outcomes than those
@@ -126,20 +147,29 @@ questions:
     cancer; patients with no regimen count as zero.)
 - id: crc_2.0_public-Qb46e39d8
   category: 4
-  text: Among patients with stage I-III colorectal cancer who received adjuvant chemotherapy
-    after surgery for the cancer, what proportion received a FOLFOX-based regimen?
+  text: Among patients whose colorectal cancer was Stage II or III at diagnosis and
+    not microsatellite instability-high, and whose first regimen for the cancer started
+    within 6 months after diagnosis and before any distant metastasis, what proportion
+    of those first regimens contained oxaliplatin together with fluorouracil or capecitabine,
+    with 95% CI? Assume any clinical-trial regimen did not contain oxaliplatin.
 - id: crc_2.0_public-Qb79df7cb
   category: 5
-  text: Among patients with colorectal cancer whose first treatment for advanced/metastatic
-    disease (Stage IV at diagnosis or later distant metastatic recurrence) was a FOLFOX-containing
-    regimen (Fluorouracil + Leucovorin + Oxaliplatin), what is the median PFS-I from
-    regimen start in months with 95% CI, excluding patients whose first advanced/metastatic
-    regimen was a clinical-trial regimen (composition not annotated in BPC)?
+  text: Among patients with colorectal cancer that became advanced (Stage IV at diagnosis,
+    or a distant metastasis after a Stage I–III diagnosis) whose first regimen started
+    on or after the onset of advanced disease contained fluorouracil, leucovorin,
+    and oxaliplatin, what is the hazard ratio (95% CI) for PFS-I from the start of
+    that regimen for patients aged 70 or older versus younger patients, using a univariable
+    Cox model, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date), excluding patients whose regimen was a clinical-trial regimen?
 - id: crc_2.0_public-Qc0f2a3d4
   category: 5
-  text: How does overall survival differ by tumor sidedness in metastatic colorectal
-    cancer, with risk-set adjustment for delayed cohort entry (left-truncating at
-    NGS testing date)?
+  text: Among patients with metastatic colorectal cancer (Stage IV at diagnosis, or
+    a distant metastasis after a Stage I–III diagnosis) whose primary tumor was right-sided
+    (cecum, ascending colon, hepatic flexure, or transverse colon) or left-sided (splenic
+    flexure, descending colon, sigmoid colon, rectosigmoid junction, or rectum), what
+    is the difference in median overall survival from the onset of metastatic disease
+    (left-sided minus right-sided), in months, with 95% CI, with risk-set adjustment
+    for delayed cohort entry (left-truncating at NGS testing date)?
 - id: crc_2.0_public-Qc9366c21
   category: 4
   text: Among patients with Stage IV colorectal cancer at diagnosis (any colorectal
@@ -161,11 +191,14 @@ questions:
     bevacizumab?
 - id: crc_2.0_public-Qe166f13a
   category: 1
-  text: What proportion of older patients in the colorectal cancer cohort are Hispanic?
+  text: What proportion of patients in the colorectal cancer cohort who were 65 or
+    older at diagnosis of their colorectal cancer are of Hispanic ethnicity, with
+    95% CI?
 - id: crc_2.0_public-Qe3e0809c
   category: 4
-  text: Among first-line regimens for colorectal cancer in the colorectal cancer cohort,
-    what is the most common single drug used?
+  text: Among patients in the colorectal cancer cohort who received any regimen for
+    the cancer, which individual drug appeared most often in their first regimen for
+    the cancer (in any setting), counting each patient's first regimen once?
 - id: crc_2.0_public-Qebbb9c36
   category: 5
   text: Among patients with Stage IV colorectal cancer at diagnosis, what is the median
