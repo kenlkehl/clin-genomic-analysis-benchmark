@@ -1,5 +1,5 @@
 cohort: nsclc_2.0_public
-generated_at: '2026-10-13T22:14:16.097743Z'
+generated_at: '2026-11-21T15:20:55.316269Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -46,14 +46,15 @@ questions:
     all NSCLC histologic subtypes that make up the cohort's key cancer type.)
 - id: nsclc_2.0_public-Q15d8058e
   category: 7
-  text: Among patients with Stage IV NSCLC receiving first-line systemic therapy for
-    the cancer, what is the Cox proportional-hazards hazard ratio (with 95% CI and
-    p-value) for overall survival from regimen start comparing single-agent immune
-    checkpoint inhibitor monotherapy (pembrolizumab, nivolumab, atezolizumab, or durvalumab
-    as the only drug) versus platinum doublet chemotherapy without concurrent immunotherapy,
-    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
-    date), excluding patients whose first-line regimen was a clinical-trial regimen
-    (composition not annotated in BPC)?
+  text: Among patients with NSCLC that was Stage IV at diagnosis, what is the hazard
+    ratio (95% CI and p-value) for overall survival from the start of the first regimen
+    for the cancer, comparing patients whose first regimen was immune checkpoint inhibitor
+    monotherapy (pembrolizumab, nivolumab, atezolizumab, or durvalumab as the only
+    drug) versus cisplatin or carboplatin plus one of pemetrexed, gemcitabine, paclitaxel,
+    nab-paclitaxel, docetaxel, or etoposide, with no immune checkpoint inhibitor,
+    using a univariable Cox model, with risk-set adjustment for delayed cohort entry
+    (left-truncating at NGS testing date), excluding patients whose first regimen
+    was a clinical-trial regimen?
 - id: nsclc_2.0_public-Q1ea24f43
   category: 5
   text: Among patients with Stage IV NSCLC at diagnosis, what is the median overall
@@ -68,35 +69,56 @@ questions:
     for delayed cohort entry (left-truncating at NGS testing date)?
 - id: nsclc_2.0_public-Q32556403
   category: 8
-  text: Is there a treatment-by-biomarker interaction between TP53 status and platinum-based
-    chemotherapy (without concurrent immunotherapy) on outcomes in the NSCLC cohort?
+  text: Among patients with NSCLC that was Stage IV at diagnosis whose first regimen
+    for the cancer contained cisplatin or carboplatin, does TP53 mutation status (any
+    non-synonymous TP53 mutation on the first sequencing report) modify the effect
+    of that regimen also containing an immune checkpoint inhibitor (pembrolizumab,
+    nivolumab, atezolizumab, durvalumab, or cemiplimab) on time to next treatment,
+    defined as the time from the start of that regimen to the start of the next regimen
+    for the cancer, censored at the last known alive date? Report the p-value for
+    the checkpoint-inhibitor × TP53 interaction term in a Cox model with both main
+    effects, with risk-set adjustment for delayed cohort entry (left-truncating at
+    NGS testing date), excluding patients whose first regimen was a clinical-trial
+    regimen.
 - id: nsclc_2.0_public-Q37e5456c
   category: 4
-  text: What proportion of patients with NSCLC ever received immunotherapy at any
-    point during their treatment course?
+  text: What proportion of patients with NSCLC ever received immunotherapy?
 - id: nsclc_2.0_public-Q475ddf54
   category: 8
-  text: Among patients with Stage IV NSCLC initiating first-line platinum-doublet
-    chemotherapy without immunotherapy (a carboplatin- or cisplatin-containing regimen
-    combined with pemetrexed, paclitaxel, gemcitabine, or docetaxel, and not containing
-    pembrolizumab, atezolizumab, nivolumab, or durvalumab, as the first regimen for
-    the cancer), what is the hazard ratio (with 95% CI) for the interaction term between
-    TP53 mutation status (any non-synonymous TP53 variant on TP53-covering panels)
-    and the addition of bevacizumab in a Cox PH model for PFS-I from regimen start?
+  text: Among patients with non-squamous NSCLC (as the data source's curated histology
+    categories define it) that was Stage IV at diagnosis, whose first regimen for
+    the cancer contained carboplatin or cisplatin and pemetrexed, paclitaxel, gemcitabine,
+    or docetaxel, and no immune checkpoint inhibitor, what is the hazard ratio (95%
+    CI) for the interaction between TP53 mutation status (any non-synonymous TP53
+    mutation on the first sequencing report) and the regimen also containing bevacizumab,
+    in a Cox model for PFS-I from regimen start with both main effects, with risk-set
+    adjustment for delayed cohort entry (left-truncating at NGS testing date), excluding
+    patients whose first regimen was a clinical-trial regimen?
 - id: nsclc_2.0_public-Q48106600
   category: 5
-  text: Among patients with Stage IV NSCLC receiving osimertinib as first-line treatment
-    for the cancer, what is the median PFS (in months) on this treatment?
+  text: Among patients with NSCLC that was Stage IV at diagnosis who received osimertinib
+    monotherapy after progression on a regimen containing erlotinib, gefitinib, or
+    afatinib, what is the median PFS-I in months, with 95% CI, measured from the start
+    of the first such osimertinib regimen, with risk-set adjustment for delayed cohort
+    entry (left-truncating at NGS testing date), excluding clinical-trial regimens?
 - id: nsclc_2.0_public-Q51a30c03
   category: 5
-  text: For patients with NSCLC receiving first-line carboplatin plus pemetrexed for
-    Stage IV disease, what is the median PFS-I from regimen start in months with 95%
-    CI? Exclude patients whose first-line regimen was a clinical-trial regimen (composition
-    not annotated in BPC).
+  text: Among patients with NSCLC that was Stage IV at diagnosis whose first regimen
+    for the cancer contained carboplatin and pemetrexed, with or without other drugs,
+    what is the hazard ratio (95% CI) for PFS-I from regimen start associated with
+    age at regimen start, entered as a continuous variable in a univariable Cox model,
+    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
+    date), excluding patients whose first regimen was a clinical-trial regimen?
 - id: nsclc_2.0_public-Q59452c1d
   category: 7
-  text: Do patients with advanced NSCLC who receive immunotherapy have better outcomes
-    than those who receive chemotherapy alone?
+  text: Among patients with advanced NSCLC (Stage IV at diagnosis, or a distant metastasis
+    after a Stage I–III diagnosis) whose first regimen started on or after the onset
+    of advanced disease either contained an immune checkpoint inhibitor (pembrolizumab,
+    nivolumab, atezolizumab, durvalumab, or cemiplimab) or contained cisplatin or
+    carboplatin and no immune checkpoint inhibitor, and whose first sequencing report
+    preceded the start of that regimen, what proportion of patients in each group
+    died within 2 years of starting it, with 95% CIs? Exclude patients whose first
+    such regimen was a clinical-trial regimen.
 - id: nsclc_2.0_public-Q5ab28810
   category: 3
   text: Among patients whose tumors were sequenced on a KRAS-covering panel, what
@@ -135,16 +157,24 @@ questions:
   text: In the NSCLC cohort, what proportion of patients had a tumor with a TP53 mutation?
 - id: nsclc_2.0_public-Q7d8e89e8
   category: 2
-  text: Among patients with metastatic NSCLC, what proportion have liver involvement?
+  text: Among patients with NSCLC that was Stage IV at diagnosis and PD-L1-positive
+    on their first PD-L1 test after diagnosis, what proportion had liver metastases
+    at diagnosis, with 95% CI? Count patients whose liver status at diagnosis is unknown
+    as not having liver metastases.
 - id: nsclc_2.0_public-Qa0cf060c
   category: 7
-  text: Among patients in the NSCLC cohort with Stage IV EGFR-mutant non-small cell
-    lung cancer at diagnosis whose first-line regimen was either osimertinib monotherapy
-    or erlotinib monotherapy, what is the median time to next treatment for the same
-    cancer (in months, with 95% CI) from regimen start, by regimen?
+  text: Among patients with NSCLC that was Stage IV at diagnosis, whose first regimen
+    for the cancer was osimertinib monotherapy or erlotinib monotherapy, and whose
+    tumor had an EGFR exon 19 deletion or L858R mutation on a sequencing report before
+    that regimen started, what is the median time to next treatment for each drug,
+    in months with 95% CI, measured from the start of that regimen to the start of
+    the next cancer-directed treatment, counting death as an event and censoring at
+    the last known alive date?
 - id: nsclc_2.0_public-Qbd20b49e
   category: 2
-  text: What proportion of patients with NSCLC are diagnosed at an advanced stage?
+  text: Among patients with lung adenocarcinoma, what proportion were diagnosed at
+    Stage III or IV, with 95% CI? Count patients whose stage at diagnosis is unknown,
+    or recorded only as Stage I–III without a stage group, as not Stage III–IV.
 - id: nsclc_2.0_public-Qc11bd653
   category: 4
   text: Among patients with Stage IV NSCLC (any NSCLC histologic subtype) whose first
@@ -155,8 +185,17 @@ questions:
     regimens with drugs_ct_yn == 'Yes' from the carboplatin+pemetrexed identification).
 - id: nsclc_2.0_public-Qc51cfeb9
   category: 8
-  text: Do patients with KRAS-mutant advanced NSCLC benefit more from immunotherapy
-    than patients with KRAS-wildtype advanced NSCLC?
+  text: Among patients with advanced NSCLC (Stage IV at diagnosis, or a distant metastasis
+    after a Stage I–III diagnosis) whose first sequencing report preceded their first
+    regimen started on or after the onset of advanced disease, and whose first such
+    regimen either contained an immune checkpoint inhibitor (pembrolizumab, nivolumab,
+    atezolizumab, durvalumab, or cemiplimab) or contained cisplatin or carboplatin
+    and no immune checkpoint inhibitor, what is the hazard ratio (95% CI) for overall
+    survival from the start of that regimen for checkpoint-inhibitor versus platinum
+    regimens, separately among patients with and without any non-synonymous KRAS mutation,
+    and the p-value for heterogeneity between the two subgroup hazard ratios? Use
+    univariable Cox models and exclude patients whose first such regimen was a clinical-trial
+    regimen.
 - id: nsclc_2.0_public-Qd11e3eb6
   category: 6
   text: Is there an association between TP53 co-mutation and overall survival in patients
@@ -174,5 +213,9 @@ questions:
     delayed cohort entry (left-truncating at NGS testing date)?
 - id: nsclc_2.0_public-Qe9438978
   category: 5
-  text: Among patients with NSCLC, do those with EGFR-mutant tumors have better outcomes
-    on first-line therapy for the cancer than patients with EGFR-wild-type tumors?
+  text: Among patients with NSCLC that was Stage IV at diagnosis, what is the hazard
+    ratio (95% CI) for overall survival from the start of each patient's first regimen
+    for the cancer, comparing patients whose tumor had an EGFR exon 19 deletion or
+    L858R mutation on the first sequencing report versus patients whose tumor did
+    not, using a univariable Cox model, with risk-set adjustment for delayed cohort
+    entry (left-truncating at NGS testing date)?
