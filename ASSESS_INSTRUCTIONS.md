@@ -124,7 +124,7 @@ For a population defined by the presence or absence of a biomarker:
 
 - **Genes.** The gene or gene set; for a set, whether an alteration in any one gene qualifies, or one in each.
 - **Alteration types.** Which types count: mutations (single-nucleotide variants and small insertions or deletions), copy-number changes, fusions or rearrangements, or other structural variants. "Mutation", "mutant", and "mutated" mean mutations only (see "Mutation in gene X"). "Alteration", "altered", and "aberration" leave the types open.
-- **Variants.** Whether only some variants count (named variants or codons, hotspots, or variants a named knowledge base classifies as oncogenic or pathogenic), or any non-synonymous mutation (the default; see "Mutation in gene X" for "X-mutant" labels clinicians read narrowly), and any variant allele fraction threshold.
+- **Variants.** Whether only some variants count (named variants or codons, hotspots, or variants a named knowledge base classifies as oncogenic or pathogenic), or any non-synonymous mutation (the default; see "Mutation in gene X" for "X-mutant" labels clinicians read narrowly), and any variant allele fraction threshold. "Pathogenic" or "oncogenic" without a named knowledge base or classification/ontology leaves the variant set open.
 - **Copy-number levels.** For copy-number changes, which levels count: for example, high-level amplification only or any gain, and deep (homozygous) deletion only or any loss.
 - **Fusions.** For fusions or rearrangements, which partner genes count.
 - **Germline variants.** "Mutation" means a variant reported by tumor sequencing (see "Mutation in gene X"). A question about inherited (germline) variants must say how they are identified.
