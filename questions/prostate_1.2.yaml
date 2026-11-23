@@ -1,5 +1,5 @@
 cohort: prostate_1.2
-generated_at: '2026-10-16T23:39:26.361338Z'
+generated_at: '2026-11-23T01:03:23.240777Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -67,10 +67,12 @@ questions:
     cancer at diagnosis?
 - id: prostate_1.2-Qafe15a6b
   category: 7
-  text: Among first regimens for prostate cancer that contain docetaxel, what is the
-    median overall survival in months (with 95% CI) from regimen start, with risk-set
-    adjustment for delayed cohort entry (left-truncating at NGS testing date); assume
-    any clinical-trial regimen did not contain docetaxel?
+  text: Among patients whose prostate cancer was Stage IV at diagnosis and later became
+    castration-resistant, what is the median overall survival, in months with 95%
+    CI, from the start of their first docetaxel-containing regimen started on or after
+    the onset of castration resistance, with risk-set adjustment for delayed cohort
+    entry (left-truncating at NGS testing date)? Assume any clinical-trial regimen
+    did not contain docetaxel.
 - id: prostate_1.2-Qb89136fd
   category: 4
   text: What is the median number of distinct cancer-directed regimens administered
@@ -105,38 +107,63 @@ questions:
     adjustment for delayed cohort entry (left-truncating at NGS testing date)?
 - id: prostate_1.2-Q08118ced
   category: 4
-  text: What is the median time on first-line treatment (first regimen after mCRPC
-    onset) for patients with metastatic castration-resistant prostate cancer?
+  text: Among patients whose prostate cancer was Stage IV at diagnosis and later became
+    castration-resistant, as documented in the medical oncologist's assessment, what
+    is the median duration of the first regimen started on or after that documented
+    date, measured from the regimen's start to its end date or death, whichever comes
+    first, in months with 95% CI, with risk-set adjustment for delayed cohort entry
+    (left-truncating at NGS testing date), excluding clinical-trial regimens?
 - id: prostate_1.2-Q1c301ed6
   category: 6
-  text: Is PTEN loss associated with worse overall survival in patients with metastatic
-    prostate cancer, with risk-set adjustment for delayed cohort entry (left-truncating
+  text: Among patients with metastatic prostate cancer (Stage IV at diagnosis, or
+    a distant metastasis after a Stage I–III diagnosis), what is the hazard ratio
+    (95% CI) for overall survival from the onset of metastatic disease comparing patients
+    whose tumors had a PTEN deep deletion (copy-number value −2) on the first sequencing
+    report versus patients whose tumors did not, from a Cox model adjusted for log10
+    PSA (the most recent value within 90 days before metastatic onset, per 1-unit
+    increase), with risk-set adjustment for delayed cohort entry (left-truncating
     at NGS testing date)?
 - id: prostate_1.2-Q352ae9ce
   category: 5
-  text: Among patients with prostate cancer receiving docetaxel-containing regimens,
-    what is the median PFS-I-or-M in months from regimen start (Kaplan-Meier with
-    95% CI)?
+  text: Among patients whose prostate cancer was Stage IV at diagnosis, considering
+    each patient's first regimen containing docetaxel, what is the median time from
+    the start of that regimen to PSA progression or death, in months with 95% CI,
+    censoring at the last known alive date, with risk-set adjustment for delayed cohort
+    entry (left-truncating at NGS testing date), excluding clinical-trial regimens?
 - id: prostate_1.2-Q3e2b4eb4
   category: 5
-  text: Among patients with metastatic castration-resistant prostate cancer, what
-    is the median progression-free survival on abiraterone-containing regimens?
+  text: Among patients whose prostate cancer was Stage IV at diagnosis and later became
+    castration-resistant, as documented in the medical oncologist's assessment, and
+    who had previously received a docetaxel-containing regimen, what is the median
+    PFS-I from the start of their first abiraterone-containing regimen started on
+    or after the documented castration-resistance date, in months with 95% CI, with
+    risk-set adjustment for delayed cohort entry (left-truncating at NGS testing date),
+    excluding clinical-trial regimens?
 - id: prostate_1.2-Q714edb70
   category: 1
   text: What is the most common race/ethnicity group among patients in the prostate
     cancer cohort?
 - id: prostate_1.2-Q7ea929fe
   category: 8
-  text: In men with metastatic prostate cancer initiating abiraterone acetate or enzalutamide
-    as a first-line mCRPC-era regimen, does the presence of a nonsynonymous TP53 mutation
-    in the tumor (restricted to patients tested on TP53-covered panels) modify the
-    effect of abiraterone vs enzalutamide on PFS-M from regimen start, as measured
-    by the interaction term p-value in a Cox PH model?
+  text: Among patients whose prostate cancer was Stage IV at diagnosis and later became
+    castration-resistant, as documented in the medical oncologist's assessment, whose
+    first regimen started on or after that date contained abiraterone or enzalutamide
+    but not both, does TP53 mutation status (any non-synonymous TP53 mutation on the
+    first sequencing report) modify the effect of abiraterone versus enzalutamide
+    on PFS-M from regimen start? Report the p-value for the treatment × TP53 interaction
+    term in a Cox model with both main effects, adjusted for visceral metastasis at
+    regimen start (patients with none recorded counted as without), with risk-set
+    adjustment for delayed cohort entry (left-truncating at NGS testing date), excluding
+    clinical-trial regimens.
 - id: prostate_1.2-Qa334cdaf
   category: 7
-  text: Comparing first regimens for prostate cancer that were administered as part
-    of a clinical trial vs not, what is the log-rank p-value for time-to-next-treatment
-    for the same cancer?
+  text: Among patients whose prostate cancer was locally advanced at diagnosis, what
+    is the log-rank p-value comparing time to next treatment between patients whose
+    first regimen for the cancer (in any setting) was given on a clinical trial and
+    patients whose first regimen was not? Time to next treatment runs from the start
+    of the first regimen to the start of the next regimen for the cancer or death,
+    whichever comes first, censored at the last known alive date, with risk-set adjustment
+    for delayed cohort entry (left-truncating at NGS testing date).
 - id: prostate_1.2-Qcc762a62
   category: 6
   text: Among patients with metastatic castration-resistant prostate cancer, is there
@@ -164,10 +191,15 @@ questions:
     date)?
 - id: prostate_1.2-Qe9ccfa5c
   category: 8
-  text: Among men with metastatic castration-resistant prostate cancer, does TP53
-    mutation status modify the effect of abiraterone-containing versus docetaxel-containing
-    first-line mCRPC regimens on overall survival, with risk-set adjustment for delayed
-    cohort entry (left-truncating at NGS testing date)?
+  text: Among patients whose prostate cancer was Stage IV at diagnosis and later became
+    castration-resistant, as documented in the medical oncologist's assessment, whose
+    first regimen started on or after that date contained abiraterone or docetaxel
+    but not both, what is the p-value for the treatment × TP53 interaction (any non-synonymous
+    TP53 mutation on the first sequencing report) in a Cox model for overall survival
+    from regimen start, with both main effects and adjusted for PSA doubling time
+    before regimen start (under 3 months versus 3 months or longer; patients without
+    a calculable value excluded), with risk-set adjustment for delayed cohort entry
+    (left-truncating at NGS testing date), excluding clinical-trial regimens?
 - id: prostate_1.2-Qf17acd7c
   category: 8
   text: Among patients with Stage IV prostate cancer receiving a first regimen for
@@ -182,5 +214,6 @@ questions:
     records.)
 - id: prostate_1.2-Qf8b44f4f
   category: 3
-  text: Among patients in the prostate cancer cohort whose tumors were sequenced,
-    what fraction had a tumor with an AR alteration?
+  text: What proportion of patients in the prostate cancer cohort had an AR amplification
+    (copy-number value 2) on any sequenced specimen, with 95% CI, separately for Black
+    and White patients (patients of unknown race excluded)?
