@@ -1,5 +1,5 @@
 cohort: breast_1.2
-generated_at: '2026-11-18T21:28:34.816794Z'
+generated_at: '2026-11-23T02:28:54.689566Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -27,9 +27,9 @@ questions:
     survival from regimen start (in months) different between platinum-containing
     regimens without concurrent immunotherapy and non-platinum regimens without concurrent
     immunotherapy, excluding patients whose first-line regimen was a clinical-trial
-    regimen (composition not annotated in BPC), with risk-set adjustment for delayed
-    cohort entry (left-truncating at NGS testing date)? (Restrict to invasive breast
-    carcinoma; exclude the small subset of breast sarcomas.)
+    regimen, with risk-set adjustment for delayed cohort entry (left-truncating at
+    NGS testing date)? (Restrict to invasive breast carcinoma; exclude the small subset
+    of breast sarcomas.)
 - id: breast_1.2-Qa6ab70c3
   category: 5
   text: Among patients with Stage IV breast cancer at diagnosis, what is the median
@@ -169,8 +169,8 @@ questions:
     containing both trastuzumab and pertuzumab versus regimens containing trastuzumab
     without pertuzumab, with risk-set adjustment for delayed cohort entry (left-truncating
     at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
-    regimen (composition not annotated in BPC)? (Count each BPC regimen record as
-    a regimen, including separately curated LHRH-agonist records.)
+    regimen? (Count each BPC regimen record as a regimen, including separately curated
+    LHRH-agonist records.)
 - id: breast_1.2-Q993b440a
   category: 3
   text: In the breast cancer cohort, how many patients had a tumor that was ERBB2-mutant
@@ -228,6 +228,9 @@ questions:
     NGS testing date), excluding clinical-trial regimens?
 - id: breast_1.2-Qf5fdd296
   category: 4
-  text: What proportion of patients with metastatic breast cancer received chemotherapy
-    in the first-line metastatic setting? Assume any clinical-trial regimen did not
-    contain chemotherapy.
+  text: Among patients with metastatic breast cancer (Stage IV at diagnosis, or a
+    distant metastasis after a Stage I–III diagnosis), what proportion had a first
+    regimen started on or after the onset of metastatic disease that contained cytotoxic
+    chemotherapy, counting antibody–drug conjugates with a cytotoxic payload (such
+    as trastuzumab deruxtecan or sacituzumab govitecan) as chemotherapy, with 95%
+    CI? Assume any clinical-trial regimen did not contain chemotherapy.

@@ -1,5 +1,5 @@
 cohort: nsclc_2.0_public
-generated_at: '2026-11-21T15:20:55.316269Z'
+generated_at: '2026-11-23T02:28:54.689566Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -169,7 +169,8 @@ questions:
     that regimen started, what is the median time to next treatment for each drug,
     in months with 95% CI, measured from the start of that regimen to the start of
     the next cancer-directed treatment, counting death as an event and censoring at
-    the last known alive date?
+    the last known alive date, excluding patients whose first regimen was a clinical-trial
+    regimen?
 - id: nsclc_2.0_public-Qbd20b49e
   category: 2
   text: Among patients with lung adenocarcinoma, what proportion were diagnosed at

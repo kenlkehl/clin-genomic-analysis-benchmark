@@ -1,5 +1,5 @@
 cohort: prostate_1.2
-generated_at: '2026-11-23T01:03:23.240777Z'
+generated_at: '2026-11-23T02:28:54.689566Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -157,13 +157,14 @@ questions:
     clinical-trial regimens.
 - id: prostate_1.2-Qa334cdaf
   category: 7
-  text: Among patients whose prostate cancer was locally advanced at diagnosis, what
-    is the log-rank p-value comparing time to next treatment between patients whose
-    first regimen for the cancer (in any setting) was given on a clinical trial and
-    patients whose first regimen was not? Time to next treatment runs from the start
-    of the first regimen to the start of the next regimen for the cancer or death,
-    whichever comes first, censored at the last known alive date, with risk-set adjustment
-    for delayed cohort entry (left-truncating at NGS testing date).
+  text: Among patients whose prostate cancer was locally advanced at diagnosis and
+    who received at least one regimen for the cancer, what is the log-rank p-value
+    comparing time to next treatment between patients whose first regimen for the
+    cancer (in any setting) was given on a clinical trial and patients whose first
+    regimen was not? Time to next treatment runs from the start of the first regimen
+    to the start of the next regimen for the cancer or death, whichever comes first,
+    censored at the last known alive date, with risk-set adjustment for delayed cohort
+    entry (left-truncating at NGS testing date).
 - id: prostate_1.2-Qcc762a62
   category: 6
   text: Among patients with metastatic castration-resistant prostate cancer, is there

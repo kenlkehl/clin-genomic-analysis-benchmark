@@ -1,5 +1,5 @@
 cohort: bladder_1.2
-generated_at: '2026-11-18T19:18:45.815617Z'
+generated_at: '2026-11-23T02:28:54.689566Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -27,18 +27,20 @@ questions:
   text: What proportion of patients in the bladder cancer cohort are female?
 - id: bladder_1.2-Qa0d4f13f
   category: 6
-  text: Among patients with bladder cancer whose tumor was sequenced on the MSK-IMPACT468
-    panel, what is the hazard ratio (95% CI) for overall survival from diagnosis comparing
-    patients whose tumors harbor any non-synonymous TP53 mutation to those without,
-    using a univariate Cox proportional hazards model, with risk-set adjustment for
-    delayed cohort entry (left-truncating at NGS testing date)? (Treat 'bladder cancer'
-    here as cancer of any histology arising from either the urinary bladder or the
-    upper urinary tract / renal pelvis.)
+  text: Among patients with bladder cancer whose first sequenced specimen was tested
+    on the MSK-IMPACT468 panel, what is the hazard ratio (95% CI) for overall survival
+    from diagnosis comparing patients whose first sequenced specimen had any non-synonymous
+    TP53 mutation versus patients whose first sequenced specimen did not, using a
+    univariate Cox proportional hazards model, with risk-set adjustment for delayed
+    cohort entry (left-truncating at NGS testing date)? (Treat 'bladder cancer' here
+    as cancer of any histology arising from either the urinary bladder or the upper
+    urinary tract / renal pelvis.)
 - id: bladder_1.2-Qeebfe861
   category: 2
   text: Among patients with bladder cancer, what proportion were diagnosed at Stage
     IV? (Treat 'bladder cancer' here as cancer of any histology arising from either
-    the urinary bladder or the upper urinary tract / renal pelvis.)
+    the urinary bladder or the upper urinary tract / renal pelvis.) (Exclude patients
+    whose stage at diagnosis is unknown.)
 - id: bladder_1.2-Q0205dab1
   category: 6
   text: Among patients with bladder cancer whose first-line regimen for the cancer
@@ -92,13 +94,13 @@ questions:
   category: 7
   text: Among patients with Stage IV bladder cancer at diagnosis, what is the hazard
     ratio for overall survival from the start of the first-line regimen for the cancer,
-    comparing platinum-based regimens without concurrent immunotherapy versus single-agent
-    immune checkpoint inhibitor regimens (atezolizumab, pembrolizumab, nivolumab,
-    durvalumab, or avelumab as monotherapy), with risk-set adjustment for delayed
-    cohort entry (left-truncating at NGS testing date), excluding patients whose first-line
-    regimen was a clinical-trial regimen (composition not annotated in BPC)? (Treat
-    'bladder cancer' here as cancer of any histology arising from either the urinary
-    bladder or the upper urinary tract / renal pelvis.)
+    comparing regimens containing cisplatin or carboplatin and no immune checkpoint
+    inhibitor versus single-agent immune checkpoint inhibitor regimens (atezolizumab,
+    pembrolizumab, nivolumab, durvalumab, or avelumab as monotherapy), with risk-set
+    adjustment for delayed cohort entry (left-truncating at NGS testing date), excluding
+    patients whose first-line regimen was a clinical-trial regimen? (Treat 'bladder
+    cancer' here as cancer of any histology arising from either the urinary bladder
+    or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q29edb9b4
   category: 6
   text: Among patients with advanced bladder cancer (Stage IV at diagnosis, or Stage
@@ -204,9 +206,8 @@ questions:
     regimen start, as assessed by the interaction-term p-value in a Cox proportional
     hazards model, with risk-set adjustment for delayed cohort entry (left-truncating
     at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
-    regimen (composition not annotated in BPC)? (Treat 'bladder cancer' here as cancer
-    of any histology arising from either the urinary bladder or the upper urinary
-    tract / renal pelvis.)
+    regimen? (Treat 'bladder cancer' here as cancer of any histology arising from
+    either the urinary bladder or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Qb3f6a73a
   category: 5
   text: Among regimens containing cisplatin administered for bladder cancer, what
@@ -239,7 +240,7 @@ questions:
 - id: bladder_1.2-Qde17cbb3
   category: 1
   text: What is the most common race/ethnicity category among patients in the bladder
-    cancer cohort?
+    cancer cohort? (Use the data source's combined race/ethnicity categories.)
 - id: bladder_1.2-Qef4973b7
   category: 2
   text: Among patients in the bladder cancer cohort, what is the difference in the

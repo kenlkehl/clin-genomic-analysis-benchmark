@@ -1,5 +1,5 @@
 cohort: crc_2.0_public
-generated_at: '2026-11-18T22:40:58.389091Z'
+generated_at: '2026-11-23T02:28:54.689566Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -22,10 +22,10 @@ questions:
     and bevacizumab) versus FOLFOX alone (exactly fluorouracil, leucovorin, and oxaliplatin),
     what is the hazard ratio for overall survival measured from regimen start, with
     risk-set adjustment for delayed cohort entry (left-truncating at NGS testing date),
-    excluding patients whose first-line regimen was a clinical-trial regimen (composition
-    not annotated in BPC)? (A first-line regimen containing any other drug counts
-    in neither arm.) (Include the full colorectal cancer cohort — colon primaries,
-    rectal/rectosigmoid primaries, and unspecified colorectal primaries.)
+    excluding patients whose first-line regimen was a clinical-trial regimen? (A first-line
+    regimen containing any other drug counts in neither arm.) (Include the full colorectal
+    cancer cohort — colon primaries, rectal/rectosigmoid primaries, and unspecified
+    colorectal primaries.)
 - id: crc_2.0_public-Q73ef7699
   category: 2
   text: How many patients in the colorectal cancer cohort had liver metastases present
@@ -66,10 +66,10 @@ questions:
     on the first sequencing report, and who received a regimen containing cetuximab
     or panitumumab, what is the hazard ratio (95% CI) for PFS-I from the start of
     their first such regimen comparing patients whose tumors had a BRAF V600E mutation
-    on the first sequencing report versus patients whose tumors had no BRAF mutation,
-    using a univariable Cox model, with risk-set adjustment for delayed cohort entry
-    (left-truncating at NGS testing date), excluding patients whose first such regimen
-    was a clinical-trial regimen?
+    on the first sequencing report versus patients whose tumors did not have a BRAF
+    V600E mutation, using a univariable Cox model, with risk-set adjustment for delayed
+    cohort entry (left-truncating at NGS testing date), excluding patients whose first
+    such regimen was a clinical-trial regimen?
 - id: crc_2.0_public-Q0cd6a6b0
   category: 7
   text: Among patients whose colorectal cancer was Stage IV at diagnosis, what is
@@ -131,9 +131,9 @@ questions:
     for the cancer, what is the hazard ratio for OS from regimen start comparing regimens
     containing bevacizumab versus regimens without any anti-VEGF or anti-EGFR antibody,
     with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
-    date), excluding patients whose first-line regimen was a clinical-trial regimen
-    (composition not annotated in BPC)? (Include the full colorectal cancer cohort
-    — colon primaries, rectal/rectosigmoid primaries, and unspecified colorectal primaries.)
+    date), excluding patients whose first-line regimen was a clinical-trial regimen?
+    (Include the full colorectal cancer cohort — colon primaries, rectal/rectosigmoid
+    primaries, and unspecified colorectal primaries.)
 - id: crc_2.0_public-Q83ea787b
   category: 3
   text: Among samples sequenced on the MSK-IMPACT468 panel, what proportion show a

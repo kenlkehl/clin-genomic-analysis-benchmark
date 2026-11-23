@@ -1,5 +1,5 @@
 cohort: panc_1.2
-generated_at: '2026-11-22T17:23:03.340838Z'
+generated_at: '2026-11-23T02:28:54.689566Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -26,8 +26,7 @@ questions:
     KRAS mutation) modify the treatment effect on overall survival from regimen start,
     as assessed by the interaction term p-value in a Cox proportional hazards model,
     with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
-    date), excluding patients whose first-line regimen was a clinical-trial regimen
-    (composition not annotated in BPC)?
+    date), excluding patients whose first-line regimen was a clinical-trial regimen?
 - id: panc_1.2-Q27072f96
   category: 3
   text: How many unique tumor samples in the pancreatic cancer cohort carry a high-level
@@ -100,8 +99,7 @@ questions:
     deletion vs patients whose tumors have no CDKN2A deletion (restricted to patients
     whose tested panel covered CDKN2A), with risk-set adjustment for delayed cohort
     entry (left-truncating at NGS testing date), excluding patients whose first-line
-    regimen for advanced disease was a clinical-trial regimen (composition not annotated
-    in BPC)?
+    regimen for advanced disease was a clinical-trial regimen?
 - id: panc_1.2-Q2c0d889e
   category: 6
   text: Among patients whose pancreatic cancer was Stage I–III at diagnosis and later
@@ -130,7 +128,7 @@ questions:
     among patients with Stage IV pancreatic cancer, as captured by the interaction
     p-value in a Cox proportional hazards model, with risk-set adjustment for delayed
     cohort entry (left-truncating at NGS testing date), excluding patients whose first-line
-    regimen was a clinical-trial regimen (composition not annotated in BPC)?
+    regimen was a clinical-trial regimen?
 - id: panc_1.2-Q4dd86a68
   category: 7
   text: Among patients with pancreatic cancer that was Stage I or II at diagnosis
@@ -175,7 +173,7 @@ questions:
     (shallow/heterozygous loss counts as neither; restricted to patients whose tested
     panel covered CDKN2A), with risk-set adjustment for delayed cohort entry (left-truncating
     at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
-    regimen (composition not annotated in BPC)?
+    regimen?
 - id: panc_1.2-Q834775b1
   category: 8
   text: Among patients with metastatic pancreatic cancer (Stage IV at diagnosis, or
@@ -196,7 +194,7 @@ questions:
     FOLFIRINOX (Fluorouracil + Leucovorin Calcium + Oxaliplatin + Irinotecan) to Gemcitabine
     + nab-Paclitaxel, with risk-set adjustment for delayed cohort entry (left-truncating
     at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
-    regimen (composition not annotated in BPC)?
+    regimen?
 - id: panc_1.2-Q9ca4f452
   category: 7
   text: Among patients with metastatic pancreatic cancer (Stage IV at diagnosis, or
