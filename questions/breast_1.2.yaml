@@ -1,5 +1,5 @@
 cohort: breast_1.2
-generated_at: '2026-11-23T02:28:54.689566Z'
+generated_at: '2026-11-23T15:09:06.364624Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -9,39 +9,46 @@ questions:
 - id: breast_1.2-Q438e2904
   category: 4
   text: Among patients with Stage IV breast cancer at diagnosis, what is the median
-    number of distinct regimens received for that index cancer? (Restrict to invasive
-    breast carcinoma; exclude the small subset of breast sarcomas.) (Count each BPC
-    regimen record for that cancer; patients with no regimen count as zero.)
+    number of distinct regimens received for that index cancer? (Restrict to cancers
+    the data source records as breast cancer rather than breast sarcoma.) (Count each
+    BPC regimen record for that cancer; patients with no regimen count as zero.)
 - id: breast_1.2-Q522c00c5
   category: 6
   text: Among patients with Stage IV breast cancer at diagnosis, what is the hazard
-    ratio for overall survival from diagnosis comparing patients with any TP53 non-synonymous
-    somatic mutation to those without, restricted to patients whose sequencing panel
-    covers TP53, with risk-set adjustment for delayed cohort entry (left-truncating
-    at NGS testing date)? (Restrict to invasive breast carcinoma; exclude the small
-    subset of breast sarcomas.)
+    ratio for overall survival from diagnosis comparing patients whose first sequenced
+    specimen had any non-synonymous TP53 mutation versus patients whose first sequenced
+    specimen did not, restricted to patients whose first sequenced specimen was on
+    a panel that covers TP53, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date)? (Restrict to cancers the data source records as breast cancer
+    rather than breast sarcoma.)
 - id: breast_1.2-Q8d040027
   category: 7
-  text: Among patients with triple-negative breast cancer that was Stage IV at diagnosis
-    who received any first-line cytotoxic regimen for the cancer, is median overall
-    survival from regimen start (in months) different between platinum-containing
-    regimens without concurrent immunotherapy and non-platinum regimens without concurrent
-    immunotherapy, excluding patients whose first-line regimen was a clinical-trial
-    regimen, with risk-set adjustment for delayed cohort entry (left-truncating at
-    NGS testing date)? (Restrict to invasive breast carcinoma; exclude the small subset
-    of breast sarcomas.)
+  text: Among patients whose breast cancer was Stage IV and triple-negative at diagnosis,
+    and whose first regimen for the cancer contained at least one cytotoxic drug (carboplatin,
+    cisplatin, oxaliplatin, paclitaxel, nab-paclitaxel, docetaxel, doxorubicin, liposomal
+    doxorubicin, epirubicin, cyclophosphamide, ifosfamide, gemcitabine, capecitabine,
+    fluorouracil, methotrexate, vinorelbine, vinblastine, vincristine, eribulin, ixabepilone,
+    etoposide, irinotecan, topotecan, bleomycin, mitomycin, mitoxantrone, carmustine,
+    pemetrexed, trabectedin, dacarbazine, temozolomide, or sacituzumab govitecan)
+    and no immune checkpoint inhibitor, what is the log-rank p-value comparing overall
+    survival from regimen start between regimens containing carboplatin, cisplatin,
+    or oxaliplatin and regimens containing none of them, with risk-set adjustment
+    for delayed cohort entry (left-truncating at NGS testing date), excluding patients
+    whose first regimen was a clinical-trial regimen? (Restrict to cancers the data
+    source records as breast cancer rather than breast sarcoma.)
 - id: breast_1.2-Qa6ab70c3
   category: 5
   text: Among patients with Stage IV breast cancer at diagnosis, what is the median
     overall survival in months from diagnosis with 95% confidence interval, with risk-set
     adjustment for delayed cohort entry (left-truncating at NGS testing date)? (Restrict
-    to invasive breast carcinoma; exclude the small subset of breast sarcomas.)
+    to cancers the data source records as breast cancer rather than breast sarcoma.)
 - id: breast_1.2-Qd9af976f
   category: 4
-  text: Among patients with HR+/HER2- breast cancer, what proportion received a CDK4/6
-    inhibitor (palbociclib, ribociclib, or abemaciclib) as part of any regimen for
-    that cancer? Assume any clinical-trial regimen did not contain a CDK4/6 inhibitor.
-    (Restrict to invasive breast carcinoma; exclude the small subset of breast sarcomas.)
+  text: Among patients whose breast cancer was HR-positive and HER2-negative at diagnosis,
+    what proportion received a CDK4/6 inhibitor (palbociclib, ribociclib, or abemaciclib)
+    as part of any regimen for that cancer? Assume any clinical-trial regimen did
+    not contain a CDK4/6 inhibitor. (Restrict to cancers the data source records as
+    breast cancer rather than breast sarcoma.)
 - id: breast_1.2-Qeda1eecf
   category: 1
   text: What proportion of patients in the breast cancer cohort are non-white (using
@@ -117,8 +124,8 @@ questions:
 - id: breast_1.2-Q3d022b1f
   category: 2
   text: How many patients in the breast cohort had stage IV breast cancer at initial
-    diagnosis? (Restrict to invasive breast carcinoma; exclude the small subset of
-    breast sarcomas.)
+    diagnosis? (Restrict to cancers the data source records as breast cancer rather
+    than breast sarcoma.)
 - id: breast_1.2-Q4a538b91
   category: 8
   text: Among patients with metastatic breast cancer (Stage IV at diagnosis, or a
@@ -152,8 +159,8 @@ questions:
   category: 4
   text: What proportion of patients in the breast cohort ever received a regimen containing
     trastuzumab (Herceptin) for their breast cancer? Assume any clinical-trial regimen
-    did not contain trastuzumab. (Restrict to invasive breast carcinoma; exclude the
-    small subset of breast sarcomas.)
+    did not contain trastuzumab. (Restrict to cancers the data source records as breast
+    cancer rather than breast sarcoma.)
 - id: breast_1.2-Q8a4babcc
   category: 5
   text: Among patients whose breast cancer was triple-negative at diagnosis, became
@@ -163,14 +170,14 @@ questions:
     at NGS testing date)?
 - id: breast_1.2-Q8d802225
   category: 7
-  text: Among patients with HER2+ metastatic breast cancer initiating first-line therapy
-    after Stage IV diagnosis, what is the Cox proportional-hazards hazard ratio (with
+  text: Among patients whose breast cancer was Stage IV and HER2-positive at diagnosis
+    and whose first regimen for the cancer contained trastuzumab (not a trastuzumab
+    antibody–drug conjugate), what is the Cox proportional-hazards hazard ratio (with
     95% CI and p-value) for overall survival from regimen start comparing regimens
-    containing both trastuzumab and pertuzumab versus regimens containing trastuzumab
-    without pertuzumab, with risk-set adjustment for delayed cohort entry (left-truncating
-    at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
-    regimen? (Count each BPC regimen record as a regimen, including separately curated
-    LHRH-agonist records.)
+    that also contained pertuzumab versus regimens without pertuzumab, with risk-set
+    adjustment for delayed cohort entry (left-truncating at NGS testing date), excluding
+    patients whose first regimen was a clinical-trial regimen? (Count each BPC regimen
+    record as a regimen, including separately curated LHRH-agonist records.)
 - id: breast_1.2-Q993b440a
   category: 3
   text: In the breast cancer cohort, how many patients had a tumor that was ERBB2-mutant
@@ -191,11 +198,14 @@ questions:
     an advanced stage?
 - id: breast_1.2-Qd3de1f04
   category: 6
-  text: Among patients with Stage IV triple-negative breast cancer, is there an association
-    between BRCA1 and/or BRCA2 somatic mutation status (any non-synonymous mutation)
-    (comparing patients with a BRCA1- and/or BRCA2-mutant tumor to patients whose
-    tumor has mutations in neither gene) and overall survival from diagnosis, with
-    risk-set adjustment for delayed cohort entry (left-truncating at NGS testing date)?
+  text: Among patients whose breast cancer was Stage IV and triple-negative at diagnosis,
+    what is the hazard ratio (95% CI) for overall survival from diagnosis comparing
+    patients whose first sequenced specimen had any non-synonymous BRCA1 or BRCA2
+    mutation versus patients whose first sequenced specimen had neither, using a univariable
+    Cox model, restricted to patients whose first sequenced specimen was on a panel
+    covering both genes, with risk-set adjustment for delayed cohort entry (left-truncating
+    at NGS testing date)? (Restrict to cancers the data source records as breast cancer
+    rather than breast sarcoma.)
 - id: breast_1.2-Qd65985df
   category: 3
   text: Among patients whose breast cancer was HR-positive and HER2-negative at diagnosis
@@ -204,9 +214,10 @@ questions:
     partner gene) on any sequenced specimen?
 - id: breast_1.2-Qdc5b5eb2
   category: 4
-  text: How many patients in the breast cohort received endocrine therapy as part
-    of treatment (any line, any setting)? Assume any clinical-trial regimen did not
-    contain endocrine therapy.
+  text: How many patients in the breast cohort received endocrine therapy (tamoxifen,
+    toremifene, anastrozole, letrozole, exemestane, fulvestrant, goserelin, leuprolide,
+    or triptorelin) as part of any regimen for their breast cancer (any line, any
+    setting)? Assume any clinical-trial regimen did not contain these drugs.
 - id: breast_1.2-Qdce7a7df
   category: 1
   text: What proportion of patients in the breast cancer cohort have primary race
