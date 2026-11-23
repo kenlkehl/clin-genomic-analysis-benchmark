@@ -184,7 +184,10 @@ export CLINGEN_DATA_ROOT=/path/to/cohort/data   # required: directory containing
 .venv/bin/python scripts/sync_yaml_from_review.py
 
 # ---- assess: one prompt per question, no tools ----------------------------
-# --model is <provider>:<model>, with providers vertex-anthropic, vertex-openai
+# --model is <provider>:<model>, with providers vertex-anthropic,
+# databricks-anthropic (Claude through the Databricks Unity AI Gateway; the model
+# is the full gateway endpoint name; needs `uv sync --extra databricks` and a
+# `databricks auth login --profile unity-gateway`), vertex-openai
 # (Gemini, Gemma, and other Vertex MaaS models), vertex-responses (partner
 # models Vertex serves only on its Responses endpoint, such as
 # meta/muse-ember-1.0), azure-openai, and
@@ -305,7 +308,7 @@ defense in depth. Antigravity relies on the outer boundary because its Linux
 `nsjail` cannot execute correctly when nested inside bubblewrap.
 
 Start from `adapters/template/`. The assess task needs no adapter: add a model
-API to `assess/backends.py` if none of the five providers reaches it.
+API to `assess/backends.py` if none of the six providers reaches it.
 
 ## Repo layout
 

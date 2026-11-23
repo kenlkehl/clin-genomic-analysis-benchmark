@@ -23,6 +23,10 @@ dependencies = [
     "python-dotenv>=1.0.0",
 ]
 
+[project.optional-dependencies]
+# The databricks-anthropic assess provider (Databricks Unity AI Gateway).
+databricks = ["databricks-sdk>=0.169.0"]
+
 [project.scripts]
 clingen-bench = "clin_genomic_analysis_benchmark.cli:cli"
 

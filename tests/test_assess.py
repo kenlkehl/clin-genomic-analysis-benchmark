@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -312,6 +313,73 @@ def test_vertex_anthropic_caches_the_rulebook_and_skips_thinking(monkeypatch):
     assert completion.usage["cache_read_input_tokens"] == 4
     assert backend.provenance()["project"] == "proj"
     assert backend.provenance()["region"] == "global"
+
+
+def test_databricks_anthropic_sends_the_same_request_with_a_fresh_gateway_token(monkeypatch):
+    captured = {"tokens": []}
+    message = SimpleNamespace(
+        content=[SimpleNamespace(type="text", text='{"a": 1}')],
+        stop_reason="max_tokens", model="claude-haiku-5-5",
+        usage=SimpleNamespace(input_tokens=5, output_tokens=2, cache_read_input_tokens=4,
+                              cache_creation_input_tokens=1))
+    tokens = iter(["tok-1", "tok-2"])
+
+    class FakeWorkspaceClient:
+        def __init__(self, **kwargs):
+            captured["workspace"] = kwargs
+            self.config = SimpleNamespace(
+                host="https://adb-1.2.azuredatabricks.net/", auth_type="databricks-cli",
+                authenticate=lambda: {"Authorization": f"Bearer {next(tokens)}"})
+
+    class FakeAnthropic:
+        def __init__(self, **kwargs):
+            captured["client"] = kwargs
+            self.messages = SimpleNamespace(
+                stream=lambda **kw: captured.setdefault("request", kw) and _FakeStream(message))
+
+        def with_options(self, **kwargs):
+            captured["tokens"].append(kwargs["auth_token"])
+            return self
+
+    import anthropic
+    monkeypatch.setattr(anthropic, "Anthropic", FakeAnthropic)
+    monkeypatch.setitem(sys.modules, "databricks.sdk",
+                        SimpleNamespace(WorkspaceClient=FakeWorkspaceClient))
+    for name in ("ARM_CLIENT_ID", "DATABRICKS_RUNTIME_VERSION", "DATABRICKS_CONFIG_PROFILE"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-not-for-databricks")
+    endpoint = "ai_gateway_model_services_prod.team_proj.team_proj-claude-haiku-5-5"
+    backend = backends.make_backend(backends.BackendConfig(
+        provider="databricks-anthropic", model=endpoint,
+        params={"output_config": {"effort": "low"}}))
+
+    completion = backend.complete(AssessPrompt(rulebook="RULES\n", question="Q"))
+    backend.complete(AssessPrompt(rulebook="RULES\n", question="Q"))
+
+    assert captured["workspace"] == {"profile": "unity-gateway"}
+    client = captured["client"]
+    assert client["base_url"] == "https://adb-1.2.azuredatabricks.net/ai-gateway/anthropic"
+    assert isinstance(client["default_headers"]["X-Api-Key"], anthropic.Omit)
+    assert client["max_retries"] == 0
+    assert captured["tokens"] == ["tok-1", "tok-2"]
+    request = captured["request"]
+    assert request["model"] == endpoint
+    assert request["messages"][0]["content"] == [
+        {"type": "text", "text": "RULES" + SEPARATOR, "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": "Q"}]
+    assert request["max_tokens"] == backends.DEFAULT_ANTHROPIC_MAX_TOKENS
+    assert request["output_config"] == {"effort": "low"}
+    assert (completion.text, completion.stop_reason, completion.response_model) == (
+        '{"a": 1}', "max_tokens", "claude-haiku-5-5")
+    assert completion.usage == {"input_tokens": 5, "output_tokens": 2,
+                                "cache_read_input_tokens": 4, "cache_creation_input_tokens": 1}
+    provenance = backend.provenance()
+    assert provenance["model"] == endpoint
+    assert provenance["workspace_host"] == "https://adb-1.2.azuredatabricks.net"
+    assert provenance["databricks_profile"] == "unity-gateway"
+    assert "tok-" not in json.dumps(provenance)
+    assert "sk-not-for-databricks" not in json.dumps(provenance)
+    assert "tok-" not in json.dumps(backend.config.to_dict())
 
 
 def test_openai_compatible_sends_one_user_message_and_redacts_the_url(monkeypatch):

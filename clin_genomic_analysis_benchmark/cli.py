@@ -154,6 +154,7 @@ def compute_gold(cohort: str, max_repair_iters: int, only: str | None,
 @cli.command()
 @click.option("--model", "model_spec", required=True,
               help="<provider>:<model>, e.g. vertex-anthropic:claude-opus-5-5, "
+                   "databricks-anthropic:<gateway-endpoint-name>, "
                    "vertex-openai:google/gemini-3-pro, "
                    "vertex-responses:meta/muse-ember-1.0, azure-openai:gpt-5, "
                    "openai-compatible:google/gemma-4-26b-it.")
@@ -169,8 +170,8 @@ def compute_gold(cohort: str, max_repair_iters: int, only: str | None,
               show_default=True,
               help="Initial retry delay; subsequent delays use exponential backoff.")
 @click.option("--max-tokens", default=None, type=click.IntRange(min=1),
-              help="Reply token limit (default: 32000 for vertex-anthropic, server default "
-                   "otherwise).")
+              help="Reply token limit (default: 32000 for vertex-anthropic and "
+                   "databricks-anthropic, server default otherwise).")
 @click.option("--temperature", default=None, type=float)
 @click.option("--params", default=None,
               help='Extra request fields as JSON, e.g. \'{"reasoning_effort": "high"}\'.')
