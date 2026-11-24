@@ -2,10 +2,12 @@
 
     SCORE = w_assess · assess + w_analyze · analyze
 
-computed per cohort and overall. The two runs must cover the same cohorts,
-have been scored against the same gold bank, and use the same conventions;
-otherwise the halves measure different things and combining is refused unless
-explicitly allowed.
+computed per cohort and overall, where ``assess`` is the assess run's headline
+(balanced exact match) and ``analyze`` the analyze run's points score. Both
+scorecards must come from the current scorer; rescore older runs first. The
+two runs must cover the same cohorts, have been scored against the same gold
+bank, and use the same conventions; otherwise the halves measure different
+things and combining is refused unless explicitly allowed.
 """
 
 from __future__ import annotations
@@ -61,9 +63,11 @@ def _load_scorecard(run_path: str | Path, task: str) -> tuple[Path, dict, str]:
     raw = path.read_bytes()
     card = json.loads(raw)
     if card.get("scorer") != SCORER or card.get("task") != task:
+        hint = ("; rescore it with `clingen-bench score`"
+                if card.get("task") == task else "")
         raise ValueError(
             f"{path} is not a {SCORER} {task} scorecard "
-            f"(scorer={card.get('scorer')!r}, task={card.get('task')!r})")
+            f"(scorer={card.get('scorer')!r}, task={card.get('task')!r}){hint}")
     return run_dir, card, hashlib.sha256(raw).hexdigest()
 
 
@@ -168,7 +172,8 @@ def _markdown(card: dict[str, Any]) -> str:
         "",
         "| task | score | weight |",
         "|---|---:|---:|",
-        f"| assess | {pct(card['overall']['subtask_scores']['assess'])} | {w['assess'] * 100:.0f}% |",
+        f"| assess (balanced exact match) | {pct(card['overall']['subtask_scores']['assess'])} | "
+        f"{w['assess'] * 100:.0f}% |",
         f"| analyze | {pct(card['overall']['subtask_scores']['analyze'])} | "
         f"{w['analyze'] * 100:.0f}% |",
         "",

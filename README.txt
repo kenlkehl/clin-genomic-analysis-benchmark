@@ -1,6 +1,6 @@
 ===============================================================================
 Clinical Genomic Analysis Benchmark — Orientation for Colleagues
-Last updated: 2026-11-04
+Last updated: 2026-11-23
 ===============================================================================
 
 WHAT THIS BENCHMARK IS
@@ -84,14 +84,18 @@ half each (they must cover the same cohorts and be scored against the same
 gold).
 
   * ASSESS: each of the agent's four verdicts is compared with the gold verdict
-    for that part. The reasons are kept for auditing but not scored. Because
-    most parts of most questions are clear, an agent that simply said "clear"
-    every time would look good on plain accuracy. So for each part we use
-    balanced accuracy: the average of (how often the agent caught a part that
-    needs clarification) and (how often it correctly left a clear part alone).
-    Saying "clear" every time scores 50%, as does saying "unclear" every time.
-    The ASSESS score is the average over the four parts. If the model never
-    returns a valid reply for a question, all four verdicts count as wrong.
+    for that part. The reasons are kept for auditing but not scored. A
+    question counts as right only if all four verdicts match the gold. If the
+    model never returns a valid reply for a question, that question is wrong.
+    About half the questions are fully clear, and agents get most of those
+    right, so an agent that simply said "clear" every time would look good on
+    a plain percentage. So the ASSESS score is the average of two rates: the
+    share of clear questions it got exactly right, and the share of ambiguous
+    questions it got exactly right. Saying "clear" every time scores 50%.
+    The scorecard also shows, for each part, how often the agent caught a
+    part that needs clarification and how often it correctly left a clear
+    part alone; the average over the four parts of those per-part scores was
+    the ASSESS score until November 2026 and is still shown for comparison.
 
   * ANALYZE: the agent's number is compared with the gold answer and earns
     2 (within 5%), 1 (5-15% off) or 0 points. The ANALYZE score is points

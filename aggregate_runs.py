@@ -6,11 +6,13 @@ This intentionally excludes deeper archive/grouping directories such as
 ``runs/failed_runs`` and ``runs/contaminated_gpt_cheated``.
 
 Assess runs, analyze runs, and combined scorecards (``runs/combined/<id>``) each
-get a row, labelled by ``task``. Only scorecards from the split-task scorer
-(``deterministic-rules-v4``) are aggregated. Older scorecards (a single run
-holding both tasks, or classify/disambiguate and concept-ID scoring) measure a
-different setup, so they are skipped with a note on stderr rather than mixed
-into the comparison.
+get a row, labelled by ``task``. Only scorecards from the current scorer
+(``deterministic-rules-v5``, whose assess headline is balanced exact match) are
+aggregated. Older scorecards (the v4 mean-of-component-balanced-accuracy
+headline, a single run holding both tasks, or classify/disambiguate and
+concept-ID scoring) are skipped with a note on stderr rather than mixed into
+the comparison; rescore those runs with ``clingen-bench score``. The v4
+headline is kept in the ``previous_assess_score_pct`` column.
 """
 
 from __future__ import annotations
@@ -25,7 +27,7 @@ from typing import Any
 
 from clin_genomic_analysis_benchmark.components import COMPONENT_IDS
 
-SCORER = "deterministic-rules-v4"
+SCORER = "deterministic-rules-v5"
 TASKS = ("assess", "analyze", "combined")
 COMPONENT_METRICS = ("balanced_accuracy", "sensitivity", "specificity")
 
@@ -43,6 +45,10 @@ CSV_FIELDS = (
     "score_pct",
     "assess_score_pct",
     "analyze_score_pct",
+    "exact_match_clear_pct",
+    "exact_match_ambiguous_pct",
+    "exact_match_pct",
+    "previous_assess_score_pct",
     "question_level_accuracy_pct",
     *(
         f"{component}_{metric}_pct"
@@ -154,6 +160,29 @@ def _questions_failed_after_retries(scorecard_path: Path) -> int:
     return len(failed_questions)
 
 
+_EXACT_MATCH_COLUMNS = {   # CSV column -> key under overall.exact_match
+    "exact_match_clear_pct": "clear",
+    "exact_match_ambiguous_pct": "ambiguous",
+    "exact_match_pct": "overall",
+}
+
+
+def _exact_match_columns(assess: dict[str, Any] | None, *, field: str,
+                         path: Path) -> dict[str, str]:
+    """The assess headline's breakdown, plus the scorer-v4 headline."""
+    if assess is None:
+        return {column: "" for column in (*_EXACT_MATCH_COLUMNS, "previous_assess_score_pct")}
+    exact = _mapping(assess.get("exact_match"), field=f"{field}.exact_match", path=path)
+    columns = {
+        column: _percentage(exact.get(key), field=f"{field}.exact_match.{key}", path=path)
+        for column, key in _EXACT_MATCH_COLUMNS.items()
+    }
+    columns["previous_assess_score_pct"] = _percentage(
+        assess.get("mean_component_balanced_accuracy"),
+        field=f"{field}.mean_component_balanced_accuracy", path=path)
+    return columns
+
+
 def _component_columns(assess: dict[str, Any] | None, *, field: str,
                        path: Path) -> dict[str, str]:
     if assess is None:
@@ -227,7 +256,7 @@ def read_scorecard(scorecard_path: Path, runs_dir: Path) -> dict[str, str | int]
     if scorer != SCORER:
         raise IncompatibleScorecard(
             f"{scorecard_path}: scorer {scorer!r} is not {SCORER!r}; scorecards from "
-            "before the assess/analyze split are not comparable"
+            "older scorers are not comparable (rescore the run)"
         )
     task = root.get("task")
     if task not in TASKS:
@@ -288,6 +317,7 @@ def read_scorecard(scorecard_path: Path, runs_dir: Path) -> dict[str, str | int]
             field=f"{assess_field}.classify_accuracy",
             path=scorecard_path,
         ),
+        **_exact_match_columns(assess, field=assess_field, path=scorecard_path),
         **_component_columns(assess, field=assess_field, path=scorecard_path),
         "scorecard": relative_scorecard.as_posix(),
     }

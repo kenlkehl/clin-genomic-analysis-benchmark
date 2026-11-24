@@ -39,5 +39,13 @@ class AssessmentResult:
         return sum(1 for c in self.components if c.correct)
 
     @property
+    def exact_match(self) -> bool:
+        """The question-level verdict: right only if every component is right.
+
+        A failed call has no verdicts, so it is never an exact match.
+        """
+        return bool(self.components) and self.n_correct == len(self.components)
+
+    @property
     def classification_correct(self) -> bool:
         return self.agent_classification == self.gold_classification

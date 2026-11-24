@@ -121,7 +121,7 @@ def test_assess_run_scores_each_component_exactly(tmp_path, monkeypatch):
 
     card = _scorecard(run_dir)
     md = (run_dir / "scorecard.md").read_text()
-    assert card["scorer"] == "deterministic-rules-v4"
+    assert card["scorer"] == "deterministic-rules-v5"
     assert card["task"] == "assess"
     assert card["provenance"]["model"] == "claude-opus-5-5"
     assert card["rulebook"] == _RULEBOOK
@@ -131,6 +131,7 @@ def test_assess_run_scores_each_component_exactly(tmp_path, monkeypatch):
     assert {c["component"]: c["outcome"] for c in assessment["components"]} == {
         "denominator": "tn", "outcome": "tp", "covariates": "fp", "analysis_plan": "fn"}
     assert assessment["n_correct"] == 2
+    assert assessment["exact_match"] is False
     assert assessment["classification_correct"] is True
     assert assessment["agent_rationales"]["outcome"] == "outcome note"
     components = card["overall"]["components"]
@@ -139,6 +140,9 @@ def test_assess_run_scores_each_component_exactly(tmp_path, monkeypatch):
     assert components["covariates"]["specificity"] == 0.0
     assert "analysis" not in card["overall"]
     assert "| `cohort_1-Q1` | cohort_1 | 1 | O+P | O+C | 2/4 |" in md
+    assert card["overall"]["score"] == 0.0
+    assert card["assess_scoring"]["score"] == "balanced_exact_match"
+    assert "- **ASSESS SCORE: 0.0%** — balanced exact match" in md
 
 
 def test_failed_assess_counts_every_component_wrong(tmp_path, monkeypatch):
@@ -152,11 +156,40 @@ def test_failed_assess_counts_every_component_wrong(tmp_path, monkeypatch):
     question = _scorecard(run_dir)["questions"][0]
     assert question["failure_reason"] == "no JSON object in reply"
     assert question["assessment"]["agent_classification"] is None
+    assert question["assessment"]["exact_match"] is False
     assert [c["outcome"] for c in question["assessment"]["components"]] == [
         "fp", "fn", "fp", "fp"]
     assert _scorecard(run_dir)["overall"]["components"]["outcome"]["n_missing"] == 1
     assert "| `cohort_1-Q1` | cohort_1 | 1 | O | failed | 0/4 |" in (
         run_dir / "scorecard.md").read_text()
+
+
+def test_failed_assess_call_is_a_wrong_question(tmp_path, monkeypatch):
+    """A failed call on a gold-clear question costs the clear rate like a wrong verdict."""
+    run_dir = tmp_path / "runs" / "assess_model" / "run-1"
+    _write_run(run_dir, task="assess", records=[
+        _assess_record({"success": True, "result": _assess_result()}, qid="cohort_1-Q1"),
+        _assess_record({"success": False, "failure_reason": "timeout"}, qid="cohort_1-Q2"),
+        _assess_record({"success": True, "result": _assess_result("outcome")},
+                       qid="cohort_1-Q3"),
+    ])
+    monkeypatch.setattr(driver.q_io, "load_gold", lambda cohort: _gold_bank(
+        _unambiguous(answer_type="count", gold_answer={"value": 1}, qid="cohort_1-Q1"),
+        _unambiguous(answer_type="count", gold_answer={"value": 1}, qid="cohort_1-Q2"),
+        _ambiguous("outcome", qid="cohort_1-Q3")))
+
+    driver.score_run(run_path=str(run_dir))
+
+    card = _scorecard(run_dir)
+    exact = card["overall"]["exact_match"]
+    assert (exact["correct_clear"], exact["n_clear"]) == (1, 2)
+    assert (exact["correct_ambiguous"], exact["n_ambiguous"]) == (1, 1)
+    assert card["overall"]["score"] == 0.75    # mean of 1/2 and 1/1
+    assert card["per_cohort"]["cohort_1"]["score"] == 0.75
+    md = (run_dir / "scorecard.md").read_text()
+    assert "- Exact match, gold-clear questions: 50.0% (1/2)" in md
+    assert "- Exact match, all questions: 66.7% (2/3)" in md
+    assert "| cohort_1 | 3 | **75.0%** | 50.0% (1/2) | 100.0% (1/1) |" in md
 
 
 def test_assess_run_lists_gold_questions_it_missed(tmp_path, monkeypatch):
@@ -332,7 +365,7 @@ def _scored(qid: str, gold: dict[str, bool], agent: dict[str, bool] | None) -> Q
 
 
 def test_always_clear_model_scores_half_on_assess():
-    """Balanced accuracy, not plain accuracy: answering "clear" everywhere is 50%."""
+    """Balanced, not plain: answering "clear" everywhere is 50%, whatever the bank's mix."""
     qs = [_scored("u", _flags(*COMPONENT_IDS), _flags())]
     qs += [_scored(f"c{i}", _flags(), _flags()) for i in range(3)]
     overall, _ = aggregate_assess(qs)
@@ -340,6 +373,51 @@ def test_always_clear_model_scores_half_on_assess():
         tally = overall.components[cid]
         assert tally.accuracy == 0.75
         assert tally.balanced_accuracy == 0.5
+    assert overall.exact_match.overall == 0.75
+    assert overall.score == 0.5
+    assert overall.mean_component_balanced_accuracy == 0.5
+
+
+def test_assess_score_is_mean_of_clear_and_ambiguous_exact_match():
+    qs = [
+        _scored("c1", _flags(), _flags()),
+        _scored("c2", _flags(), _flags()),
+        _scored("c3", _flags(), _flags()),
+        _scored("c4", _flags(), _flags("covariates")),                 # wrong
+        _scored("a1", _flags("outcome"), _flags("outcome")),
+        _scored("a2", _flags("denominator"), _flags("outcome")),       # wrong
+    ]
+    overall, per_cohort = aggregate_assess(qs)
+    exact = overall.exact_match
+    assert (exact.correct_clear, exact.n_clear) == (3, 4)
+    assert (exact.correct_ambiguous, exact.n_ambiguous) == (1, 2)
+    assert exact.clear == 0.75 and exact.ambiguous == 0.5
+    assert overall.score == pytest.approx((0.75 + 0.5) / 2)
+    assert exact.overall == pytest.approx(4 / 6)      # not the headline
+    assert per_cohort["c"].score == overall.score
+    assert overall.by_category[1].score == overall.score
+
+
+def test_one_wrong_component_makes_the_question_wrong():
+    qs = [_scored("a", _flags("outcome", "analysis_plan"), _flags("outcome")),
+          _scored("b", _flags(), _flags())]
+    overall, _ = aggregate_assess(qs)
+    assert qs[0].assessment.n_correct == 3
+    assert qs[0].assessment.exact_match is False
+    assert qs[0].assessment.classification_correct is True   # looser, diagnostic only
+    assert overall.exact_match.ambiguous == 0.0
+    assert overall.exact_match.clear == 1.0
+    assert overall.score == 0.5
+    # The per-component view still credits three of the four verdicts.
+    assert overall.mean_component_balanced_accuracy == pytest.approx(0.875)
+
+
+def test_failed_call_is_never_an_exact_match():
+    qs = [_scored("a", _flags(), None), _scored("b", _flags(), _flags())]
+    overall, _ = aggregate_assess(qs)
+    assert qs[0].assessment.exact_match is False
+    assert overall.exact_match.clear == 0.5
+    assert overall.exact_match.single_class is True   # no gold-ambiguous question
     assert overall.score == 0.5
 
 
@@ -359,10 +437,11 @@ def test_single_class_component_uses_the_defined_rate():
 
 @pytest.fixture
 def scored_pair(tmp_path, monkeypatch):
-    """A scored assess run (score 0.75 on Q1) and analyze run (score 0.5)."""
+    """A scored assess run (balanced exact match 0.75) and analyze run (score 0.5)."""
     gold = _gold_bank(_unambiguous(answer_type="count", gold_answer={"value": 10}),
                       _unambiguous(answer_type="count", gold_answer={"value": 5},
-                                   qid="cohort_1-Q2"))
+                                   qid="cohort_1-Q2"),
+                      _ambiguous("outcome", qid="cohort_1-Q3"))
     monkeypatch.setattr(driver.q_io, "load_gold", lambda cohort: gold)
     monkeypatch.setattr(combine, "RUNS_DIR", tmp_path / "runs")
     assess_dir = tmp_path / "runs" / "assess_model" / "run-a"
@@ -370,6 +449,8 @@ def scored_pair(tmp_path, monkeypatch):
         _assess_record({"success": True, "result": _assess_result()}),
         _assess_record({"success": True, "result": _assess_result("outcome")},
                        qid="cohort_1-Q2"),
+        _assess_record({"success": True, "result": _assess_result("outcome")},
+                       qid="cohort_1-Q3"),
     ])
     analyze_dir = tmp_path / "runs" / "agent" / "run-b"
     _write_run(analyze_dir, task="analyze", provenance={"model": "m-analyze"}, records=[
@@ -383,7 +464,10 @@ def scored_pair(tmp_path, monkeypatch):
 
 def test_combine_weights_the_two_tasks(scored_pair):
     assess_dir, analyze_dir = scored_pair
-    assess_score = _scorecard(assess_dir)["overall"]["score"]
+    assess_overall = _scorecard(assess_dir)["overall"]
+    assess_score = assess_overall["score"]
+    assert assess_score == 0.75                       # clear 1/2, ambiguous 1/1
+    assert assess_overall["mean_component_balanced_accuracy"] == 0.9375   # not used
     assert _scorecard(analyze_dir)["overall"]["score"] == 0.5
 
     out = combine.combine_runs(assess_run=assess_dir, analyze_run=analyze_dir, run_id="c1")
@@ -424,8 +508,17 @@ def test_combine_refuses_different_gold_or_conventions(scored_pair):
 
 def test_combine_needs_one_run_of_each_task(scored_pair):
     assess_dir, _ = scored_pair
-    with pytest.raises(ValueError, match="not a deterministic-rules-v4 analyze scorecard"):
+    with pytest.raises(ValueError, match="not a deterministic-rules-v5 analyze scorecard"):
         combine.combine_runs(assess_run=assess_dir, analyze_run=assess_dir)
+
+
+def test_combine_refuses_a_scorecard_from_an_older_scorer(scored_pair):
+    assess_dir, analyze_dir = scored_pair
+    card = _scorecard(assess_dir)
+    card["scorer"] = "deterministic-rules-v4"
+    (assess_dir / "scorecard.json").write_text(json.dumps(card))
+    with pytest.raises(ValueError, match="scorer='deterministic-rules-v4'.*rescore it"):
+        combine.combine_runs(assess_run=assess_dir, analyze_run=analyze_dir)
 
 
 def test_subtask_weights_are_validated():

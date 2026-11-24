@@ -75,7 +75,7 @@ Weights live in `scoring_configs/default.yaml` if you want something other than 
 | analyze | 65.0% |    50% |
 ```
 
-followed by a per-cohort table. Each run's own scorecard has the detail: for assess, a per-component table (sensitivity, specificity, balanced accuracy, accuracy, missing verdicts); for analyze, points and bands per cohort, category, and answer type; and for both, one row per question.
+followed by a per-cohort table. Each run's own scorecard has the detail: for assess, exact match on gold-clear questions, on gold-ambiguous questions, and overall, the previous metric, and a per-component table (sensitivity, specificity, balanced accuracy, accuracy, missing verdicts); for analyze, points and bands per cohort, category, and answer type; and for both, one row per question.
 
 ### 1. Assess
 
@@ -101,9 +101,9 @@ The model returns one verdict per component with a short rationale:
 
 A question is **ambiguous** if any component needs clarification and **unambiguous** if none does. `ASSESS_INSTRUCTIONS.md` catalogs what each component must pin down to be clear.
 
-Every question in the bank is assessed. Scoring is exact and deterministic — no semantic matcher, no LLM call. Each verdict is compared with the gold verdict for that component; the rationale is recorded for auditing but never scored. The assess score is the **mean over the four components of balanced accuracy**: the average of the hit rate on gold "needs clarification" verdicts and the hit rate on gold "clear" verdicts. Most gold verdicts are "clear", so plain accuracy would reward a model that calls every component clear; balanced accuracy scores that strategy (and its opposite) at 50%. A call that never returns a valid reply (after its retries) counts as wrong on every component. Where a slice of the bank has only one gold class for a component (e.g. a cohort where no question leaves covariates unclear), that component's balanced accuracy is the one defined rate, and the scorecard marks it single-class.
+Every question in the bank is assessed. Scoring is exact and deterministic — no semantic matcher, no LLM call. Each verdict is compared with the gold verdict for that component; the rationale is recorded for auditing but never scored. A question's assess verdict is correct only if **all four** component verdicts match gold (exact match); a call that never returns a valid reply (after its retries) counts as wrong. About half the bank is gold-clear, and models get most of those right, so a plain exact-match rate would depend on how many clear questions the bank happens to hold. The assess score is therefore **balanced exact match**: the mean of the exact-match rate on gold-clear questions and the exact-match rate on gold-ambiguous questions. A model that calls every question clear scores 50%. Where a slice of the bank holds only one gold class (e.g. a cohort or category with no gold-ambiguous question), its score is the one defined rate, and the scorecard marks it single-class.
 
-The scorecard also reports question-level ambiguous/unambiguous accuracy derived from the verdicts. It is diagnostic only: it is implied by the component verdicts and is not part of the score.
+The scorecard also reports, as diagnostics outside the score: the per-component table (where a slice has only one gold class for a component, its balanced accuracy is the one defined rate, marked single-class); question-level ambiguous/unambiguous accuracy derived from the verdicts, which is looser than exact match; and the **previous metric**, the mean over the four components of balanced accuracy, which was the headline up to scorer v4. `combine` and `aggregate_runs.py` accept only current (v5) scorecards; rescore older runs with `clingen-bench score`, which makes no model calls.
 
 ### 2. Analyze
 

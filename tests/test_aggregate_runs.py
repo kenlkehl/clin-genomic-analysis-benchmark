@@ -35,6 +35,8 @@ def _write_manifest(path: Path, failed_after_retries: int, history: str) -> None
 def _assess_overall(score: float | None, balanced: float | None = 0.7,
                     question_level: float | None = 0.8) -> dict:
     return {"n": 205, "score": score, "classify_accuracy": question_level,
+            "exact_match": {"clear": 0.9, "ambiguous": 0.6, "overall": 0.76},
+            "mean_component_balanced_accuracy": balanced,
             "components": _components(balanced)}
 
 
@@ -42,7 +44,7 @@ def _write_assess(path: Path, *, run_name: str, run_id: str, score: float | None
                   balanced: float | None = 0.7, failed_after_retries: int = 0) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({
-        "scorer": "deterministic-rules-v4",
+        "scorer": "deterministic-rules-v5",
         "task": "assess",
         "run_name": run_name,
         "run_id": run_id,
@@ -57,7 +59,7 @@ def _write_analyze(path: Path, *, run_name: str, run_id: str, score: float | Non
                    failed_after_retries: int = 0) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({
-        "scorer": "deterministic-rules-v4",
+        "scorer": "deterministic-rules-v5",
         "task": "analyze",
         "run_name": run_name,
         "run_id": run_id,
@@ -110,6 +112,10 @@ def test_aggregate_runs_reads_each_task_from_active_two_level_scorecards(
         "score_pct": "80.0",
         "assess_score_pct": "80.0",
         "analyze_score_pct": "",
+        "exact_match_clear_pct": "90.0",
+        "exact_match_ambiguous_pct": "60.0",
+        "exact_match_pct": "76.0",
+        "previous_assess_score_pct": "70.0",
         "question_level_accuracy_pct": "80.0",
         "scorecard": "assess_b/run-2/scorecard.json",
     }
@@ -123,6 +129,7 @@ def test_aggregate_runs_reads_each_task_from_active_two_level_scorecards(
     analyze = rows[0]
     assert analyze["score_pct"] == analyze["analyze_score_pct"] == "50.0"
     assert analyze["assess_score_pct"] == ""
+    assert analyze["exact_match_pct"] == analyze["previous_assess_score_pct"] == ""
     assert analyze["denominator_balanced_accuracy_pct"] == ""
     assert analyze["effort"] == "high"
     assert analyze["questions_failed_after_retries"] == "1"
@@ -135,7 +142,7 @@ def test_aggregate_runs_reads_combined_scorecards(tmp_path: Path) -> None:
     path = runs_dir / "combined" / "c1" / "scorecard.json"
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps({
-        "scorer": "deterministic-rules-v4",
+        "scorer": "deterministic-rules-v5",
         "task": "combined",
         "run_name": "combined",
         "run_id": "c1",
@@ -161,17 +168,19 @@ def test_aggregate_runs_reads_combined_scorecards(tmp_path: Path) -> None:
     assert (row["score_pct"], row["assess_score_pct"], row["analyze_score_pct"]) == (
         "65.0", "80.0", "50.0")
     assert row["question_level_accuracy_pct"] == "80.0"
+    assert row["exact_match_ambiguous_pct"] == "60.0"
     assert row["denominator_balanced_accuracy_pct"] == "70.0"
     assert row["questions_scored"] == "205"
 
 
-def test_aggregate_runs_skips_scorecards_from_before_the_split(
+def test_aggregate_runs_skips_scorecards_from_older_scorers(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     runs_dir = tmp_path / "runs"
     _write_assess(runs_dir / "assess_a" / "run-1" / "scorecard.json",
                   run_name="assess_a", run_id="run-1", score=0.5)
-    for scorer in ("deterministic-rules-v2", "deterministic-rules-v3"):
+    for scorer in ("deterministic-rules-v2", "deterministic-rules-v3",
+                   "deterministic-rules-v4"):
         old = runs_dir / f"agent-{scorer}" / "run-old" / "scorecard.json"
         old.parent.mkdir(parents=True)
         old.write_text(json.dumps({"scorer": scorer, "agent_name": "a", "run_id": "r",
@@ -182,8 +191,8 @@ def test_aggregate_runs_skips_scorecards_from_before_the_split(
 
     assert [row["run_name"] for row in _rows(output_path)] == ["assess_a"]
     err = capsys.readouterr().err
-    assert "Skipped 2 scorecard(s)" in err
-    assert "deterministic-rules-v3" in err
+    assert "Skipped 3 scorecard(s)" in err
+    assert "deterministic-rules-v4" in err
 
 
 def test_aggregate_runs_sorts_unscored_runs_last_within_a_task(tmp_path: Path) -> None:
@@ -266,4 +275,7 @@ def test_aggregate_runs_reads_scorecards_the_scorer_writes(tmp_path: Path, monke
     by_task = {row["task"]: row for row in _rows(output_path)}
     assert by_task["analyze"]["score_pct"] == "100.0"
     assert by_task["assess"]["question_level_accuracy_pct"] == "100.0"
+    assert by_task["assess"]["exact_match_clear_pct"] == "100.0"
+    assert by_task["assess"]["exact_match_ambiguous_pct"] == ""      # no gold-ambiguous
+    assert by_task["assess"]["previous_assess_score_pct"] == "100.0"
     assert by_task["combined"]["score_pct"] != ""

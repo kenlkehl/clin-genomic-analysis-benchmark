@@ -27,7 +27,8 @@ def score_assessment(
     """Compare the agent's ``needs_clarification`` verdicts with gold.
 
     ``agent_flags`` is None when the assess call failed; every component then
-    counts as wrong. Rationales are recorded but never scored.
+    counts as wrong, and so does the question (``exact_match`` is False).
+    Rationales are recorded but never scored.
     """
     gold_classification = classification_from_flags(gold_flags)
     agent_classification = (

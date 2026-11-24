@@ -7,9 +7,9 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Optional, Union
 
 from ..components import COMPONENT_IDS, COMPONENTS_BY_ID
-from .aggregator import AnalyzeAgg, AssessAgg, QuestionScore
+from .aggregator import AnalyzeAgg, AssessAgg, ExactMatchTally, QuestionScore
 
-SCORER = "deterministic-rules-v4"
+SCORER = "deterministic-rules-v5"
 
 # Short codes for the per-question table, e.g. "O+P" = outcome and analysis
 # plan need clarification.
@@ -37,6 +37,14 @@ class Scorecard:
 
 def pct(value: Optional[float]) -> str:
     return f"{value * 100:.1f}%" if value is not None else "—"
+
+
+def _fraction(correct: int, n: int) -> str:
+    return f"{pct(correct / n)} ({correct}/{n})" if n else "—"
+
+
+def _headline(tally: ExactMatchTally) -> str:
+    return f"**{pct(tally.balanced)}**" + (" (single-class)" if tally.single_class else "")
 
 
 def _flag_code(flags: dict[str, Optional[bool]]) -> str:
@@ -98,12 +106,23 @@ def _header(lines: list[str], card: Scorecard) -> None:
 
 def _assess_markdown(card: Scorecard, lines: list[str]) -> None:
     overall: AssessAgg = card.overall  # type: ignore[assignment]
-    lines.append(f"- **ASSESS SCORE: {pct(overall.score)}** — mean over the four components "
-                 "of balanced accuracy")
+    em = overall.exact_match
+    lines.append(f"- **ASSESS SCORE: {pct(overall.score)}** — balanced exact match: the mean "
+                 "of the exact-match rates on gold-clear and gold-ambiguous questions. A "
+                 "question is an exact match only if all four component verdicts match gold; "
+                 "a failed call is never one.")
+    lines.append(f"- Exact match, gold-clear questions: "
+                 f"{_fraction(em.correct_clear, em.n_clear)}")
+    lines.append(f"- Exact match, gold-ambiguous questions: "
+                 f"{_fraction(em.correct_ambiguous, em.n_ambiguous)}")
+    lines.append(f"- Exact match, all questions: "
+                 f"{_fraction(em.correct_clear + em.correct_ambiguous, em.n)}")
+    lines.append(f"- Previous metric (scorer v4: mean over the four components of balanced "
+                 f"accuracy): {pct(overall.mean_component_balanced_accuracy)}")
     lines.append("")
     lines.append("## Components\n")
-    lines.append("Positive = needs clarification. A failed call counts as wrong for every "
-                 "component.\n")
+    lines.append("Diagnostic; not part of the score. Positive = needs clarification. A failed "
+                 "call counts as wrong for every component.\n")
     lines.append("| component | gold unclear / n | sensitivity | specificity "
                  "| balanced acc | accuracy | no verdict |")
     lines.append("|---|---:|---:|---:|---:|---:|---:|")
@@ -119,26 +138,36 @@ def _assess_markdown(card: Scorecard, lines: list[str]) -> None:
                  f"verdicts; diagnostic): {pct(overall.classify_accuracy)}")
 
     lines.append("\n## Per cohort\n")
-    lines.append("| cohort | n | assess | "
+    lines.append("assess = balanced exact match; clear / ambiguous = exact match on gold-clear / "
+                 "gold-ambiguous questions.\n")
+    lines.append("| cohort | n | assess | clear | ambiguous | "
                  + " | ".join(f"{_CODES[cid]} bal acc" for cid in COMPONENT_IDS) + " |")
-    lines.append("|---|---:|---:|" + "---:|" * len(COMPONENT_IDS))
+    lines.append("|---|---:|---:|---:|---:|" + "---:|" * len(COMPONENT_IDS))
     for name in sorted(card.per_cohort):
         a: AssessAgg = card.per_cohort[name]  # type: ignore[assignment]
+        t = a.exact_match
         comps = " | ".join(pct(a.components[cid].balanced_accuracy) for cid in COMPONENT_IDS)
-        lines.append(f"| {name} | {a.n} | **{pct(a.score)}** | {comps} |")
+        lines.append(f"| {name} | {a.n} | {_headline(t)} | "
+                     f"{_fraction(t.correct_clear, t.n_clear)} | "
+                     f"{_fraction(t.correct_ambiguous, t.n_ambiguous)} | {comps} |")
 
     lines.append("\n## Per category (aggregate across cohorts)\n")
-    lines.append("| cat | n | verdict acc | question-level acc |")
-    lines.append("|---:|---:|---:|---:|")
+    lines.append("| cat | n | assess | clear | ambiguous | verdict acc | question-level acc |")
+    lines.append("|---:|---:|---:|---:|---:|---:|---:|")
     for cid in sorted(overall.by_category):
         c = overall.by_category[cid]
+        t = c.exact_match
         verdict_acc = c.verdicts_correct / c.verdicts_n if c.verdicts_n else None
         cls_acc = c.classify_correct / c.n if c.n else None
-        lines.append(f"| {cid} | {c.n} | {pct(verdict_acc)} | {pct(cls_acc)} |")
+        lines.append(f"| {cid} | {c.n} | {_headline(t)} | "
+                     f"{_fraction(t.correct_clear, t.n_clear)} | "
+                     f"{_fraction(t.correct_ambiguous, t.n_ambiguous)} | "
+                     f"{pct(verdict_acc)} | {pct(cls_acc)} |")
 
     lines.append("\n## Per question\n")
     lines.append("Components needing clarification: D = denominator, O = outcome, "
-                 "C = covariates, P = analysis plan.\n")
+                 "C = covariates, P = analysis plan. A question is an exact match only "
+                 "at 4/4.\n")
     lines.append("| qid | cohort | cat | gold | model | verdicts correct |")
     lines.append("|---|---|---:|---|---|---:|")
     for q in sorted(card.question_scores, key=lambda x: (x.cohort, x.category, x.question_id)):
@@ -211,6 +240,9 @@ def _agg_to_dict(agg: Agg) -> dict:
     d = asdict(agg)
     if isinstance(agg, AssessAgg):
         d["components"] = {cid: tally.to_dict() for cid, tally in agg.components.items()}
+        d["exact_match"] = agg.exact_match.to_dict()
+        for cat_id, cat in agg.by_category.items():
+            d["by_category"][cat_id]["exact_match"] = cat.exact_match.to_dict()
     return d
 
 
@@ -220,6 +252,7 @@ def _question_to_dict(q: QuestionScore) -> dict:
         d["analysis"]["band"] = q.analysis.band.value
     if q.assessment is not None:
         d["assessment"]["n_correct"] = q.assessment.n_correct
+        d["assessment"]["exact_match"] = q.assessment.exact_match
         d["assessment"]["classification_correct"] = q.assessment.classification_correct
     return d
 
@@ -242,10 +275,11 @@ def to_dict(card: Scorecard) -> dict[str, Any]:
     }
     if card.task == "assess":
         out["assess_scoring"] = {
-            "match": "exact_component_verdict",
+            "match": "exact_question_verdict",   # all four component verdicts
             "components": list(COMPONENT_IDS),
-            "score": "mean_balanced_accuracy",
+            "score": "balanced_exact_match",     # mean of gold-clear and gold-ambiguous rates
             "missing_verdict": "counted_wrong",
+            "previous_score": "mean_component_balanced_accuracy",   # the scorer-v4 headline
         }
     else:
         out["analyze_scoring"] = {

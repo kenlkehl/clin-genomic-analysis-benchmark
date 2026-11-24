@@ -2,11 +2,13 @@
 
 Each task is scored on its own, as a fraction in [0, 1]:
 
-  assess  — the mean over the four components of balanced accuracy, i.e. the
-            average of the hit rate on gold "needs clarification" verdicts and
-            on gold "clear" verdicts. Most gold verdicts are "clear", so plain
-            accuracy would reward answering "clear" everywhere; balanced
-            accuracy scores that (and its opposite) at 50%.
+  assess  — balanced exact match. A question is right only if all four
+            component verdicts match gold; a failed call is wrong. The score is
+            the mean of the exact-match rates on gold-clear and gold-ambiguous
+            questions, so the bank's mix of the two (about half are clear, and
+            clear questions are the easy ones) does not set the score. Per-
+            component balanced accuracy is kept as a diagnostic, and its mean
+            (the scorer-v4 headline) is reported as the previous metric.
   analyze — 2/1/0 points per gold-unambiguous question, over 2 points per
             question. Every such question is attempted; a failed one scores 0.
 
@@ -87,6 +89,62 @@ class ComponentTally:
 
 
 @dataclass
+class ExactMatchTally:
+    """Question-level exact matches (all four verdicts right), split by the
+    gold class of the question."""
+    n_clear: int = 0
+    correct_clear: int = 0
+    n_ambiguous: int = 0
+    correct_ambiguous: int = 0
+
+    @property
+    def n(self) -> int:
+        return self.n_clear + self.n_ambiguous
+
+    @property
+    def clear(self) -> Optional[float]:
+        return _rate(self.correct_clear, self.n_clear)
+
+    @property
+    def ambiguous(self) -> Optional[float]:
+        return _rate(self.correct_ambiguous, self.n_ambiguous)
+
+    @property
+    def overall(self) -> Optional[float]:
+        return _rate(self.correct_clear + self.correct_ambiguous, self.n)
+
+    @property
+    def single_class(self) -> bool:
+        """True when the slice holds only clear or only ambiguous gold questions."""
+        return self.n > 0 and (self.clear is None or self.ambiguous is None)
+
+    @property
+    def balanced(self) -> Optional[float]:
+        """Mean of the defined class rates; one rate alone if gold is single-class."""
+        rates = [r for r in (self.clear, self.ambiguous) if r is not None]
+        return sum(rates) / len(rates) if rates else None
+
+    def add(self, *, gold_ambiguous: bool, correct: bool) -> None:
+        if gold_ambiguous:
+            self.n_ambiguous += 1
+            self.correct_ambiguous += int(correct)
+        else:
+            self.n_clear += 1
+            self.correct_clear += int(correct)
+
+    def to_dict(self) -> dict:
+        return {
+            "n_clear": self.n_clear, "correct_clear": self.correct_clear,
+            "n_ambiguous": self.n_ambiguous, "correct_ambiguous": self.correct_ambiguous,
+            "clear": self.clear,
+            "ambiguous": self.ambiguous,
+            "overall": self.overall,
+            "balanced": self.balanced,
+            "single_class": self.single_class,
+        }
+
+
+@dataclass
 class QuestionScore:
     question_id: str
     cohort: str
@@ -108,32 +166,43 @@ def _band_counts() -> dict[str, int]:
 class AssessCategoryAgg:
     category: int
     n: int = 0
+    exact_match: ExactMatchTally = field(default_factory=ExactMatchTally)
     verdicts_correct: int = 0
     verdicts_n: int = 0
     classify_correct: int = 0
+    score: Optional[float] = None     # balanced exact match
 
 
 @dataclass
 class AssessAgg:
     cohort: str
     n: int = 0
+    exact_match: ExactMatchTally = field(default_factory=ExactMatchTally)
     components: dict[str, ComponentTally] = field(
         default_factory=lambda: {cid: ComponentTally() for cid in COMPONENT_IDS})
-    # Question-level ambiguous/unambiguous, derived from the verdicts. Not part
-    # of the score (it is implied by the component verdicts); diagnostic.
+    # Question-level ambiguous/unambiguous, derived from the verdicts. Looser
+    # than exact match (any unclear verdict on a gold-ambiguous question
+    # counts); diagnostic.
     classify_correct: int = 0
     classify_accuracy: Optional[float] = None
     by_category: dict[int, AssessCategoryAgg] = field(default_factory=dict)
-    score: Optional[float] = None
+    # The scorer-v4 headline, kept so runs scored before v5 stay comparable.
+    mean_component_balanced_accuracy: Optional[float] = None
+    score: Optional[float] = None     # balanced exact match
 
 
 def _accumulate_assess(agg: AssessAgg, q: QuestionScore) -> None:
     agg.n += 1
     cat = agg.by_category.setdefault(q.category, AssessCategoryAgg(category=q.category))
     cat.n += 1
-    if q.assessment is None:
+    a = q.assessment
+    # A question with no assessment at all is wrong, like a failed call.
+    gold_ambiguous = (a.gold_classification if a else q.gold_classification) == "ambiguous"
+    for tally in (agg.exact_match, cat.exact_match):
+        tally.add(gold_ambiguous=gold_ambiguous, correct=a is not None and a.exact_match)
+    if a is None:
         return
-    for c in q.assessment.components:
+    for c in a.components:
         agg.components[c.component].add(c.outcome, missing=c.agent_needs_clarification is None)
         cat.verdicts_n += 1
         cat.verdicts_correct += int(c.correct)
@@ -147,7 +216,10 @@ def _finalise_assess(agg: AssessAgg) -> AssessAgg:
         agg.classify_accuracy = agg.classify_correct / agg.n
     bal = [t.balanced_accuracy for t in agg.components.values()
            if t.balanced_accuracy is not None]
-    agg.score = sum(bal) / len(bal) if bal else None
+    agg.mean_component_balanced_accuracy = sum(bal) / len(bal) if bal else None
+    agg.score = agg.exact_match.balanced
+    for cat in agg.by_category.values():
+        cat.score = cat.exact_match.balanced
     return agg
 
 
