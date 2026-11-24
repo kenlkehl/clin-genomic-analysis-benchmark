@@ -1,5 +1,5 @@
 cohort: bladder_1.2
-generated_at: '2026-11-24T00:20:46.312320Z'
+generated_at: '2026-11-24T00:25:50.528835Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -199,15 +199,18 @@ questions:
     samples have either a fusion involving FGFR3 or an activating FGFR3 mutation?
 - id: bladder_1.2-Qa1524899
   category: 8
-  text: Among patients with Stage IV bladder cancer receiving first-line platinum-based
-    chemotherapy without concurrent immunotherapy for the cancer, does an ERCC2 mutation
-    (restricted to patients whose sequencing panel covers ERCC2) modify the effect
-    of cisplatin- versus carboplatin-containing regimens on overall survival from
-    regimen start, as assessed by the interaction-term p-value in a Cox proportional
-    hazards model, with risk-set adjustment for delayed cohort entry (left-truncating
-    at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
-    regimen? (Treat 'bladder cancer' here as cancer of any histology arising from
-    either the urinary bladder or the upper urinary tract / renal pelvis.)
+  text: Among patients with Stage IV bladder cancer at diagnosis whose first regimen
+    for the cancer contained cisplatin or carboplatin and no immune checkpoint inhibitor,
+    does an ERCC2 mutation (any non-synonymous ERCC2 mutation on the first sequenced
+    specimen, restricted to patients whose first sequenced specimen was on a panel
+    covering ERCC2) modify the effect of cisplatin-containing regimens (with or without
+    carboplatin) versus carboplatin-containing regimens without cisplatin on overall
+    survival from regimen start, as assessed by the interaction-term p-value in a
+    Cox proportional hazards model with both main effects, with risk-set adjustment
+    for delayed cohort entry (left-truncating at NGS testing date), excluding patients
+    whose first regimen was a clinical-trial regimen? (Treat 'bladder cancer' here
+    as cancer of any histology arising from either the urinary bladder or the upper
+    urinary tract / renal pelvis.)
 - id: bladder_1.2-Qb3f6a73a
   category: 5
   text: Among regimens containing cisplatin administered for bladder cancer, what
