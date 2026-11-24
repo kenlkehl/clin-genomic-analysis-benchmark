@@ -1,5 +1,5 @@
 cohort: prostate_1.2
-generated_at: '2026-11-23T22:11:29.800877Z'
+generated_at: '2026-11-24T00:20:46.312320Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -38,12 +38,12 @@ questions:
     regimen did not contain abiraterone acetate.
 - id: prostate_1.2-Q8e4139df
   category: 2
-  text: Among patients in the prostate cancer cohort, how many had an initial prostate
-    cancer Gleason score of 9 or 10?
+  text: Among patients in the prostate cancer cohort, how many had an initial clinical
+    prostate cancer Gleason score of 9 or 10?
 - id: prostate_1.2-Q94868401
   category: 1
   text: How many unique patients in the prostate cancer cohort self-identify as Non-Hispanic
-    Black?
+    Black? (Use the data source's combined race/ethnicity categories.)
 - id: prostate_1.2-Q95d5d662
   category: 6
   text: In the prostate cancer cohort, what is the Cox PH hazard ratio (95% CI, p-value)
@@ -59,12 +59,13 @@ questions:
     1940?
 - id: prostate_1.2-Q9e43be6a
   category: 2
-  text: Among patients in the prostate cohort diagnosed with stage IV prostate cancer,
-    what proportion had bone metastases at diagnosis (within 30 days of diagnosis)?
+  text: Among patients in the prostate cohort whose prostate cancer was Stage IV at
+    diagnosis, what proportion had bone metastases at diagnosis (within 30 days of
+    diagnosis, as the data source records bone metastases and their dates)?
 - id: prostate_1.2-Qa6e104e6
   category: 2
   text: What proportion of patients in the prostate cancer cohort had Stage IV prostate
-    cancer at diagnosis?
+    cancer at diagnosis, excluding patients whose stage at diagnosis is unknown?
 - id: prostate_1.2-Qafe15a6b
   category: 7
   text: Among patients whose prostate cancer was Stage IV at diagnosis and later became
@@ -99,12 +100,14 @@ questions:
     had a tumor with a TP53 mutation?
 - id: prostate_1.2-Q0358d0d9
   category: 6
-  text: In the prostate cancer cohort, what is the Cox proportional-hazards hazard
-    ratio (with 95% CI and p-value) for overall survival from the onset of advanced
-    disease, comparing patients whose tumors carry any non-synonymous TP53 mutation
-    versus patients with TP53-wildtype tumors, restricting the denominator to patients
-    whose cancer panel test used an assay whose gene panel includes TP53, with risk-set
-    adjustment for delayed cohort entry (left-truncating at NGS testing date)?
+  text: Among patients in the prostate cancer cohort whose cancer became advanced
+    (as the data source defines advanced disease), what is the Cox proportional-hazards
+    hazard ratio (with 95% CI and p-value) for overall survival from the onset of
+    advanced disease, comparing patients whose first sequenced specimen had any non-synonymous
+    TP53 mutation versus patients whose first sequenced specimen did not, restricted
+    to patients whose first sequenced specimen was on a panel that includes TP53,
+    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
+    date)?
 - id: prostate_1.2-Q08118ced
   category: 4
   text: Among patients whose prostate cancer was Stage IV at diagnosis and later became
@@ -142,7 +145,7 @@ questions:
 - id: prostate_1.2-Q714edb70
   category: 1
   text: What is the most common race/ethnicity group among patients in the prostate
-    cancer cohort?
+    cancer cohort? (Use the data source's combined race/ethnicity categories.)
 - id: prostate_1.2-Q7ea929fe
   category: 8
   text: Among patients whose prostate cancer was Stage IV at diagnosis and later became
@@ -203,12 +206,13 @@ questions:
     (left-truncating at NGS testing date), excluding clinical-trial regimens?
 - id: prostate_1.2-Qf17acd7c
   category: 8
-  text: Among patients with Stage IV prostate cancer receiving a first regimen for
-    the cancer, is there a statistically significant interaction between PTEN homozygous
-    deletion (versus PTEN copy-number neutral or amplified) and docetaxel exposure
-    (docetaxel-containing vs non-docetaxel-containing first regimen) on overall survival
-    from regimen start, restricted to tumors assayed on panels that cover PTEN, fit
-    using a Cox proportional hazards model with a treatment-by-biomarker interaction
+  text: Among patients with Stage IV prostate cancer at diagnosis who received a first
+    regimen for the cancer, what is the p-value for the interaction between PTEN homozygous
+    deletion (versus PTEN copy-number neutral or amplified) on the first sequenced
+    specimen with copy-number results and docetaxel exposure (docetaxel-containing
+    vs non-docetaxel-containing first regimen) on overall survival from regimen start,
+    restricted to patients whose specimen was on a panel covering PTEN, in a Cox proportional
+    hazards model with both main effects and a treatment-by-biomarker interaction
     term, with risk-set adjustment for delayed cohort entry (left-truncating at NGS
     testing date), assuming any clinical-trial regimen did not contain docetaxel?
     (Count each BPC regimen record as a regimen, including separately curated LHRH-agonist
