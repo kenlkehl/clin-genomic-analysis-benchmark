@@ -1,13 +1,13 @@
 cohort: nsclc_2.0_public
-generated_at: '2026-11-24T00:25:50.528835Z'
+generated_at: '2026-11-24T00:40:31.583438Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
 - id: nsclc_2.0_public-Q00fa95f4
   category: 2
-  text: Among patients with a Stage I-III NSCLC diagnosis, how many developed a distant
-    metastasis after diagnosis, as the data source records distant metastases? (Include
-    all NSCLC histologic subtypes in the cohort.)
+  text: Among patients whose NSCLC was Stage I–III at diagnosis, how many developed
+    a distant metastasis after diagnosis, as the data source records distant metastases?
+    (Include all NSCLC histologic subtypes in the cohort.)
 - id: nsclc_2.0_public-Q566b7369
   category: 1
   text: What proportion of patients in the non-small cell lung cancer cohort are female?
@@ -15,7 +15,8 @@ questions:
 - id: nsclc_2.0_public-Q75afd228
   category: 2
   text: Among non-small cell lung cancers with curated histology, what proportion
-    are classified as adenocarcinoma? (Include all NSCLC histologic subtypes.)
+    are classified as adenocarcinoma in the data source's curated histology categories?
+    (Include all NSCLC histologic subtypes.)
 - id: nsclc_2.0_public-Q9027ef59
   category: 1
   text: Among patients with Stage IV NSCLC at diagnosis, what proportion were former

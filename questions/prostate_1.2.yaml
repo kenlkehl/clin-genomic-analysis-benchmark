@@ -1,5 +1,5 @@
 cohort: prostate_1.2
-generated_at: '2026-11-24T00:25:50.528835Z'
+generated_at: '2026-11-24T00:40:31.583438Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -60,8 +60,9 @@ questions:
 - id: prostate_1.2-Q9e43be6a
   category: 2
   text: Among patients in the prostate cohort whose prostate cancer was Stage IV at
-    diagnosis, what proportion had bone metastases at diagnosis (within 30 days of
-    diagnosis, as the data source records bone metastases and their dates)?
+    diagnosis, what proportion had bone metastases at diagnosis (within 30 days after
+    diagnosis, as the data source records bone metastases and their dates; patients
+    with no recorded bone metastasis counted as without)?
 - id: prostate_1.2-Qa6e104e6
   category: 2
   text: What proportion of patients in the prostate cancer cohort had Stage IV prostate

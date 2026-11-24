@@ -1,5 +1,5 @@
 cohort: breast_1.2
-generated_at: '2026-11-24T00:25:50.528835Z'
+generated_at: '2026-11-24T00:40:31.583438Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -221,7 +221,7 @@ questions:
 - id: breast_1.2-Qdce7a7df
   category: 1
   text: What proportion of patients in the breast cancer cohort have primary race
-    recorded as Black?
+    recorded as Black (patients with unknown race counted as not Black)?
 - id: breast_1.2-Qde59dc35
   category: 3
   text: Among samples in the breast cancer cohort sequenced on the MSK-IMPACT468 panel,
