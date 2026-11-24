@@ -1,14 +1,13 @@
 cohort: bladder_1.2
-generated_at: '2026-11-24T00:40:31.583438Z'
+generated_at: '2026-11-24T17:42:11.050296Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
 - id: bladder_1.2-Q0f9b4db9
   category: 1
-  text: What was the median age at bladder cancer diagnosis (in years), among patients
-    with bladder cancer in the bladder cohort? (Treat 'bladder cancer' here as cancer
-    of any histology arising from either the urinary bladder or the upper urinary
-    tract / renal pelvis.)
+  text: Among patients diagnosed at Stage IV, what was the median age at bladder cancer
+    diagnosis, in years? (Treat 'bladder cancer' here as cancer of any histology arising
+    from either the urinary bladder or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q227dd2ba
   category: 5
   text: Among patients with Stage IV bladder cancer at diagnosis, what is the median
@@ -29,18 +28,18 @@ questions:
   category: 6
   text: Among patients with bladder cancer whose first sequenced specimen was tested
     on the MSK-IMPACT468 panel, what is the hazard ratio (95% CI) for overall survival
-    from diagnosis comparing patients whose first sequenced specimen had any non-synonymous
-    TP53 mutation versus patients whose first sequenced specimen did not, using a
-    univariate Cox proportional hazards model, with risk-set adjustment for delayed
-    cohort entry (left-truncating at NGS testing date)? (Treat 'bladder cancer' here
-    as cancer of any histology arising from either the urinary bladder or the upper
-    urinary tract / renal pelvis.)
+    from diagnosis comparing patients whose first sequenced specimen had a TP53 mutation
+    versus patients whose first sequenced specimen did not, with risk-set adjustment
+    for delayed cohort entry (left-truncating at the NGS testing date)? (Treat 'bladder
+    cancer' here as cancer of any histology arising from either the urinary bladder
+    or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Qeebfe861
   category: 2
-  text: Among patients with bladder cancer, what proportion were diagnosed at Stage
-    IV? (Treat 'bladder cancer' here as cancer of any histology arising from either
-    the urinary bladder or the upper urinary tract / renal pelvis.) (Exclude patients
-    whose stage at diagnosis is unknown.)
+  text: Among patients with bladder cancer who received a regimen containing cisplatin,
+    what proportion were diagnosed at Stage IV? Assume any clinical-trial regimen
+    did not contain cisplatin. (Treat 'bladder cancer' here as cancer of any histology
+    arising from either the urinary bladder or the upper urinary tract / renal pelvis.)
+    (Exclude patients whose stage at diagnosis is unknown.)
 - id: bladder_1.2-Q0205dab1
   category: 6
   text: Among patients with bladder cancer whose first-line regimen for the cancer
@@ -62,7 +61,9 @@ questions:
     regimen contained a PD-1/PD-L1 inhibitor (atezolizumab, pembrolizumab, nivolumab,
     avelumab, or durvalumab), what is the median overall survival from regimen start,
     in months, with 95% confidence interval? Assume any clinical-trial regimen did
-    not contain a PD-1/PD-L1 inhibitor.
+    not contain a PD-1/PD-L1 inhibitor. (Treat 'bladder cancer' here as cancer of
+    any histology arising from either the urinary bladder or the upper urinary tract
+    / renal pelvis.)
 - id: bladder_1.2-Q0b957b34
   category: 8
   text: Among patients with Stage IV bladder cancer whose first-line regimen was immune
@@ -113,7 +114,9 @@ questions:
   text: Among patients with bladder cancer aged 70 or older, what proportion had a
     high-grade cancer at diagnosis (WHO/ISUP high grade, or grade III or IV where
     grade is recorded on a three- or four-tier scale), with 95% CI? Count cancers
-    with unknown grade as not high grade.
+    with unknown grade as not high grade. (Treat 'bladder cancer' here as cancer of
+    any histology arising from either the urinary bladder or the upper urinary tract
+    / renal pelvis.)
 - id: bladder_1.2-Q41ab4999
   category: 5
   text: Among patients with advanced bladder cancer (Stage IV at diagnosis, or Stage
@@ -151,9 +154,9 @@ questions:
     cohort entry (left-truncating at NGS testing date)?
 - id: bladder_1.2-Q79a8ab4a
   category: 4
-  text: Among patients in the bladder cancer cohort, what proportion ever received
-    cisplatin as part of any cancer-directed regimen? Assume any clinical-trial regimen
-    did not contain cisplatin.
+  text: Among patients in the bladder cancer cohort diagnosed at Stage II or III,
+    what proportion ever received cisplatin as part of any cancer-directed regimen?
+    Assume any clinical-trial regimen did not contain cisplatin.
 - id: bladder_1.2-Q8688f291
   category: 7
   text: Among patients with Stage IV bladder cancer whose first-line regimen contained
@@ -181,18 +184,21 @@ questions:
     after the start of that regimen and before the start of the next regimen, or the
     end of follow-up if there was none; mixed and stable assessments do not count
     as response), with 95% CI? Assume any clinical-trial regimen did not contain cisplatin
-    or carboplatin.
+    or carboplatin. (Treat 'bladder cancer' here as cancer of any histology arising
+    from either the urinary bladder or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q9da20c67
   category: 3
-  text: Among patients with bladder cancer whose first sequenced sample was tested
-    on the MSK-IMPACT468 panel, what fraction harbor a CDKN2A homozygous deletion
-    in that sample?
+  text: Among patients with bladder cancer, what fraction harbor a CDKN2A homozygous
+    deletion? (Treat 'bladder cancer' here as cancer of any histology arising from
+    either the urinary bladder or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q9e3ce6d2
   category: 4
   text: Among patients with bladder cancer, what is the cumulative incidence of starting
     a regimen containing cisplatin or carboplatin within 12 months of diagnosis, treating
     death before such a regimen as a competing event and censoring at the last known
     alive date? Assume any clinical-trial regimen did not contain cisplatin or carboplatin.
+    (Treat 'bladder cancer' here as cancer of any histology arising from either the
+    urinary bladder or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Qa030511b
   category: 3
   text: Among all sequenced samples in the bladder cancer cohort, how many distinct
@@ -215,7 +221,9 @@ questions:
   category: 5
   text: Among regimens containing cisplatin administered for bladder cancer, what
     is the median PFS-I from regimen start in months with 95% CI? Assume any clinical-trial
-    regimen did not contain cisplatin.
+    regimen did not contain cisplatin. (Treat 'bladder cancer' here as cancer of any
+    histology arising from either the urinary bladder or the upper urinary tract /
+    renal pelvis.)
 - id: bladder_1.2-Qb863d3fc
   category: 8
   text: Among patients with Stage IV bladder cancer at diagnosis whose first-line
@@ -252,5 +260,6 @@ questions:
     not Stage III–IV.
 - id: bladder_1.2-Qf0cdbd7f
   category: 3
-  text: Among patients with bladder cancer whose tumors were sequenced, what proportion
-    had a tumor with a TP53 mutation?
+  text: What is the prevalence of TP53 mutations among patients with bladder cancer?
+    (Treat 'bladder cancer' here as cancer of any histology arising from either the
+    urinary bladder or the upper urinary tract / renal pelvis.)
