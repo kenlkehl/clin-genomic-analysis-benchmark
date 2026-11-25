@@ -1,22 +1,24 @@
 cohort: nsclc_2.0_public
-generated_at: '2026-11-24T00:40:31.583438Z'
+generated_at: '2026-11-25T23:36:20.474490Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
 - id: nsclc_2.0_public-Q00fa95f4
   category: 2
-  text: Among patients whose NSCLC was Stage I–III at diagnosis, how many developed
-    a distant metastasis after diagnosis, as the data source records distant metastases?
-    (Include all NSCLC histologic subtypes in the cohort.)
+  text: Among patients whose NSCLC was early-stage (Stage I–III) at diagnosis, how
+    many later developed a distant metastasis, as the data source records distant
+    metastases? (Include all NSCLC histologic subtypes in the cohort.)
 - id: nsclc_2.0_public-Q566b7369
   category: 1
   text: What proportion of patients in the non-small cell lung cancer cohort are female?
     (Include all key cancer-type subtypes, i.e. all NSCLC histologic subtypes.)
 - id: nsclc_2.0_public-Q75afd228
   category: 2
-  text: Among non-small cell lung cancers with curated histology, what proportion
-    are classified as adenocarcinoma in the data source's curated histology categories?
-    (Include all NSCLC histologic subtypes.)
+  text: Among patients recorded at NSCLC diagnosis as never having used cigarettes
+    (in the data source's cigarette-use categories), what proportion had adenocarcinoma
+    in the data source's curated histology categories? Exclude patients whose curated
+    histology is missing or recorded as unknown; a carcinoma not otherwise specified
+    counts as not adenocarcinoma. (Include all NSCLC histologic subtypes.)
 - id: nsclc_2.0_public-Q9027ef59
   category: 1
   text: Among patients with Stage IV NSCLC at diagnosis, what proportion were former
@@ -29,9 +31,9 @@ questions:
     NSCLC histologic subtypes.)
 - id: nsclc_2.0_public-Qd253aedd
   category: 3
-  text: In the NSCLC cohort, among patients with at least one cancer panel test on
-    a panel that includes EGFR, what proportion had a tumor with at least one non-synonymous
-    EGFR mutation? (Include all NSCLC histologic subtypes in the cohort.)
+  text: Among patients whose NSCLC was classified as adenocarcinoma in the data source's
+    curated histology categories, what proportion had a tumor with at least one non-synonymous
+    EGFR mutation?
 - id: nsclc_2.0_public-Qda260301
   category: 4
   text: How many distinct patients in the non-small-cell lung cancer cohort ever received
@@ -39,9 +41,10 @@ questions:
     osimertinib. (Include all NSCLC histologic subtypes.)
 - id: nsclc_2.0_public-Q04488571
   category: 1
-  text: How many patients in the NSCLC cancer cohort were classified as never having
-    used cigarettes at the time of NSCLC diagnosis, in the data source's cigarette-use
-    categories? (Include all NSCLC histologic subtypes.)
+  text: Among patients whose NSCLC had at least one non-synonymous EGFR mutation,
+    how many were classified as never having used cigarettes at the time of NSCLC
+    diagnosis, in the data source's cigarette-use categories? (Include all NSCLC histologic
+    subtypes.)
 - id: nsclc_2.0_public-Q0cef3bbc
   category: 4
   text: Among patients with Stage IV NSCLC at diagnosis, what proportion ever received
@@ -62,9 +65,10 @@ questions:
     was a clinical-trial regimen?
 - id: nsclc_2.0_public-Q1ea24f43
   category: 5
-  text: Among patients with Stage IV NSCLC at diagnosis, what is the median overall
-    survival from diagnosis in months (with 95% CI), with risk-set adjustment for
-    delayed cohort entry (left-truncating at NGS testing date)?
+  text: Among patients with NSCLC diagnosed at Stage IV, what is the median survival
+    from diagnosis in months (with 95% CI), with risk-set adjustment for delayed cohort
+    entry (left-truncating at the NGS testing date)? (Include all NSCLC histologic
+    subtypes in the cohort.)
 - id: nsclc_2.0_public-Q1f9df13e
   category: 6
   text: Among patients with Stage IV NSCLC at diagnosis, what is the hazard ratio
@@ -128,22 +132,21 @@ questions:
     such regimen was a clinical-trial regimen.
 - id: nsclc_2.0_public-Q5ab28810
   category: 3
-  text: Among patients whose tumors were sequenced on a KRAS-covering panel, what
-    proportion had a tumor with at least one KRAS G12C missense mutation? (Include
-    all NSCLC histologic subtypes in the cohort.)
+  text: Among patients recorded at NSCLC diagnosis as current or former cigarette
+    users (in the data source's cigarette-use categories), what proportion had a KRAS
+    G12C mutation? (Include all NSCLC histologic subtypes in the cohort.)
 - id: nsclc_2.0_public-Q5b41f709
   category: 5
-  text: Among patients with Stage IV NSCLC at diagnosis whose first regimen for the
-    cancer was pembrolizumab monotherapy, what is the median OS from regimen start
-    in months (with 95% CI), with risk-set adjustment for delayed cohort entry (left-truncating
-    at NGS testing date); assume any clinical-trial regimen did not contain pembrolizumab?
-    (Include all NSCLC histologic subtypes in the cohort.)
+  text: Among patients with NSCLC diagnosed at Stage IV whose first-line regimen was
+    single-agent pembrolizumab, what is the median OS in months (with 95% CI), with
+    risk-set adjustment for delayed cohort entry (left-truncating at the NGS testing
+    date); assume any clinical-trial regimen did not contain pembrolizumab? (Include
+    all NSCLC histologic subtypes in the cohort.)
 - id: nsclc_2.0_public-Q643ab252
   category: 3
-  text: Among all sequenced tumor samples obtained for any NSCLC index cancer in the
-    NSCLC cohort (including all NSCLC histologic subtypes, and counting a sample regardless
-    of whether its panel covered MET), how many unique samples harbor a high-level
-    MET amplification?
+  text: Across all sequenced tumor specimens in the NSCLC cohort, how many specimens
+    harbor a high-level MET amplification? (Include all NSCLC histologic subtypes
+    in the cohort.)
 - id: nsclc_2.0_public-Q65fdb736
   category: 3
   text: What is the prevalence of MET alterations among patients with NSCLC whose
@@ -151,8 +154,8 @@ questions:
 - id: nsclc_2.0_public-Q6e39b7f6
   category: 4
   text: Among patients with Stage IV NSCLC at diagnosis (including all NSCLC histologic
-    subtypes), what proportion ever received pembrolizumab as a single agent (monotherapy)
-    in any regimen? Assume any clinical-trial regimen did not contain pembrolizumab.
+    subtypes), what proportion ever received a single-agent PD-1 inhibitor? Assume
+    any clinical-trial regimen did not contain a PD-1 inhibitor.
 - id: nsclc_2.0_public-Q7840687a
   category: 7
   text: Among patients with Stage IV NSCLC at diagnosis who received first-line carboplatin
@@ -185,13 +188,13 @@ questions:
     or recorded only as Stage I–III without a stage group, as not Stage III–IV.
 - id: nsclc_2.0_public-Qc11bd653
   category: 4
-  text: Among patients with Stage IV NSCLC at diagnosis (any NSCLC histologic subtype)
-    whose first regimen for the cancer contained carboplatin and pemetrexed, what
-    is the median time on regimen in months, from regimen start to the end of all
-    its drugs or death, whichever comes first, censoring regimens with no recorded
-    end at the last known alive date, with risk-set adjustment for delayed cohort
-    entry (left-truncating at NGS testing date)? Assume any clinical-trial regimen
-    did not contain carboplatin or pemetrexed.
+  text: Among patients with NSCLC diagnosed at Stage IV (any NSCLC histologic subtype)
+    whose first-line regimen contained carboplatin and pemetrexed, what is the median
+    time on that regimen in months, from regimen start to the end of all its drugs
+    or death, whichever comes first, censoring regimens with no recorded end at the
+    last known alive date, with risk-set adjustment for delayed cohort entry (left-truncating
+    at the NGS testing date)? Assume any clinical-trial regimen did not contain carboplatin
+    or pemetrexed.
 - id: nsclc_2.0_public-Qc51cfeb9
   category: 8
   text: Among patients with advanced NSCLC (Stage IV at diagnosis, or a distant metastasis
@@ -215,12 +218,11 @@ questions:
 - id: nsclc_2.0_public-Qe746d620
   category: 6
   text: Among patients with Stage IV NSCLC at diagnosis (including all NSCLC histologic
-    subtypes) whose first sequenced specimen was on a panel that includes KRAS, what
-    is the hazard ratio (95% CI) for overall survival from onset of advanced disease
-    (as the data source defines it) comparing patients whose first sequenced specimen
-    had a KRAS G12C missense mutation versus all other patients (KRAS-wildtype and
-    other KRAS variants combined), with risk-set adjustment for delayed cohort entry
-    (left-truncating at NGS testing date)?
+    subtypes), what is the hazard ratio (95% CI) for overall survival from the onset
+    of advanced disease comparing patients whose first sequenced specimen had a KRAS
+    G12C mutation versus all other patients (KRAS-wildtype and other KRAS variants
+    combined), with risk-set adjustment for delayed cohort entry (left-truncating
+    at the NGS testing date)?
 - id: nsclc_2.0_public-Qe9438978
   category: 5
   text: Among patients with NSCLC that was Stage IV at diagnosis, what is the hazard

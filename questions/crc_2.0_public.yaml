@@ -1,5 +1,5 @@
 cohort: crc_2.0_public
-generated_at: '2026-11-25T16:31:47.573950Z'
+generated_at: '2026-11-25T23:36:20.474490Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -39,9 +39,9 @@ questions:
   category: 2
   text: What proportion of colorectal cancers are classified as left colon vs. right
     colon vs. rectal vs. other, using the data source's colorectal site categories
-    and excluding cancers with no recorded category? (Include the full colorectal
-    cancer cohort — colon primaries, rectal/rectosigmoid primaries, and unspecified
-    colorectal primaries.)
+    and excluding cancers with no recorded category or a category recorded as unknown?
+    (Include the full colorectal cancer cohort — colon primaries, rectal/rectosigmoid
+    primaries, and unspecified colorectal primaries.)
 - id: crc_2.0_public-Qf495a5d4
   category: 1
   text: Among patients whose colorectal cancer was diagnosed at Stage IV, what proportion

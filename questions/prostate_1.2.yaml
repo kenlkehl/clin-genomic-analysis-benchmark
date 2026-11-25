@@ -1,5 +1,5 @@
 cohort: prostate_1.2
-generated_at: '2026-11-24T00:40:31.583438Z'
+generated_at: '2026-11-25T23:36:20.474490Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -146,7 +146,8 @@ questions:
 - id: prostate_1.2-Q714edb70
   category: 1
   text: What is the most common race/ethnicity group among patients in the prostate
-    cancer cohort? (Use the data source's combined race/ethnicity categories.)
+    cancer cohort? (Use the data source's combined race/ethnicity categories.) Patients
+    with unknown race/ethnicity are excluded.
 - id: prostate_1.2-Q7ea929fe
   category: 8
   text: Among patients whose prostate cancer was Stage IV at diagnosis and later became

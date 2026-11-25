@@ -1,5 +1,5 @@
 cohort: bladder_1.2
-generated_at: '2026-11-24T17:42:11.050296Z'
+generated_at: '2026-11-25T23:36:20.474490Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -251,7 +251,8 @@ questions:
 - id: bladder_1.2-Qde17cbb3
   category: 1
   text: What is the most common race/ethnicity category among patients in the bladder
-    cancer cohort? (Use the data source's combined race/ethnicity categories.)
+    cancer cohort? (Use the data source's combined race/ethnicity categories.) Patients
+    with unknown race/ethnicity are excluded.
 - id: bladder_1.2-Qef4973b7
   category: 2
   text: Among patients in the bladder cancer cohort, what is the difference in the
