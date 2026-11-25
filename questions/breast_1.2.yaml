@@ -1,25 +1,26 @@
 cohort: breast_1.2
-generated_at: '2026-11-24T00:40:31.583438Z'
+generated_at: '2026-11-25T02:18:34.785162Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
 - id: breast_1.2-Q0ed39ff9
   category: 1
-  text: How many unique patients in the breast cancer cohort are female?
+  text: How many female patients in the breast cancer cohort were younger than 40
+    at breast cancer diagnosis? (Restrict to cancers the data source records as breast
+    cancer rather than breast sarcoma.)
 - id: breast_1.2-Q438e2904
   category: 4
   text: Among patients with Stage IV breast cancer at diagnosis, what is the median
-    number of distinct regimens received for that index cancer? (Restrict to cancers
-    the data source records as breast cancer rather than breast sarcoma.) (Count each
-    BPC regimen record for that cancer; patients with no regimen count as zero.)
+    number of cancer-directed regimens received for that cancer, counting each course
+    of treatment as a separate regimen even when it repeats earlier drugs? (Restrict
+    to cancers the data source records as breast cancer rather than breast sarcoma.)
 - id: breast_1.2-Q522c00c5
   category: 6
   text: Among patients with Stage IV breast cancer at diagnosis, what is the hazard
     ratio for overall survival from diagnosis comparing patients whose first sequenced
-    specimen had any non-synonymous TP53 mutation versus patients whose first sequenced
-    specimen did not, restricted to patients whose first sequenced specimen was on
-    a panel that covers TP53, with risk-set adjustment for delayed cohort entry (left-truncating
-    at NGS testing date)? (Restrict to cancers the data source records as breast cancer
+    specimen had a TP53 mutation versus patients whose first sequenced specimen did
+    not, with risk-set adjustment for delayed cohort entry (left-truncating at the
+    NGS testing date)? (Restrict to cancers the data source records as breast cancer
     rather than breast sarcoma.)
 - id: breast_1.2-Q8d040027
   category: 7
@@ -45,10 +46,9 @@ questions:
 - id: breast_1.2-Qd9af976f
   category: 4
   text: Among patients whose breast cancer was HR-positive and HER2-negative at diagnosis,
-    what proportion received a CDK4/6 inhibitor (palbociclib, ribociclib, or abemaciclib)
-    as part of any regimen for that cancer? Assume any clinical-trial regimen did
-    not contain a CDK4/6 inhibitor. (Restrict to cancers the data source records as
-    breast cancer rather than breast sarcoma.)
+    what proportion ever received a CDK4/6 inhibitor for that cancer? Assume any clinical-trial
+    regimen did not contain a CDK4/6 inhibitor. (Restrict to cancers the data source
+    records as breast cancer rather than breast sarcoma.)
 - id: breast_1.2-Qeda1eecf
   category: 1
   text: What proportion of patients in the breast cancer cohort are non-white (using
@@ -72,8 +72,9 @@ questions:
     the median PFS-M from regimen start with 95% confidence interval?
 - id: breast_1.2-Q1e90a8f5
   category: 3
-  text: What proportion of patients in the breast cancer cohort had a tumor with a
-    TP53 mutation?
+  text: Among patients whose breast cancer was triple-negative at diagnosis, what
+    proportion had a TP53 mutation? (Restrict to cancers the data source records as
+    breast cancer rather than breast sarcoma.)
 - id: breast_1.2-Q2e82fad9
   category: 1
   text: What is the median age at first breast cancer diagnosis (in years), with 95%
@@ -143,10 +144,8 @@ questions:
     than those on endocrine monotherapy?
 - id: breast_1.2-Q563e05a4
   category: 3
-  text: Among NGS samples in the breast cohort, how many unique samples have a high-level
-    ERBB2 amplification (defined as CNA value == 2 per cBioPortal/GISTIC convention,
-    where 2 = high-level amplification, 1 = gain, 0 = neutral, -1 = shallow loss,
-    -2 = deep deletion)?
+  text: Across all sequenced specimens in the breast cancer cohort, how many specimens
+    have a high-level ERBB2 amplification?
 - id: breast_1.2-Q7e4e718d
   category: 6
   text: Among patients with HER2-positive (HER2+/HR+ or HER2+/HR-) breast cancer receiving
@@ -171,13 +170,13 @@ questions:
 - id: breast_1.2-Q8d802225
   category: 7
   text: Among patients whose breast cancer was Stage IV and HER2-positive at diagnosis
-    and whose first regimen for the cancer contained trastuzumab (not a trastuzumab
-    antibody–drug conjugate), what is the Cox proportional-hazards hazard ratio (with
-    95% CI and p-value) for overall survival from regimen start comparing regimens
-    that also contained pertuzumab versus regimens without pertuzumab, with risk-set
-    adjustment for delayed cohort entry (left-truncating at NGS testing date), excluding
-    patients whose first regimen was a clinical-trial regimen? (Count each BPC regimen
-    record as a regimen, including separately curated LHRH-agonist records.)
+    and whose first-line regimen contained trastuzumab (not a trastuzumab antibody–drug
+    conjugate), what is the hazard ratio (with 95% CI and p-value) for overall survival
+    comparing regimens that also contained pertuzumab versus regimens without pertuzumab,
+    with risk-set adjustment for delayed cohort entry (left-truncating at the NGS
+    testing date), excluding patients whose first-line regimen was a clinical-trial
+    regimen? (Count each BPC regimen record as a regimen, including separately curated
+    LHRH-agonist records.)
 - id: breast_1.2-Q993b440a
   category: 3
   text: In the breast cancer cohort, how many patients had a tumor that was ERBB2-mutant
@@ -199,13 +198,13 @@ questions:
 - id: breast_1.2-Qd3de1f04
   category: 6
   text: Among patients whose breast cancer was Stage IV and triple-negative at diagnosis,
-    what is the hazard ratio (95% CI) for overall survival from diagnosis comparing
-    patients whose first sequenced specimen had any non-synonymous BRCA1 or BRCA2
-    mutation versus patients whose first sequenced specimen had neither, using a univariable
-    Cox model, restricted to patients whose first sequenced specimen was on a panel
-    covering both genes, with risk-set adjustment for delayed cohort entry (left-truncating
-    at NGS testing date)? (Restrict to cancers the data source records as breast cancer
-    rather than breast sarcoma.)
+    what is the hazard ratio (95% CI) for overall survival from the onset of advanced
+    disease comparing patients whose first sequenced specimen had any non-synonymous
+    BRCA1 or BRCA2 mutation versus patients whose first sequenced specimen had neither,
+    restricted to patients whose first sequenced specimen was on a panel covering
+    both genes, with risk-set adjustment for delayed cohort entry (left-truncating
+    at the NGS testing date)? (Restrict to cancers the data source records as breast
+    cancer rather than breast sarcoma.)
 - id: breast_1.2-Qd65985df
   category: 3
   text: Among patients whose breast cancer was HR-positive and HER2-negative at diagnosis
@@ -214,14 +213,16 @@ questions:
     partner gene) on any sequenced specimen?
 - id: breast_1.2-Qdc5b5eb2
   category: 4
-  text: How many patients in the breast cohort received endocrine therapy (tamoxifen,
-    toremifene, anastrozole, letrozole, exemestane, fulvestrant, goserelin, leuprolide,
-    or triptorelin) as part of any regimen for their breast cancer (any line, any
-    setting)? Assume any clinical-trial regimen did not contain these drugs.
+  text: How many patients in the breast cancer cohort ever received endocrine therapy
+    (tamoxifen, toremifene, anastrozole, letrozole, exemestane, fulvestrant, goserelin,
+    leuprolide, or triptorelin) for their breast cancer? Assume any clinical-trial
+    regimen did not contain these drugs.
 - id: breast_1.2-Qdce7a7df
   category: 1
-  text: What proportion of patients in the breast cancer cohort have primary race
-    recorded as Black (patients with unknown race counted as not Black)?
+  text: Among patients whose breast cancer was triple-negative at diagnosis, what
+    proportion have primary race recorded as Black (patients with unknown race counted
+    as not Black)? (Restrict to cancers the data source records as breast cancer rather
+    than breast sarcoma.)
 - id: breast_1.2-Qde59dc35
   category: 3
   text: Among samples in the breast cancer cohort sequenced on the MSK-IMPACT468 panel,
