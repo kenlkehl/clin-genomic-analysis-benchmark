@@ -1,14 +1,12 @@
 cohort: crc_2.0_public
-generated_at: '2026-11-24T00:40:31.583438Z'
+generated_at: '2026-11-25T16:31:47.573950Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
 - id: crc_2.0_public-Q0050520a
   category: 1
-  text: What is the median age (in years) at colorectal cancer diagnosis among patients
-    in the colorectal cancer cohort, with 95% CI? (Include the full colorectal cancer
-    cohort — colon primaries, rectal/rectosigmoid primaries, and unspecified colorectal
-    primaries.)
+  text: What is the median age, in years, at colorectal cancer diagnosis among patients
+    diagnosed at Stage I–III, with 95% CI?
 - id: crc_2.0_public-Q0356f2dd
   category: 3
   text: Among patients in the CRC cohort who have at least one sequenced sample for
@@ -20,23 +18,17 @@ questions:
   text: Among patients with Stage IV colorectal cancer at diagnosis whose first-line
     regimen was FOLFOX plus bevacizumab (exactly fluorouracil, oxaliplatin, and bevacizumab,
     with or without leucovorin) versus FOLFOX alone (exactly fluorouracil and oxaliplatin,
-    with or without leucovorin), what is the hazard ratio for overall survival measured
-    from regimen start, with risk-set adjustment for delayed cohort entry (left-truncating
-    at NGS testing date), excluding patients whose first-line regimen was a clinical-trial
-    regimen? (A first-line regimen containing any other drug counts in neither arm.)
-    (Include the full colorectal cancer cohort — colon primaries, rectal/rectosigmoid
-    primaries, and unspecified colorectal primaries.)
+    with or without leucovorin), what is the hazard ratio for overall survival, with
+    risk-set adjustment for delayed cohort entry (left-truncating at the NGS testing
+    date), excluding patients whose first-line regimen was a clinical-trial regimen?
 - id: crc_2.0_public-Q73ef7699
   category: 2
-  text: How many patients in the colorectal cancer cohort had liver metastases present
-    at the time of diagnosis (within 30 days after diagnosis, as the data source records
-    liver metastases and their dates)? (Include the full colorectal cancer cohort
-    — colon primaries, rectal/rectosigmoid primaries, and unspecified colorectal primaries.)
+  text: How many patients with early-onset colorectal cancer (diagnosed before age
+    50) had liver metastases present at the time of diagnosis (within 30 days after
+    diagnosis, as the data source records liver metastases and their dates)?
 - id: crc_2.0_public-Q93f9f64f
   category: 3
-  text: How many unique patients with CRC had a tumor with a BRAF V600E mutation?
-    (Include the full colorectal cancer cohort — colon primaries, rectal/rectosigmoid
-    primaries, and unspecified colorectal primaries.)
+  text: How many patients with CRC had a BRAF V600E-mutant tumor?
 - id: crc_2.0_public-Qcfa317fb
   category: 2
   text: What proportion of patients in the colorectal cancer cohort were Stage IV
@@ -52,19 +44,17 @@ questions:
     colorectal primaries.)
 - id: crc_2.0_public-Qf495a5d4
   category: 1
-  text: What proportion of patients in the CRC cohort are categorized as Non-Hispanic
-    Black (patients with unknown race or ethnicity counted as not Non-Hispanic Black)?
-    (Use the data source's combined race/ethnicity categories.)
+  text: Among patients whose colorectal cancer was diagnosed at Stage IV, what proportion
+    are categorized as Non-Hispanic Black (patients with unknown race or ethnicity
+    counted as not Non-Hispanic Black)? (Use the data source's combined race/ethnicity
+    categories.)
 - id: crc_2.0_public-Qf83eea88
   category: 6
   text: Among patients with Stage IV colorectal cancer at diagnosis, what is the hazard
-    ratio for overall survival (measured from diagnosis) comparing patients whose
-    first sequenced specimen had any non-synonymous KRAS mutation versus patients
-    whose first sequenced specimen had none, restricted to patients whose first sequenced
-    specimen was on a panel covering KRAS, with risk-set adjustment for delayed cohort
-    entry (left-truncating at NGS testing date)? (Include the full colorectal cancer
-    cohort — colon primaries, rectal/rectosigmoid primaries, and unspecified colorectal
-    primaries.)
+    ratio for overall survival from diagnosis comparing patients whose first sequenced
+    specimen had any non-synonymous KRAS mutation versus patients whose first sequenced
+    specimen had none, with risk-set adjustment for delayed cohort entry (left-truncating
+    at the NGS testing date)?
 - id: crc_2.0_public-Q032daf19
   category: 6
   text: Among patients whose colorectal cancer was Stage IV at diagnosis and RAS wild-type
@@ -88,16 +78,18 @@ questions:
     regimen?
 - id: crc_2.0_public-Q0f6de4fb
   category: 2
-  text: What proportion of patients with colorectal cancer had a high-grade tumor
-    (grade III or IV) at diagnosis, treating missing/unknown grade as not high-grade?
+  text: Among patients whose colorectal cancer was not diagnosed at Stage IV, what
+    proportion had a high-grade tumor (grade III or IV) at diagnosis, treating missing/unknown
+    grade as not high-grade?
 - id: crc_2.0_public-Q1574f462
   category: 3
   text: What fraction of patients in the CRC cohort had a tumor with an APC mutation
     (any non-synonymous mutation)?
 - id: crc_2.0_public-Q1b53c7e3
   category: 3
-  text: What proportion of patients in the CRC cohort had a tumor with a TP53 mutation
-    detected on sequencing?
+  text: Among patients who ever received bevacizumab for their colorectal cancer,
+    what proportion had a TP53 mutation? Assume any clinical-trial regimen did not
+    contain bevacizumab.
 - id: crc_2.0_public-Q36e76d7b
   category: 1
   text: How many unique patients in the colorectal cancer cohort are female?
@@ -127,20 +119,17 @@ questions:
     with KRAS-wildtype colorectal cancer?
 - id: crc_2.0_public-Q6ecab01d
   category: 4
-  text: How many unique patients with colorectal cancer (including colon cancer, rectal/rectosigmoid
-    cancer, and unspecified colon/rectum cancer) ever received an immune checkpoint
-    inhibitor regimen for their colorectal cancer? Assume any clinical trial regimens
-    did not contain a checkpoint inhibitor.
+  text: How many patients with colorectal cancer ever received an immune checkpoint
+    inhibitor for their colorectal cancer? Assume any clinical-trial regimen did not
+    contain an immune checkpoint inhibitor.
 - id: crc_2.0_public-Q7e62c001
   category: 7
   text: Among patients with Stage IV colorectal cancer at diagnosis, what is the hazard
-    ratio for OS from the start of the first regimen for the cancer, comparing patients
-    whose first regimen contained bevacizumab versus patients whose first regimen
-    contained none of bevacizumab, ramucirumab, ziv-aflibercept, cetuximab, or panitumumab,
-    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
-    date), excluding patients whose first regimen was a clinical-trial regimen? (Include
-    the full colorectal cancer cohort — colon primaries, rectal/rectosigmoid primaries,
-    and unspecified colorectal primaries.)
+    ratio for OS comparing patients whose first-line regimen contained bevacizumab
+    versus patients whose first-line regimen contained none of bevacizumab, ramucirumab,
+    ziv-aflibercept, cetuximab, or panitumumab, with risk-set adjustment for delayed
+    cohort entry (left-truncating at the NGS testing date), excluding patients whose
+    first-line regimen was a clinical-trial regimen?
 - id: crc_2.0_public-Q83ea787b
   category: 3
   text: Among samples sequenced on the MSK-IMPACT468 panel, what proportion show a
@@ -209,8 +198,9 @@ questions:
 - id: crc_2.0_public-Qebbb9c36
   category: 5
   text: Among patients with Stage IV colorectal cancer at diagnosis, what is the median
-    overall survival from diagnosis in months with 95% CI, with risk-set adjustment
-    for delayed cohort entry (left-truncating at NGS testing date)?
+    overall survival from the onset of advanced disease, in months with 95% CI, with
+    risk-set adjustment for delayed cohort entry (left-truncating at the NGS testing
+    date)?
 - id: crc_2.0_public-Qfbabddc6
   category: 8
   text: Does APC mutation status modify the effect of oxaliplatin-containing adjuvant
