@@ -1,31 +1,27 @@
 cohort: prostate_1.2
-generated_at: '2026-11-25T23:36:20.474490Z'
+generated_at: '2026-11-26T01:06:37.780421Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
 - id: prostate_1.2-Q17f290d9
   category: 3
-  text: In the prostate cancer cohort, among sequenced samples obtained for a prostate
-    cancer diagnosis, how many unique samples show a high-level (deep) deletion of
-    PTEN? (Count only CNA value -2 as a deep deletion.)
+  text: Across all sequenced specimens in the prostate cancer cohort, how many specimens
+    show a deep (homozygous) deletion of PTEN?
 - id: prostate_1.2-Q1e8d34c1
   category: 2
-  text: How many patients in the prostate cohort had prostate cancer with high-grade
-    disease at diagnosis (initial clinical Gleason score ≥ 8 / ISUP grade group 4–5;
-    missing/unknown grade treated as not high-grade)?
+  text: Among patients whose primary race is recorded as Black, how many had prostate
+    cancer with high-grade disease at diagnosis (initial clinical Gleason score ≥
+    8 / ISUP grade group 4–5; missing/unknown grade treated as not high-grade)?
 - id: prostate_1.2-Q31783668
   category: 4
-  text: How many unique patients in the prostate cohort ever received docetaxel in
-    any regimen for their prostate cancer? Assume any clinical-trial regimen did not
-    contain docetaxel.
+  text: How many patients in the prostate cancer cohort ever received a taxane for
+    their prostate cancer? Assume any clinical-trial regimen did not contain a taxane.
 - id: prostate_1.2-Q5a10607f
   category: 5
-  text: Among patients in the prostate cancer cohort who received any prostate cancer-directed
-    systemic therapy, what is the median overall survival in months from the start
-    of their first prostate cancer-directed systemic regimen (Kaplan-Meier with 95%
-    CI), with risk-set adjustment for delayed cohort entry (left-truncating at NGS
-    testing date)? Include all systemic therapy regimens regardless of burden of disease/intent
-    of therapy.
+  text: Among patients with prostate cancer who received any cancer-directed regimen
+    for it, what is the median overall survival in months from the start of their
+    first regimen for the cancer in any setting, with 95% CI, with risk-set adjustment
+    for delayed cohort entry (left-truncating at the NGS testing date)?
 - id: prostate_1.2-Q62b56bf7
   category: 3
   text: Among patients in the prostate cohort whose sequenced prostate cancer specimen
@@ -33,17 +29,18 @@ questions:
     cancer tumor with at least one non-synonymous SPOP mutation?
 - id: prostate_1.2-Q6b869850
   category: 4
-  text: Among patients with prostate cancer, what proportion ever received abiraterone
-    acetate as part of any prostate cancer-directed regimen? Assume any clinical-trial
-    regimen did not contain abiraterone acetate.
+  text: Among patients with prostate cancer diagnosed at Stage IV, what proportion
+    ever received abiraterone for their prostate cancer? Assume any clinical-trial
+    regimen did not contain abiraterone.
 - id: prostate_1.2-Q8e4139df
   category: 2
-  text: Among patients in the prostate cancer cohort, how many had an initial clinical
-    prostate cancer Gleason score of 9 or 10?
+  text: Among patients in the prostate cancer cohort, how many had ISUP grade group
+    5 prostate cancer on initial clinical assessment at diagnosis?
 - id: prostate_1.2-Q94868401
   category: 1
-  text: How many unique patients in the prostate cancer cohort self-identify as Non-Hispanic
-    Black? (Use the data source's combined race/ethnicity categories.)
+  text: Among patients who ever received enzalutamide for their prostate cancer, how
+    many are categorized as Non-Hispanic Black? Assume any clinical-trial regimen
+    did not contain enzalutamide. (Use the data source's combined race/ethnicity categories.)
 - id: prostate_1.2-Q95d5d662
   category: 6
   text: In the prostate cancer cohort, what is the Cox PH hazard ratio (95% CI, p-value)
@@ -55,14 +52,14 @@ questions:
     for delayed cohort entry (left-truncating at NGS testing date)?
 - id: prostate_1.2-Q98cef48a
   category: 1
-  text: What proportion of patients in the prostate cancer cohort were born before
-    1940?
+  text: Among patients whose prostate cancer was diagnosed at Stage I–III, what proportion
+    were born before 1940?
 - id: prostate_1.2-Q9e43be6a
   category: 2
-  text: Among patients in the prostate cohort whose prostate cancer was Stage IV at
-    diagnosis, what proportion had bone metastases at diagnosis (within 30 days after
-    diagnosis, as the data source records bone metastases and their dates; patients
-    with no recorded bone metastasis counted as without)?
+  text: Among patients whose prostate cancer was Stage IV at diagnosis and had a deep
+    (homozygous) PTEN deletion, what proportion had bone metastases at diagnosis (within
+    30 days after diagnosis, as the data source records bone metastases and their
+    dates; patients with no recorded bone metastasis counted as without)?
 - id: prostate_1.2-Qa6e104e6
   category: 2
   text: What proportion of patients in the prostate cancer cohort had Stage IV prostate
@@ -77,14 +74,13 @@ questions:
     did not contain docetaxel.
 - id: prostate_1.2-Qb89136fd
   category: 4
-  text: What is the median number of distinct cancer-directed regimens administered
-    for prostate cancer to patients in the prostate cancer cohort? (Count each BPC
-    regimen record for that cancer; patients with no regimen count as zero.)
+  text: What is the median number of cancer-directed regimens administered for prostate
+    cancer to patients in the prostate cancer cohort, counting each course of treatment
+    as a separate regimen even when it repeats earlier drugs?
 - id: prostate_1.2-Qd8337668
   category: 3
-  text: Among patients in the prostate cancer cohort, how many unique patients had
-    a prostate cancer tumor specimen with at least one non-synonymous mutation in
-    PTEN reported?
+  text: Among patients whose prostate cancer was ISUP grade group 4–5 on initial clinical
+    assessment at diagnosis, how many had a PTEN mutation?
 - id: prostate_1.2-Qdb8fc80a
   category: 5
   text: Among patients with Stage IV prostate cancer at diagnosis, what is the median
@@ -97,8 +93,9 @@ questions:
     confidence interval?
 - id: prostate_1.2-Qf6226dee
   category: 3
-  text: What proportion of patients with prostate cancer whose tumors were sequenced
-    had a tumor with a TP53 mutation?
+  text: Among patients who ever received abiraterone or enzalutamide for their prostate
+    cancer, what proportion had a TP53 mutation? Assume any clinical-trial regimen
+    did not contain abiraterone or enzalutamide.
 - id: prostate_1.2-Q0358d0d9
   category: 6
   text: Among patients in the prostate cancer cohort whose cancer became advanced
@@ -145,9 +142,9 @@ questions:
     excluding clinical-trial regimens?
 - id: prostate_1.2-Q714edb70
   category: 1
-  text: What is the most common race/ethnicity group among patients in the prostate
-    cancer cohort? (Use the data source's combined race/ethnicity categories.) Patients
-    with unknown race/ethnicity are excluded.
+  text: Among patients diagnosed with prostate cancer before age 55, what is the most
+    common race/ethnicity group? (Use the data source's combined race/ethnicity categories.)
+    Patients with unknown race/ethnicity are excluded.
 - id: prostate_1.2-Q7ea929fe
   category: 8
   text: Among patients whose prostate cancer was Stage IV at diagnosis and later became
