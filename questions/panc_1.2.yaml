@@ -1,5 +1,5 @@
 cohort: panc_1.2
-generated_at: '2026-11-26T00:50:24.283757Z'
+generated_at: '2026-11-26T15:29:46.486492Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -89,14 +89,16 @@ questions:
     at diagnosis (patients with no recorded site counted as without liver metastases)?
 - id: panc_1.2-Q0457f850
   category: 8
-  text: In patients with metastatic pancreatic cancer (de novo Stage IV or recurrent/relapsed
-    metastatic) treated with first-line gemcitabine-containing regimens (where first-line
-    refers to the first regimen after onset of metastatic disease), does TP53 mutation
-    status modify the treatment effect on PFS-I from regimen start when compared to
-    first-line regimens containing a fluoropyrimidine but no gemcitabine (e.g. FOLFIRINOX),
-    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
-    date), as measured by the interaction term hazard ratio (ratio of HRs) with 95%
-    CI?
+  text: Among patients with metastatic pancreatic cancer (Stage IV at diagnosis, or
+    a distant metastasis after a Stage I–III diagnosis) whose first regimen started
+    on or after the onset of metastatic disease contained gemcitabine, or contained
+    a fluoropyrimidine but no gemcitabine, what is the hazard ratio (95% CI) for the
+    interaction between TP53 mutation status on the first sequenced specimen (any
+    non-synonymous TP53 mutation) and gemcitabine (versus fluoropyrimidine without
+    gemcitabine) in a Cox model for PFS-I from regimen start with both main effects,
+    with risk-set adjustment for delayed cohort entry (left-truncating at the NGS
+    testing date)? Assume any clinical-trial regimen did not contain gemcitabine or
+    a fluoropyrimidine.
 - id: panc_1.2-Q07d410a5
   category: 8
   text: Among patients with Stage IV pancreatic cancer at diagnosis whose first regimen
@@ -174,7 +176,9 @@ questions:
     patients whose first regimen was a clinical-trial regimen?
 - id: panc_1.2-Q75d370b9
   category: 1
-  text: How does smoking status relate to demographics in the pancreatic cancer cohort?
+  text: In the pancreatic cancer cohort, what is the p-value from a chi-square test
+    comparing the proportion of female patients between those diagnosed with pancreatic
+    cancer before age 60 and those diagnosed at age 60 or older?
 - id: panc_1.2-Q7c645417
   category: 6
   text: Among patients with Stage IV pancreatic cancer at diagnosis whose first regimen
@@ -246,8 +250,11 @@ questions:
     drugs?
 - id: panc_1.2-Qddc3b21c
   category: 6
-  text: Does MMR-deficient status on pathology testing predict better outcomes than
-    MMR-proficient status in patients with pancreatic cancer?
+  text: Among patients with pancreatic cancer whose diagnostic specimen had mismatch-repair
+    immunohistochemistry, what is the hazard ratio for overall survival from diagnosis
+    comparing patients whose tumors were MMR-deficient (loss of MLH1, MSH2, MSH6,
+    or PMS2 expression) versus MMR-proficient, with risk-set adjustment for delayed
+    cohort entry (left-truncating at the NGS testing date)?
 - id: panc_1.2-Qe65302a7
   category: 5
   text: Among patients with pancreatic ductal adenocarcinoma that was Stage IV at
@@ -260,4 +267,4 @@ questions:
 - id: panc_1.2-Qf8273a02
   category: 3
   text: In the pancreatic cancer cohort, what fraction of patients had a tumor with
-    a MYC amplification in any pancreatic cancer specimen?
+    a focal high-level MYC amplification in any pancreatic cancer specimen?

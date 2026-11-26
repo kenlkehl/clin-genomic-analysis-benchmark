@@ -1,5 +1,5 @@
 cohort: bladder_1.2
-generated_at: '2026-11-25T23:36:20.474490Z'
+generated_at: '2026-11-26T15:29:46.486492Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -77,8 +77,10 @@ questions:
     patients whose first-line regimen was a clinical-trial regimen?
 - id: bladder_1.2-Q0bd947a3
   category: 3
-  text: In the bladder cohort, what proportion of patients had a tumor with an FGFR3
-    alteration?
+  text: Among patients with bladder cancer whose first sequenced specimen was tested
+    on a panel covering FGFR3, what proportion had an FGFR3-mutant tumor on that specimen?
+    (Treat 'bladder cancer' here as cancer of any histology arising from either the
+    urinary bladder or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q0c84ad6c
   category: 8
   text: Among patients with Stage II–III bladder cancer at diagnosis whose first regimen
@@ -130,12 +132,14 @@ questions:
     at NGS testing date), excluding patients whose regimen was a clinical-trial regimen?
 - id: bladder_1.2-Q45c05604
   category: 7
-  text: Among patients with muscle-invasive bladder cancer who underwent cystectomy
-    and received neoadjuvant gemcitabine + cisplatin as their first regimen prior
-    to cystectomy, what is the median overall survival from regimen start with 95%
-    CI, with risk-set adjustment for delayed cohort entry (left-truncating at NGS
-    testing date); assume any clinical-trial regimen did not contain gemcitabine or
-    cisplatin?
+  text: Among patients whose bladder cancer was diagnosed at Stage II or III, who
+    underwent radical cystectomy, and whose first systemic regimen for the cancer,
+    started before the cystectomy, was gemcitabine plus cisplatin, what is the median
+    overall survival from the start of that regimen, in months with 95% CI, with risk-set
+    adjustment for delayed cohort entry (left-truncating at the NGS testing date)?
+    Assume any clinical-trial regimen did not contain gemcitabine or cisplatin. (Treat
+    'bladder cancer' here as cancer of any histology arising from either the urinary
+    bladder or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q4940c838
   category: 4
   text: How many unique patients in the bladder cancer cohort received atezolizumab
@@ -149,9 +153,13 @@ questions:
     patients with no regimen count as zero.)
 - id: bladder_1.2-Q7381798f
   category: 7
-  text: Is there an overall survival benefit to adding bevacizumab to chemotherapy
-    in patients with Stage IV bladder cancer, with risk-set adjustment for delayed
-    cohort entry (left-truncating at NGS testing date)?
+  text: Among patients with bladder cancer diagnosed at Stage IV whose first-line
+    regimen contained gemcitabine and cisplatin, what is the hazard ratio for overall
+    survival comparing patients whose first-line regimen also contained bevacizumab
+    versus patients whose first-line regimen did not, with risk-set adjustment for
+    delayed cohort entry (left-truncating at the NGS testing date)? (Treat 'bladder
+    cancer' here as cancer of any histology arising from either the urinary bladder
+    or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q79a8ab4a
   category: 4
   text: Among patients in the bladder cancer cohort diagnosed at Stage II or III,
@@ -219,11 +227,13 @@ questions:
     urinary tract / renal pelvis.)
 - id: bladder_1.2-Qb3f6a73a
   category: 5
-  text: Among regimens containing cisplatin administered for bladder cancer, what
-    is the median PFS-I from regimen start in months with 95% CI? Assume any clinical-trial
-    regimen did not contain cisplatin. (Treat 'bladder cancer' here as cancer of any
-    histology arising from either the urinary bladder or the upper urinary tract /
-    renal pelvis.)
+  text: Among patients with urothelial carcinoma of the bladder or upper urinary tract,
+    considering each patient's first cisplatin-containing regimen started on or after
+    the onset of metastatic disease (Stage IV at diagnosis, or a distant metastasis
+    after a Stage I–III diagnosis), what is the median PFS-I from the start of that
+    regimen, in months with 95% CI, with risk-set adjustment for delayed cohort entry
+    (left-truncating at the NGS testing date)? Assume any clinical-trial regimen did
+    not contain cisplatin.
 - id: bladder_1.2-Qb863d3fc
   category: 8
   text: Among patients with Stage IV bladder cancer at diagnosis whose first-line

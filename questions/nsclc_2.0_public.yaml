@@ -1,5 +1,5 @@
 cohort: nsclc_2.0_public
-generated_at: '2026-11-25T23:36:20.474490Z'
+generated_at: '2026-11-26T15:29:46.486492Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -93,7 +93,9 @@ questions:
     regimen.
 - id: nsclc_2.0_public-Q37e5456c
   category: 4
-  text: What proportion of patients with NSCLC ever received immunotherapy?
+  text: What proportion of patients with NSCLC diagnosed at Stage IV ever received
+    an immune checkpoint inhibitor for their NSCLC? (Include all NSCLC histologic
+    subtypes in the cohort.)
 - id: nsclc_2.0_public-Q475ddf54
   category: 8
   text: Among patients with non-squamous NSCLC (as the data source's curated histology
@@ -149,8 +151,8 @@ questions:
     in the cohort.)
 - id: nsclc_2.0_public-Q65fdb736
   category: 3
-  text: What is the prevalence of MET alterations among patients with NSCLC whose
-    tumors were sequenced?
+  text: What is the prevalence of MET amplification among patients with NSCLC whose
+    tumors were sequenced? (Include all NSCLC histologic subtypes in the cohort.)
 - id: nsclc_2.0_public-Q6e39b7f6
   category: 4
   text: Among patients with Stage IV NSCLC at diagnosis (including all NSCLC histologic
@@ -158,10 +160,12 @@ questions:
     any clinical-trial regimen did not contain a PD-1 inhibitor.
 - id: nsclc_2.0_public-Q7840687a
   category: 7
-  text: Among patients with Stage IV NSCLC at diagnosis who received first-line carboplatin
-    plus pemetrexed (with or without bevacizumab) as their first regimen for the cancer,
-    what is the median PFS-I from regimen start in months with 95% CI? Assume any
-    clinical-trial regimen did not contain carboplatin, pemetrexed, or bevacizumab.
+  text: Among patients with NSCLC diagnosed at Stage IV whose first-line regimen contained
+    carboplatin and pemetrexed, what is the median progression-free survival from
+    the start of that regimen, with progression as documented in imaging reports,
+    in months with 95% CI, with risk-set adjustment for delayed cohort entry (left-truncating
+    at the NGS testing date)? Assume any clinical-trial regimen did not contain carboplatin
+    or pemetrexed. (Include all NSCLC histologic subtypes in the cohort.)
 - id: nsclc_2.0_public-Q7a93af46
   category: 3
   text: In the NSCLC cohort, what proportion of patients had a tumor with a TP53 mutation?
@@ -210,11 +214,16 @@ questions:
     regimen.
 - id: nsclc_2.0_public-Qd11e3eb6
   category: 6
-  text: Is there an association between TP53 co-mutation and overall survival in patients
-    with an EGFR-mutant lung adenocarcinoma?
+  text: Among patients whose NSCLC was classified as adenocarcinoma in the data source's
+    curated histology categories and whose first sequenced specimen was EGFR-mutant,
+    what is the hazard ratio for overall survival from diagnosis comparing patients
+    whose first sequenced specimen also had a TP53 mutation versus patients whose
+    first sequenced specimen did not, with risk-set adjustment for delayed cohort
+    entry (left-truncating at the NGS testing date)?
 - id: nsclc_2.0_public-Qd5c0a58a
   category: 1
-  text: What proportion of older patients in the NSCLC cohort are non-Hispanic White?
+  text: What proportion of patients aged 75 or older at NSCLC diagnosis are categorized
+    as Non-Hispanic White? (Use the data source's combined race/ethnicity categories.)
 - id: nsclc_2.0_public-Qe746d620
   category: 6
   text: Among patients with Stage IV NSCLC at diagnosis (including all NSCLC histologic

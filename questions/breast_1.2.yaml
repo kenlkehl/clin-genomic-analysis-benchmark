@@ -1,5 +1,5 @@
 cohort: breast_1.2
-generated_at: '2026-11-25T02:18:34.785162Z'
+generated_at: '2026-11-26T15:29:46.486492Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -55,7 +55,10 @@ questions:
     primary race; treat 'Other' and 'Unknown' as not non-white; ignore Hispanic ethnicity)?
 - id: breast_1.2-Q080cf2ee
   category: 2
-  text: What proportion of patients with breast cancer had metastatic disease?
+  text: What proportion of patients in the breast cancer cohort were diagnosed with
+    metastatic breast cancer, counting patients whose metastatic status is unknown
+    as not metastatic? (Restrict to cancers the data source records as breast cancer
+    rather than breast sarcoma.)
 - id: breast_1.2-Q086f5cc2
   category: 7
   text: Among patients with HR-positive, HER2-negative metastatic breast cancer (Stage
@@ -68,8 +71,10 @@ questions:
     clinical-trial regimen?
 - id: breast_1.2-Q0c55cde3
   category: 5
-  text: Among regimens containing palbociclib for HR+/HER2- breast cancer, what is
-    the median PFS-M from regimen start with 95% confidence interval?
+  text: Among palbociclib-containing regimens given for breast cancer that was HR-positive
+    and HER2-negative at diagnosis, what is the median PFS-M from regimen start, in
+    months with 95% CI, with risk-set adjustment for delayed cohort entry (left-truncating
+    at the NGS testing date)? Assume any clinical-trial regimen did not contain palbociclib.
 - id: breast_1.2-Q1e90a8f5
   category: 3
   text: Among patients whose breast cancer was triple-negative at diagnosis, what
@@ -92,13 +97,24 @@ questions:
     aromatase inhibitor.
 - id: breast_1.2-Q336fdccc
   category: 7
-  text: Does adding pertuzumab to trastuzumab-based therapy improve outcomes in HER2-positive
-    metastatic breast cancer?
+  text: Among patients with HER2-positive breast cancer that was Stage IV at diagnosis,
+    whose first-line regimen contained trastuzumab (not a trastuzumab antibody–drug
+    conjugate), what is the hazard ratio for overall survival comparing patients whose
+    first-line regimen also contained pertuzumab versus patients whose first-line
+    regimen did not, with risk-set adjustment for delayed cohort entry (left-truncating
+    at the NGS testing date), excluding patients whose first-line regimen was a clinical-trial
+    regimen? (Count each BPC regimen record as a regimen, including separately curated
+    LHRH-agonist records.)
 - id: breast_1.2-Q3710dfd2
   category: 8
-  text: Is there an interaction between ESR1 mutation status and choice of treatment
-    (fulvestrant vs aromatase inhibitor) with respect to outcome among patients with
-    HR+/HER2- metastatic breast cancer who got one of those two treatments?
+  text: Among patients with breast cancer that was Stage IV, HR-positive, and HER2-negative
+    at diagnosis whose first-line regimen contained fulvestrant or an aromatase inhibitor
+    (anastrozole, letrozole, or exemestane) but not both, what is the p-value for
+    the interaction between ESR1 mutation status (any non-synonymous ESR1 mutation)
+    and first-line fulvestrant (versus aromatase inhibitor) in a Cox model for overall
+    survival with both main effects, with risk-set adjustment for delayed cohort entry
+    (left-truncating at the NGS testing date)? Assume any clinical-trial regimen did
+    not contain fulvestrant, anastrozole, letrozole, or exemestane.
 - id: breast_1.2-Q3ad97efc
   category: 8
   text: Among patients with metastatic breast cancer (Stage IV at diagnosis, or a
@@ -140,20 +156,29 @@ questions:
     cohort entry (left-truncating at NGS testing date), excluding clinical-trial regimens.
 - id: breast_1.2-Q56286dd2
   category: 5
-  text: In the breast cancer cohort, do patients on CDK4/6 inhibitor regimens do better
-    than those on endocrine monotherapy?
+  text: Among patients with breast cancer that was Stage IV, HR-positive, and HER2-negative
+    at diagnosis, what is the hazard ratio for time from the start of the first-line
+    regimen to the start of the next regimen for the cancer, comparing patients whose
+    first-line regimen contained a CDK4/6 inhibitor and either an aromatase inhibitor
+    (anastrozole, letrozole, or exemestane) or fulvestrant versus patients whose first-line
+    regimen was a single-agent aromatase inhibitor or single-agent fulvestrant, with
+    patients alive without a next regimen censored at their last known alive date,
+    and with risk-set adjustment for delayed cohort entry (left-truncating at the
+    NGS testing date)? Assume any clinical-trial regimen did not contain a CDK4/6
+    inhibitor, an aromatase inhibitor, or fulvestrant.
 - id: breast_1.2-Q563e05a4
   category: 3
   text: Across all sequenced specimens in the breast cancer cohort, how many specimens
     have a high-level ERBB2 amplification?
 - id: breast_1.2-Q7e4e718d
   category: 6
-  text: Among patients with HER2-positive (HER2+/HR+ or HER2+/HR-) breast cancer receiving
-    a trastuzumab-containing regimen as first-line therapy for metastatic disease,
-    what is the hazard ratio for PFS-I-or-M comparing patients with a tumor harboring
-    ERBB2 high-level amplification versus those without, restricted to patients whose
-    sequencing panel covers ERBB2, with risk-set adjustment for delayed cohort entry
-    (left-truncating at NGS testing date)?
+  text: Among patients whose breast cancer was HER2-positive at diagnosis and who
+    received a trastuzumab-containing regimen (not a trastuzumab antibody–drug conjugate)
+    as first-line therapy for metastatic disease, what is the hazard ratio for PFS-I-or-M
+    from the start of that regimen comparing patients whose first sequenced specimen
+    showed a high-level ERBB2 amplification versus patients whose first sequenced
+    specimen did not, with risk-set adjustment for delayed cohort entry (left-truncating
+    at the NGS testing date)? Assume any clinical-trial regimen did not contain trastuzumab.
 - id: breast_1.2-Q81d813d0
   category: 4
   text: What proportion of patients in the breast cohort ever received a regimen containing
@@ -194,7 +219,8 @@ questions:
 - id: breast_1.2-Qd26c20c2
   category: 2
   text: What proportion of patients in the breast cancer cohort were diagnosed at
-    an advanced stage?
+    Stage III or IV? (Restrict to cancers the data source records as breast cancer
+    rather than breast sarcoma.)
 - id: breast_1.2-Qd3de1f04
   category: 6
   text: Among patients whose breast cancer was Stage IV and triple-negative at diagnosis,
