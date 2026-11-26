@@ -189,6 +189,11 @@ def test_failed_assess_call_is_a_wrong_question(tmp_path, monkeypatch):
     md = (run_dir / "scorecard.md").read_text()
     assert "- Exact match, gold-clear questions: 50.0% (1/2)" in md
     assert "- Exact match, all questions: 66.7% (2/3)" in md
+    # Pooled verdicts: the failed clear call is four wrong "clear" verdicts.
+    assert card["overall"]["verdicts"]["balanced_accuracy"] == pytest.approx((1 + 7 / 11) / 2)
+    assert ("- Balanced verdict accuracy (diagnostic; all component verdicts pooled): 81.8% "
+            "— the mean of gold-unclear verdicts flagged, 100.0% (1/1), and gold-clear "
+            "verdicts not flagged, 63.6% (7/11)") in md
     assert "| cohort_1 | 3 | **75.0%** | 50.0% (1/2) | 100.0% (1/1) |" in md
 
 
@@ -376,6 +381,7 @@ def test_always_clear_model_scores_half_on_assess():
     assert overall.exact_match.overall == 0.75
     assert overall.score == 0.5
     assert overall.mean_component_balanced_accuracy == 0.5
+    assert overall.verdicts.balanced_accuracy == 0.5
 
 
 def test_assess_score_is_mean_of_clear_and_ambiguous_exact_match():
@@ -410,6 +416,10 @@ def test_one_wrong_component_makes_the_question_wrong():
     assert overall.score == 0.5
     # The per-component view still credits three of the four verdicts.
     assert overall.mean_component_balanced_accuracy == pytest.approx(0.875)
+    # Pooled, the one missed verdict is half of the two gold-unclear verdicts.
+    assert (overall.verdicts.tp, overall.verdicts.fn) == (1, 1)
+    assert (overall.verdicts.tn, overall.verdicts.fp) == (6, 0)
+    assert overall.verdicts.balanced_accuracy == pytest.approx(0.75)
 
 
 def test_failed_call_is_never_an_exact_match():

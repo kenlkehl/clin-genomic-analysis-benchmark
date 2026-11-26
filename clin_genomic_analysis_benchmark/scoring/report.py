@@ -117,6 +117,11 @@ def _assess_markdown(card: Scorecard, lines: list[str]) -> None:
                  f"{_fraction(em.correct_ambiguous, em.n_ambiguous)}")
     lines.append(f"- Exact match, all questions: "
                  f"{_fraction(em.correct_clear + em.correct_ambiguous, em.n)}")
+    v = overall.verdicts
+    lines.append(f"- Balanced verdict accuracy (diagnostic; all component verdicts pooled): "
+                 f"{pct(v.balanced_accuracy)} — the mean of gold-unclear verdicts flagged, "
+                 f"{_fraction(v.tp, v.tp + v.fn)}, and gold-clear verdicts not flagged, "
+                 f"{_fraction(v.tn, v.tn + v.fp)}")
     lines.append(f"- Previous metric (scorer v4: mean over the four components of balanced "
                  f"accuracy): {pct(overall.mean_component_balanced_accuracy)}")
     lines.append("")
@@ -241,6 +246,7 @@ def _agg_to_dict(agg: Agg) -> dict:
     if isinstance(agg, AssessAgg):
         d["components"] = {cid: tally.to_dict() for cid, tally in agg.components.items()}
         d["exact_match"] = agg.exact_match.to_dict()
+        d["verdicts"] = agg.verdicts.to_dict()
         for cat_id, cat in agg.by_category.items():
             d["by_category"][cat_id]["exact_match"] = cat.exact_match.to_dict()
     return d
@@ -280,6 +286,7 @@ def to_dict(card: Scorecard) -> dict[str, Any]:
             "score": "balanced_exact_match",     # mean of gold-clear and gold-ambiguous rates
             "missing_verdict": "counted_wrong",
             "previous_score": "mean_component_balanced_accuracy",   # the scorer-v4 headline
+            "verdict_diagnostic": "verdicts.balanced_accuracy",   # all verdicts pooled
         }
     else:
         out["analyze_scoring"] = {

@@ -188,6 +188,10 @@ class AssessAgg:
     by_category: dict[int, AssessCategoryAgg] = field(default_factory=dict)
     # The scorer-v4 headline, kept so runs scored before v5 stay comparable.
     mean_component_balanced_accuracy: Optional[float] = None
+    # Every component verdict pooled into one confusion table; diagnostic.
+    # Its balanced accuracy weights components by how many verdicts of each
+    # gold class they hold, unlike the per-component mean above.
+    verdicts: ComponentTally = field(default_factory=ComponentTally)
     score: Optional[float] = None     # balanced exact match
 
 
@@ -217,6 +221,9 @@ def _finalise_assess(agg: AssessAgg) -> AssessAgg:
     bal = [t.balanced_accuracy for t in agg.components.values()
            if t.balanced_accuracy is not None]
     agg.mean_component_balanced_accuracy = sum(bal) / len(bal) if bal else None
+    agg.verdicts = ComponentTally(
+        **{k: sum(getattr(t, k) for t in agg.components.values())
+           for k in ("tp", "fn", "tn", "fp", "n_missing")})
     agg.score = agg.exact_match.balanced
     for cat in agg.by_category.values():
         cat.score = cat.exact_match.balanced
