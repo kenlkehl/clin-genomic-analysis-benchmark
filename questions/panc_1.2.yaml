@@ -1,5 +1,5 @@
 cohort: panc_1.2
-generated_at: '2026-11-24T00:40:31.583438Z'
+generated_at: '2026-11-26T00:50:24.283757Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -15,9 +15,9 @@ questions:
     not contain FOLFIRINOX components.
 - id: panc_1.2-Q172ee2a2
   category: 4
-  text: Among patients with pancreatic cancer, what is the median number of distinct
-    cancer-directed regimens received per patient for that cancer? (Count each BPC
-    regimen record for that cancer; patients with no regimen count as zero.)
+  text: Among patients with pancreatic cancer, what is the median number of cancer-directed
+    regimens received per patient for that cancer, counting each course of treatment
+    as a separate regimen even when it repeats earlier drugs?
 - id: panc_1.2-Q194c29b3
   category: 8
   text: Among patients with Stage IV pancreatic cancer at diagnosis whose first regimen
@@ -36,9 +36,7 @@ questions:
 - id: panc_1.2-Q2c4f4dfc
   category: 3
   text: Among patients with pancreatic cancer, what proportion had a tumor with at
-    least one non-synonymous (missense, nonsense, frameshift, splice-site, in-frame
-    indel) somatic mutation in KRAS, restricted to patients whose tumors were sequenced
-    on a panel that covers KRAS?
+    least one non-synonymous KRAS mutation?
 - id: panc_1.2-Q3e3dd614
   category: 3
   text: Among patients in the pancreatic cancer cohort whose tumors were sequenced
@@ -71,22 +69,24 @@ questions:
     entry (left-truncating at NGS testing date)?
 - id: panc_1.2-Qb15f7097
   category: 1
-  text: How many unique patients in the pancreatic cancer cohort are categorized as
-    Non-Hispanic Black? (Use the data source's combined race/ethnicity categories.)
+  text: How many patients diagnosed with pancreatic cancer at age 65 or older are
+    categorized as Non-Hispanic Black? (Use the data source's combined race/ethnicity
+    categories.)
 - id: panc_1.2-Qb4b6232d
   category: 1
   text: What is the median age at diagnosis of pancreatic cancer (in years) for patients
     in the pancreatic cancer cohort?
 - id: panc_1.2-Qbb928d2b
   category: 1
-  text: Among all unique patients in the pancreatic cancer cohort, what proportion
-    are female?
+  text: Among patients who received a regimen containing gemcitabine and nab-paclitaxel
+    for their pancreatic cancer, what proportion are female? Assume any clinical-trial
+    regimen did not contain gemcitabine or nab-paclitaxel.
 - id: panc_1.2-Qc216f271
   category: 2
-  text: Among patients with pancreatic cancer diagnosed at Stage IV, what proportion
-    had liver metastases documented at diagnosis, as the data source records sites
-    of distant metastasis at diagnosis (patients with no recorded site counted as
-    without liver metastases)?
+  text: Among patients with pancreatic cancer diagnosed at Stage IV whose tumor had
+    at least one non-synonymous KRAS mutation, what proportion had liver metastases
+    documented at diagnosis, as the data source records sites of distant metastasis
+    at diagnosis (patients with no recorded site counted as without liver metastases)?
 - id: panc_1.2-Q0457f850
   category: 8
   text: In patients with metastatic pancreatic cancer (de novo Stage IV or recurrent/relapsed
@@ -153,9 +153,9 @@ questions:
     or whose pre-resection regimen was a clinical-trial regimen.
 - id: panc_1.2-Q5dce70df
   category: 4
-  text: Among patients with pancreatic cancer, what proportion ever received a regimen
-    containing gemcitabine (as a single agent or in combination) for their pancreatic
-    cancer; assume any clinical-trial regimen did not contain gemcitabine?
+  text: Among patients with pancreatic cancer, what proportion ever received gemcitabine
+    for their pancreatic cancer? Assume any clinical-trial regimen did not contain
+    gemcitabine.
 - id: panc_1.2-Q66c1eccc
   category: 2
   text: What proportion of patients in the pancreatic cancer cohort were diagnosed
@@ -238,11 +238,11 @@ questions:
     regimen?
 - id: panc_1.2-Qc051a9e5
   category: 5
-  text: Among patients with Stage IV pancreatic cancer at diagnosis whose first regimen
-    for the cancer contained fluorouracil, irinotecan, and oxaliplatin (FOLFIRINOX,
-    with or without leucovorin), what is the median overall survival in months from
-    regimen start with 95% CI, with risk-set adjustment for delayed cohort entry (left-truncating
-    at NGS testing date); assume any clinical-trial regimen did not contain FOLFIRINOX
+  text: Among patients with pancreatic cancer diagnosed at Stage IV whose first-line
+    regimen contained fluorouracil, irinotecan, and oxaliplatin (FOLFIRINOX, with
+    or without leucovorin), what is the median overall survival in months with 95%
+    CI, with risk-set adjustment for delayed cohort entry (left-truncating at the
+    NGS testing date); assume any clinical-trial regimen did not contain FOLFIRINOX
     drugs?
 - id: panc_1.2-Qddc3b21c
   category: 6
