@@ -1,5 +1,5 @@
 cohort: bladder_1.2
-generated_at: '2026-11-26T15:29:46.486492Z'
+generated_at: '2026-11-26T16:43:50.460028Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -10,9 +10,9 @@ questions:
     from either the urinary bladder or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q227dd2ba
   category: 5
-  text: Among patients with Stage IV bladder cancer at diagnosis, what is the median
+  text: Among patients diagnosed with Stage IV bladder cancer, what is the median
     overall survival from diagnosis in months with 95% CI, with risk-set adjustment
-    for delayed cohort entry (left-truncating at NGS testing date)? (Treat 'bladder
+    for delayed cohort entry (left-truncating at the NGS testing date)? (Treat 'bladder
     cancer' here as cancer of any histology arising from either the urinary bladder
     or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q45ea5e4b
@@ -23,7 +23,8 @@ questions:
     tract / renal pelvis.)
 - id: bladder_1.2-Q6f9dd68e
   category: 1
-  text: What proportion of patients in the bladder cancer cohort are female?
+  text: What proportion of patients aged 70 or older in the bladder cancer cohort
+    are female?
 - id: bladder_1.2-Qa0d4f13f
   category: 6
   text: Among patients with bladder cancer whose first sequenced specimen was tested
@@ -148,9 +149,10 @@ questions:
     arising from either the urinary bladder or the upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q5543a926
   category: 4
-  text: What is the median number of cancer-directed regimens received per patient
-    in the bladder cancer cohort? (Count each BPC regimen record for that cancer;
-    patients with no regimen count as zero.)
+  text: What is the median number of distinct cancer-directed regimens received per
+    patient for bladder cancer in the bladder cancer cohort? (Treat 'bladder cancer'
+    here as cancer of any histology arising from either the urinary bladder or the
+    upper urinary tract / renal pelvis.)
 - id: bladder_1.2-Q7381798f
   category: 7
   text: Among patients with bladder cancer diagnosed at Stage IV whose first-line

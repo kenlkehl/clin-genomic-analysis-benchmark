@@ -1,12 +1,12 @@
 cohort: crc_2.0_public
-generated_at: '2026-11-26T15:29:46.486492Z'
+generated_at: '2026-11-26T16:43:50.460028Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
 - id: crc_2.0_public-Q0050520a
   category: 1
   text: What is the median age, in years, at colorectal cancer diagnosis among patients
-    diagnosed at Stage I–III, with 95% CI?
+    diagnosed at Stage I–III who had no prior cancer, with 95% CI?
 - id: crc_2.0_public-Q0356f2dd
   category: 3
   text: Among patients in the CRC cohort who have at least one sequenced sample for
@@ -122,17 +122,16 @@ questions:
     testing date)?
 - id: crc_2.0_public-Q6ecab01d
   category: 4
-  text: How many patients with colorectal cancer ever received an immune checkpoint
-    inhibitor for their colorectal cancer? Assume any clinical-trial regimen did not
-    contain an immune checkpoint inhibitor.
+  text: How many patients with colorectal cancer received an immune checkpoint inhibitor
+    as part of their second-line regimen for colorectal cancer? Assume any clinical-trial
+    regimen did not contain an immune checkpoint inhibitor.
 - id: crc_2.0_public-Q7e62c001
   category: 7
   text: Among patients with Stage IV colorectal cancer at diagnosis, what is the hazard
     ratio for OS comparing patients whose first-line regimen contained bevacizumab
-    versus patients whose first-line regimen contained none of bevacizumab, ramucirumab,
-    ziv-aflibercept, cetuximab, or panitumumab, with risk-set adjustment for delayed
-    cohort entry (left-truncating at the NGS testing date), excluding patients whose
-    first-line regimen was a clinical-trial regimen?
+    versus patients whose first-line regimen contained no biologic agent, with risk-set
+    adjustment for delayed cohort entry (left-truncating at the NGS testing date),
+    excluding patients whose first-line regimen was a clinical-trial regimen?
 - id: crc_2.0_public-Q83ea787b
   category: 3
   text: Among samples sequenced on the MSK-IMPACT468 panel, what proportion show a
@@ -173,8 +172,8 @@ questions:
   category: 4
   text: Among patients with Stage IV colorectal cancer at diagnosis (any colorectal
     subtype counts — colon, rectal/rectosigmoid, or unspecified colorectal primary),
-    what proportion ever received a regimen containing bevacizumab? Assume any clinical
-    trial regimen did not contain bevacizumab.
+    what proportion ever received an anti-angiogenic agent? Assume any clinical-trial
+    regimen did not contain an anti-angiogenic agent.
 - id: crc_2.0_public-Qcd864369
   category: 5
   text: Among patients with colorectal cancer diagnosed at Stage IV whose tumors were
@@ -205,9 +204,7 @@ questions:
 - id: crc_2.0_public-Qebbb9c36
   category: 5
   text: Among patients with Stage IV colorectal cancer at diagnosis, what is the median
-    overall survival from the onset of advanced disease, in months with 95% CI, with
-    risk-set adjustment for delayed cohort entry (left-truncating at the NGS testing
-    date)?
+    overall survival from the onset of advanced disease, in months with 95% CI?
 - id: crc_2.0_public-Qfbabddc6
   category: 8
   text: Among patients whose colon cancer (excluding rectal and rectosigmoid primaries)

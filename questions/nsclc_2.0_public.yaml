@@ -1,5 +1,5 @@
 cohort: nsclc_2.0_public
-generated_at: '2026-11-26T15:29:46.486492Z'
+generated_at: '2026-11-26T16:43:50.460028Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -10,8 +10,7 @@ questions:
     metastases? (Include all NSCLC histologic subtypes in the cohort.)
 - id: nsclc_2.0_public-Q566b7369
   category: 1
-  text: What proportion of patients in the non-small cell lung cancer cohort are female?
-    (Include all key cancer-type subtypes, i.e. all NSCLC histologic subtypes.)
+  text: What proportion of patients with squamous cell NSCLC are female?
 - id: nsclc_2.0_public-Q75afd228
   category: 2
   text: Among patients recorded at NSCLC diagnosis as never having used cigarettes
@@ -36,9 +35,10 @@ questions:
     EGFR mutation?
 - id: nsclc_2.0_public-Qda260301
   category: 4
-  text: How many distinct patients in the non-small-cell lung cancer cohort ever received
-    osimertinib in any regimen? Assume any clinical-trial regimen did not contain
-    osimertinib. (Include all NSCLC histologic subtypes.)
+  text: How many patients in the non-small-cell lung cancer cohort received osimertinib
+    after progressing on erlotinib or gefitinib? Assume any clinical-trial regimen
+    did not contain osimertinib, erlotinib, or gefitinib. (Include all NSCLC histologic
+    subtypes.)
 - id: nsclc_2.0_public-Q04488571
   category: 1
   text: Among patients whose NSCLC had at least one non-synonymous EGFR mutation,
@@ -139,11 +139,12 @@ questions:
     G12C mutation? (Include all NSCLC histologic subtypes in the cohort.)
 - id: nsclc_2.0_public-Q5b41f709
   category: 5
-  text: Among patients with NSCLC diagnosed at Stage IV whose first-line regimen was
-    single-agent pembrolizumab, what is the median OS in months (with 95% CI), with
-    risk-set adjustment for delayed cohort entry (left-truncating at the NGS testing
-    date); assume any clinical-trial regimen did not contain pembrolizumab? (Include
-    all NSCLC histologic subtypes in the cohort.)
+  text: Among patients with NSCLC diagnosed at Stage IV with a PD-L1 tumor proportion
+    score of 50% or higher whose first-line regimen was single-agent pembrolizumab,
+    what is the median OS in months (with 95% CI), with risk-set adjustment for delayed
+    cohort entry (left-truncating at the NGS testing date); assume any clinical-trial
+    regimen did not contain pembrolizumab? (Include all NSCLC histologic subtypes
+    in the cohort.)
 - id: nsclc_2.0_public-Q643ab252
   category: 3
   text: Across all sequenced tumor specimens in the NSCLC cohort, how many specimens
@@ -156,8 +157,8 @@ questions:
 - id: nsclc_2.0_public-Q6e39b7f6
   category: 4
   text: Among patients with Stage IV NSCLC at diagnosis (including all NSCLC histologic
-    subtypes), what proportion ever received a single-agent PD-1 inhibitor? Assume
-    any clinical-trial regimen did not contain a PD-1 inhibitor.
+    subtypes), what proportion ever received a single-agent PD-1 inhibitor as maintenance
+    therapy? Assume any clinical-trial regimen did not contain a PD-1 inhibitor.
 - id: nsclc_2.0_public-Q7840687a
   category: 7
   text: Among patients with NSCLC diagnosed at Stage IV whose first-line regimen contained

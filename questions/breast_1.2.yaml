@@ -1,5 +1,5 @@
 cohort: breast_1.2
-generated_at: '2026-11-26T15:29:46.486492Z'
+generated_at: '2026-11-26T16:43:50.460028Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -31,12 +31,12 @@ questions:
     fluorouracil, methotrexate, vinorelbine, vinblastine, vincristine, eribulin, ixabepilone,
     etoposide, irinotecan, topotecan, bleomycin, mitomycin, mitoxantrone, carmustine,
     pemetrexed, trabectedin, dacarbazine, temozolomide, or sacituzumab govitecan)
-    and no immune checkpoint inhibitor, what is the log-rank p-value comparing overall
-    survival from regimen start between regimens containing carboplatin, cisplatin,
-    or oxaliplatin and regimens containing none of them, with risk-set adjustment
-    for delayed cohort entry (left-truncating at NGS testing date), excluding patients
-    whose first regimen was a clinical-trial regimen? (Restrict to cancers the data
-    source records as breast cancer rather than breast sarcoma.)
+    and no immune checkpoint inhibitor, what is the p-value comparing overall survival
+    from regimen start between regimens containing carboplatin, cisplatin, or oxaliplatin
+    and regimens containing none of them, with risk-set adjustment for delayed cohort
+    entry (left-truncating at NGS testing date), excluding patients whose first regimen
+    was a clinical-trial regimen? (Restrict to cancers the data source records as
+    breast cancer rather than breast sarcoma.)
 - id: breast_1.2-Qa6ab70c3
   category: 5
   text: Among patients with Stage IV breast cancer at diagnosis, what is the median
@@ -225,12 +225,12 @@ questions:
   category: 6
   text: Among patients whose breast cancer was Stage IV and triple-negative at diagnosis,
     what is the hazard ratio (95% CI) for overall survival from the onset of advanced
-    disease comparing patients whose first sequenced specimen had any non-synonymous
-    BRCA1 or BRCA2 mutation versus patients whose first sequenced specimen had neither,
-    restricted to patients whose first sequenced specimen was on a panel covering
-    both genes, with risk-set adjustment for delayed cohort entry (left-truncating
-    at the NGS testing date)? (Restrict to cancers the data source records as breast
-    cancer rather than breast sarcoma.)
+    disease comparing patients whose first sequenced specimen was BRCA1- or BRCA2-mutant
+    versus patients whose first sequenced specimen was not, restricted to patients
+    whose first sequenced specimen was on a panel covering both genes, with risk-set
+    adjustment for delayed cohort entry (left-truncating at the NGS testing date)?
+    (Restrict to cancers the data source records as breast cancer rather than breast
+    sarcoma.)
 - id: breast_1.2-Qd65985df
   category: 3
   text: Among patients whose breast cancer was HR-positive and HER2-negative at diagnosis
@@ -246,9 +246,8 @@ questions:
 - id: breast_1.2-Qdce7a7df
   category: 1
   text: Among patients whose breast cancer was triple-negative at diagnosis, what
-    proportion have primary race recorded as Black (patients with unknown race counted
-    as not Black)? (Restrict to cancers the data source records as breast cancer rather
-    than breast sarcoma.)
+    proportion are Black (patients with unknown race counted as not Black)? (Restrict
+    to cancers the data source records as breast cancer rather than breast sarcoma.)
 - id: breast_1.2-Qde59dc35
   category: 3
   text: Among samples in the breast cancer cohort sequenced on the MSK-IMPACT468 panel,

@@ -1,5 +1,5 @@
 cohort: prostate_1.2
-generated_at: '2026-11-26T15:29:46.486492Z'
+generated_at: '2026-11-26T16:43:50.460028Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -14,8 +14,9 @@ questions:
     8 / ISUP grade group 4–5; missing/unknown grade treated as not high-grade)?
 - id: prostate_1.2-Q31783668
   category: 4
-  text: How many patients in the prostate cancer cohort ever received a taxane for
-    their prostate cancer? Assume any clinical-trial regimen did not contain a taxane.
+  text: How many patients in the prostate cancer cohort received a taxane for their
+    prostate cancer within 4 months after first starting androgen deprivation therapy?
+    Assume any clinical-trial regimen did not contain a taxane.
 - id: prostate_1.2-Q5a10607f
   category: 5
   text: Among patients with prostate cancer who received any cancer-directed regimen
@@ -24,9 +25,10 @@ questions:
     for delayed cohort entry (left-truncating at the NGS testing date)?
 - id: prostate_1.2-Q62b56bf7
   category: 3
-  text: Among patients in the prostate cohort whose sequenced prostate cancer specimen
-    was tested on an assay panel that covers SPOP, what proportion had a prostate
-    cancer tumor with at least one non-synonymous SPOP mutation?
+  text: Among patients whose prostate cancer was localized at diagnosis and whose
+    sequenced prostate cancer specimen was tested on an assay panel that covers SPOP,
+    what proportion had a prostate cancer tumor with at least one non-synonymous SPOP
+    mutation?
 - id: prostate_1.2-Q6b869850
   category: 4
   text: Among patients with prostate cancer diagnosed at Stage IV, what proportion
@@ -35,12 +37,11 @@ questions:
 - id: prostate_1.2-Q8e4139df
   category: 2
   text: Among patients in the prostate cancer cohort, how many had ISUP grade group
-    5 prostate cancer on initial clinical assessment at diagnosis?
+    5 prostate cancer?
 - id: prostate_1.2-Q94868401
   category: 1
   text: Among patients who ever received enzalutamide for their prostate cancer, how
-    many are categorized as Non-Hispanic Black? Assume any clinical-trial regimen
-    did not contain enzalutamide. (Use the data source's combined race/ethnicity categories.)
+    many are Black? Assume any clinical-trial regimen did not contain enzalutamide.
 - id: prostate_1.2-Q95d5d662
   category: 6
   text: In the prostate cancer cohort, what is the Cox PH hazard ratio (95% CI, p-value)
@@ -74,9 +75,8 @@ questions:
     did not contain docetaxel.
 - id: prostate_1.2-Qb89136fd
   category: 4
-  text: What is the median number of cancer-directed regimens administered for prostate
-    cancer to patients in the prostate cancer cohort, counting each course of treatment
-    as a separate regimen even when it repeats earlier drugs?
+  text: What is the median number of lines of therapy received for prostate cancer
+    by patients in the prostate cancer cohort?
 - id: prostate_1.2-Qd8337668
   category: 3
   text: Among patients whose prostate cancer was ISUP grade group 4–5 on initial clinical
@@ -104,6 +104,7 @@ questions:
     advanced disease, comparing patients whose first sequenced specimen had any non-synonymous
     TP53 mutation versus patients whose first sequenced specimen did not, restricted
     to patients whose first sequenced specimen was on a panel that includes TP53,
+    in a Cox model stratified by stage at diagnosis (Stage I–III versus Stage IV),
     with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
     date)?
 - id: prostate_1.2-Q08118ced
@@ -144,7 +145,6 @@ questions:
   category: 1
   text: Among patients diagnosed with prostate cancer before age 55, what is the most
     common race/ethnicity group? (Use the data source's combined race/ethnicity categories.)
-    Patients with unknown race/ethnicity are excluded.
 - id: prostate_1.2-Q7ea929fe
   category: 8
   text: Among patients whose prostate cancer was Stage IV at diagnosis and later became

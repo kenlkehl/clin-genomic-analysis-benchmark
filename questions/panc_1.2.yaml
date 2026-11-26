@@ -1,5 +1,5 @@
 cohort: panc_1.2
-generated_at: '2026-11-26T15:29:46.486492Z'
+generated_at: '2026-11-26T16:43:50.460028Z'
 model: claude-opus-4-8@vertex
 schema_version: '2'
 questions:
@@ -9,10 +9,9 @@ questions:
     diagnosis, excluding patients whose stage at diagnosis is unknown?
 - id: panc_1.2-Q0bc79ded
   category: 4
-  text: What proportion of patients with pancreatic cancer received FOLFIRINOX (a
-    regimen containing fluorouracil, irinotecan, and oxaliplatin, with or without
-    leucovorin) at any point during follow-up? Assume any clinical-trial regimen did
-    not contain FOLFIRINOX components.
+  text: What proportion of patients with pancreatic cancer received FOLFIRINOX at
+    any point during follow-up? Assume any clinical-trial regimen did not contain
+    FOLFIRINOX components.
 - id: panc_1.2-Q172ee2a2
   category: 4
   text: Among patients with pancreatic cancer, what is the median number of cancer-directed
@@ -24,9 +23,9 @@ questions:
     for the cancer contained either fluorouracil, irinotecan, and oxaliplatin (FOLFIRINOX,
     with or without leucovorin) or gemcitabine and nab-paclitaxel (other drugs allowed;
     a regimen fitting both counts in neither), does KRAS mutation status (any non-synonymous
-    KRAS mutation on the first sequenced specimen) modify the treatment effect on
-    overall survival from regimen start, as assessed by the interaction term p-value
-    in a Cox proportional hazards model with both main effects, with risk-set adjustment
+    KRAS mutation on any sequenced specimen) modify the treatment effect on overall
+    survival from regimen start, as assessed by the interaction term p-value in a
+    Cox proportional hazards model with both main effects, with risk-set adjustment
     for delayed cohort entry (left-truncating at NGS testing date), excluding patients
     whose first regimen was a clinical-trial regimen?
 - id: panc_1.2-Q27072f96
@@ -44,21 +43,21 @@ questions:
     somatic TP53 mutation?
 - id: panc_1.2-Q9b4402d0
   category: 5
-  text: Among patients with Stage IV pancreatic cancer at diagnosis, what is the median
-    overall survival from diagnosis in months with 95% CI, with risk-set adjustment
-    for delayed cohort entry (left-truncating at NGS testing date)?
+  text: Among patients with Stage IV pancreatic cancer at diagnosis who received any
+    cancer-directed therapy, what is the median overall survival from diagnosis in
+    months with 95% CI, with risk-set adjustment for delayed cohort entry (left-truncating
+    at the NGS testing date)?
 - id: panc_1.2-Qadb92d64
   category: 7
   text: Among patients whose pancreatic cancer was Stage I–III at diagnosis, who had
     a surgical resection of the pancreas within 6 months of diagnosis, and who survived
-    to 6 months after diagnosis, what is the hazard ratio for overall survival (measured
-    from a 6-month post-diagnosis landmark) comparing those whose first regimen for
-    the cancer contained gemcitabine and started on or after the surgery date within
-    that 6-month window versus those who received no regimen within 6 months of diagnosis,
-    with risk-set adjustment for delayed cohort entry (left-truncating at NGS testing
-    date)? Patients whose first regimen within 6 months started before surgery or
-    contained no gemcitabine are excluded; assume any clinical-trial regimen did not
-    contain gemcitabine.
+    to 6 months after diagnosis, what is the hazard ratio for overall survival comparing
+    those whose first regimen for the cancer contained gemcitabine and started on
+    or after the surgery date within that 6-month window versus those who received
+    no regimen within 6 months of diagnosis, with risk-set adjustment for delayed
+    cohort entry (left-truncating at NGS testing date)? Patients whose first regimen
+    within 6 months started before surgery or contained no gemcitabine are excluded;
+    assume any clinical-trial regimen did not contain gemcitabine.
 - id: panc_1.2-Qae74ea33
   category: 6
   text: Among patients with Stage IV pancreatic cancer at diagnosis, what is the Cox
@@ -105,11 +104,11 @@ questions:
     for the cancer contained fluorouracil, irinotecan, and oxaliplatin (FOLFIRINOX,
     with or without leucovorin), what is the hazard ratio (with 95% CI) for overall
     survival from regimen start comparing patients whose first sequenced specimen
-    had a CDKN2A homozygous deletion (copy-number value −2) versus no CDKN2A deletion
-    (shallow loss counts as neither), restricted to patients whose first sequenced
-    specimen has copy-number results on a panel covering CDKN2A, with risk-set adjustment
-    for delayed cohort entry (left-truncating at NGS testing date), excluding patients
-    whose first regimen was a clinical-trial regimen?
+    had a CDKN2A homozygous deletion (copy-number value −2) versus no CDKN2A deletion,
+    restricted to patients whose first sequenced specimen has copy-number results
+    on a panel covering CDKN2A, with risk-set adjustment for delayed cohort entry
+    (left-truncating at NGS testing date), excluding patients whose first regimen
+    was a clinical-trial regimen?
 - id: panc_1.2-Q2c0d889e
   category: 6
   text: Among patients whose pancreatic cancer was Stage I–III at diagnosis and later
