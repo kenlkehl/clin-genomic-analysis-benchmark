@@ -5,7 +5,8 @@
 #             gold-clear questions and on gold-ambiguous questions, where a
 #             question counts only if all four component verdicts
 #             (denominator, outcome, covariates, analysis_plan) are right.
-#             Balancing scores "always clear" and "always unclear" at 50%.
+#             Balancing scores "always clear" at 50%, whatever the bank's
+#             mix of clear and ambiguous questions.
 #   analyze — 2/1/0 points per gold-unambiguous question, over 2 per question.
 #
 # subtask_weights: how `clingen-bench combine` weights one assess run and one
