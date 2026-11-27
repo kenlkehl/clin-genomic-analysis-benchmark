@@ -143,6 +143,20 @@ _SAFE_AGENT_ENV_VARS = (
     "VERTEX_GEMINI_MAX_RETRY_SLEEP_SECONDS",
     "VERTEX_GEMINI_MAX_OUTPUT_TOKENS",
     "VERTEX_GEMINI_MAX_REQUESTS",
+    "DATABRICKS_CLAUDE_ENDPOINT",
+    "DATABRICKS_CLAUDE_REQUEST_TIMEOUT_SECONDS",
+    "DATABRICKS_CLAUDE_MAX_REQUESTS",
+    "DATABRICKS_CONFIG_PROFILE",
+    "VERTEX_RESPONSES_PROJECT_ID",
+    "VERTEX_RESPONSES_LOCATION",
+    "VERTEX_RESPONSES_MODEL",
+    "VERTEX_RESPONSES_REASONING_EFFORT",
+    "VERTEX_RESPONSES_REQUEST_TIMEOUT_SECONDS",
+    "VERTEX_RESPONSES_MAX_RETRIES",
+    "VERTEX_RESPONSES_RETRY_BASE_SECONDS",
+    "VERTEX_RESPONSES_MAX_RETRY_SLEEP_SECONDS",
+    "VERTEX_RESPONSES_MAX_REQUESTS",
+    "VERTEX_RESPONSES_CONTEXT_WINDOW",
     "AGY_MODEL",
     "AGY_EFFORT",
     "AGY_AGENT",
@@ -528,6 +542,87 @@ def _claude_vertex_gemini_provenance(
     }
 
 
+def databricks_canonical_model(endpoint: str) -> str | None:
+    """The Claude model ID at the end of a Databricks gateway endpoint name."""
+    match = re.search(r"(claude-[a-z]+-\d+(?:-\d+)?)$", endpoint.strip())
+    return match.group(1) if match else None
+
+
+def _claude_databricks_provenance(
+    *, agent_cmd: str, env: Mapping[str, str]
+) -> dict | None:
+    """Resolve the Claude Code adapter for Claude on the Databricks AI Gateway."""
+    adapter = "claude_code_databricks"
+    if f"adapters/{adapter}/" not in agent_cmd:
+        return None
+    endpoint = env.get("DATABRICKS_CLAUDE_ENDPOINT", "").strip()
+    explicit_model = env.get("CLINGEN_CLAUDE_MODEL", "").strip()
+    model = explicit_model or (databricks_canonical_model(endpoint) if endpoint else None)
+    effort = env.get("CLINGEN_CLAUDE_EFFORT", "").strip().lower()
+    profile = env.get("DATABRICKS_CONFIG_PROFILE", "").strip()
+    return {
+        "adapter": adapter,
+        "client": "claude_code",
+        "provider": "databricks_ai_gateway",
+        "provider_source": "adapter",
+        "model": model,
+        "model_source": (
+            "CLINGEN_CLAUDE_MODEL" if explicit_model
+            else "DATABRICKS_CLAUDE_ENDPOINT" if model else "unresolved_required_setting"
+        ),
+        "gateway_endpoint": endpoint or None,
+        "gateway_endpoint_source": (
+            "DATABRICKS_CLAUDE_ENDPOINT" if endpoint else "unresolved_required_setting"
+        ),
+        "effort_level": effort or None,
+        "effort_supported": True,
+        "effort_source": "CLINGEN_CLAUDE_EFFORT" if effort else "claude_code_default",
+        "databricks_profile": profile or "unity-gateway",
+        "wire_api": "anthropic_messages",
+        "api_translation": "none_pass_through",
+        "authentication_boundary": "trusted_local_bridge",
+    }
+
+
+def _codex_vertex_responses_provenance(
+    *, agent_cmd: str, env: Mapping[str, str]
+) -> dict | None:
+    """Resolve the Codex adapter for a partner model on Vertex's Responses API."""
+    adapter = "codex_vertex_responses"
+    if f"adapters/{adapter}/" not in agent_cmd:
+        return None
+    model = env.get("VERTEX_RESPONSES_MODEL", "").strip()
+    project = env.get("VERTEX_RESPONSES_PROJECT_ID", "").strip()
+    location = env.get("VERTEX_RESPONSES_LOCATION", "").strip()
+    effort = env.get("VERTEX_RESPONSES_REASONING_EFFORT", "").strip().lower()
+    return {
+        "adapter": adapter,
+        "client": "codex",
+        "provider": "google_vertex_responses",
+        "provider_source": "adapter",
+        "model": model or None,
+        "model_source": (
+            "VERTEX_RESPONSES_MODEL" if model else "unresolved_required_setting"
+        ),
+        "effort_level": effort or None,
+        "effort_supported": True,
+        "effort_source": (
+            "VERTEX_RESPONSES_REASONING_EFFORT" if effort else "model_default"
+        ),
+        "project_id": project or None,
+        "project_id_source": (
+            "VERTEX_RESPONSES_PROJECT_ID" if project else "unresolved_required_setting"
+        ),
+        "region": location or "global",
+        "region_source": (
+            "VERTEX_RESPONSES_LOCATION" if location else "adapter_default"
+        ),
+        "wire_api": "responses",
+        "api_translation": "none_pass_through",
+        "authentication_boundary": "trusted_local_bridge",
+    }
+
+
 def _claude_vertex_gemma_provenance(
     *, agent_cmd: str, env: Mapping[str, str]
 ) -> dict | None:
@@ -807,6 +902,27 @@ def _agent_provenance(agent_cmd: str, environ: Optional[dict[str, str]] = None) 
             if name.startswith("VLLM_")
         }
         provenance.update(claude_vllm)
+        return provenance
+
+    claude_databricks = _claude_databricks_provenance(agent_cmd=agent_cmd, env=env)
+    if claude_databricks is not None:
+        provenance["environment"] = {
+            name: value
+            for name, value in explicit_env.items()
+            if name.startswith("DATABRICKS_")
+            or name in {"CLINGEN_CLAUDE_MODEL", "CLINGEN_CLAUDE_EFFORT"}
+        }
+        provenance.update(claude_databricks)
+        return provenance
+
+    vertex_responses = _codex_vertex_responses_provenance(agent_cmd=agent_cmd, env=env)
+    if vertex_responses is not None:
+        provenance["environment"] = {
+            name: value
+            for name, value in explicit_env.items()
+            if name.startswith("VERTEX_RESPONSES_")
+        }
+        provenance.update(vertex_responses)
         return provenance
 
     claude_vertex_gemma = _claude_vertex_gemma_provenance(agent_cmd=agent_cmd, env=env)

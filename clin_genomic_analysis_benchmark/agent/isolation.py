@@ -61,12 +61,14 @@ class SandboxedCommand:
 _SUPPORTED_ADAPTER_DIRS = {
     "antigravity_gemini",
     "claude_code",
+    "claude_code_databricks",
     "claude_code_vertex_gemini",
     "claude_code_vertex_gemma4",
     "claude_code_vllm_gemma4",
     "codex_gpt",
     "codex_vllm_gemma4",
     "codex_vertex_gemma4_26b",
+    "codex_vertex_responses",
     "codex_qwen_3.6_35B_A3B_GGUF_Unsloth_q4bitxl",
     "codex_qwen_3.6_27B_GGUF_Unsloth_q4bitxl",
     "opencode_azure_gpt",
@@ -149,6 +151,8 @@ _PASSTHROUGH_ENV = {
     "VERTEX_GEMMA_BRIDGE_KEY",
     # Equivalent ephemeral token for the local-vLLM Gemma compatibility bridge.
     "VLLM_GEMMA_BRIDGE_KEY",
+    # Ephemeral token for the trusted localhost Vertex Responses pass-through bridge.
+    "VERTEX_RESPONSES_BRIDGE_KEY",
     # OpenCode receives only this ephemeral local-bridge key and inline config.
     "OPENCODE_VLLM_BRIDGE_KEY",
     "OPENCODE_AZURE_BRIDGE_KEY",
@@ -587,7 +591,7 @@ def _seed_home(home: Path, kind: str, source_env: Mapping[str, str]) -> None:
         _seed_minimal_codex_home(home, source_env)
     elif kind == "claude":
         _seed_claude_home(home, source_env)
-    elif kind in {"claude_vllm", "claude_vertex"}:
+    elif kind in {"claude_vllm", "claude_vertex", "claude_bridge"}:
         _seed_claude_vllm_home(home)
     elif kind == "antigravity":
         _seed_antigravity_home(home, source_env)
@@ -857,6 +861,7 @@ def export_agent_session_audit(
         "claude": (Path(".claude/projects"), Path(".claude/debug")),
         "claude_vllm": (Path(".claude/projects"), Path(".claude/debug")),
         "claude_vertex": (Path(".claude/projects"), Path(".claude/debug")),
+        "claude_bridge": (Path(".claude/projects"), Path(".claude/debug")),
         "codex": (Path(".codex/sessions"), Path(".codex/log")),
         "codex_qwen": (Path(".codex/sessions"), Path(".codex/log")),
         "codex_vllm": (Path(".codex/sessions"), Path(".codex/log")),
